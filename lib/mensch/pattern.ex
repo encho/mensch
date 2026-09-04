@@ -36,28 +36,46 @@ defmodule Mensch.Pattern do
     update_track(pattern, track_id, &Track.apply_program_tap(&1, step, selected_type))
   end
 
-  @doc "Locks `key` on the trig at `step` on `track_id`."
-  @spec lock_param(t(), pos_integer(), pos_integer(), atom()) :: t()
-  def lock_param(%__MODULE__{} = pattern, track_id, step, key) do
-    update_track(pattern, track_id, &Track.lock_param(&1, step, key))
+  @doc "Locks `key` within `namespace` on the trig at `step` on `track_id`."
+  @spec lock_param(t(), pos_integer(), pos_integer(), Trig.lock_namespace(), atom()) :: t()
+  def lock_param(%__MODULE__{} = pattern, track_id, step, namespace, key) do
+    update_track(pattern, track_id, &Track.lock_param(&1, step, namespace, key))
   end
 
-  @doc "Clears the lock for `key` on the trig at `step` on `track_id`."
-  @spec clear_lock(t(), pos_integer(), pos_integer(), atom()) :: t()
-  def clear_lock(%__MODULE__{} = pattern, track_id, step, key) do
-    update_track(pattern, track_id, &Track.clear_lock(&1, step, key))
+  @doc "Clears the lock for `key` within `namespace` on the trig at `step` on `track_id`."
+  @spec clear_lock(t(), pos_integer(), pos_integer(), Trig.lock_namespace(), atom()) :: t()
+  def clear_lock(%__MODULE__{} = pattern, track_id, step, namespace, key) do
+    update_track(pattern, track_id, &Track.clear_lock(&1, step, namespace, key))
   end
 
-  @doc "Nudges the locked value for `key` on the trig at `step` on `track_id`."
-  @spec adjust_lock(t(), pos_integer(), pos_integer(), atom(), :up | :down) :: t()
-  def adjust_lock(%__MODULE__{} = pattern, track_id, step, key, direction) do
-    update_track(pattern, track_id, &Track.adjust_lock(&1, step, key, direction))
+  @doc "Nudges the locked value for `key` within `namespace` on the trig at `step` on `track_id`."
+  @spec adjust_lock(t(), pos_integer(), pos_integer(), Trig.lock_namespace(), atom(), :up | :down) ::
+          t()
+  def adjust_lock(%__MODULE__{} = pattern, track_id, step, namespace, key, direction) do
+    update_track(pattern, track_id, &Track.adjust_lock(&1, step, namespace, key, direction))
   end
 
   @doc "Sets the active track for this pattern."
   @spec set_active_track(t(), pos_integer()) :: t()
   def set_active_track(%__MODULE__{} = pattern, track_id) do
     %{pattern | active_track_id: track_id}
+  end
+
+  @doc "Toggles the active track's Harmonic Context between Scale and Chromatic mode."
+  @spec toggle_track_harmonic_mode(t()) :: t()
+  def toggle_track_harmonic_mode(%__MODULE__{active_track_id: track_id} = pattern) do
+    update_track(pattern, track_id, &Track.toggle_harmonic_mode/1)
+  end
+
+  @doc "Nudges a Track default (not a Trig lock) up or down on the active track."
+  @spec adjust_track_default(t(), Trig.lock_namespace(), atom(), :up | :down) :: t()
+  def adjust_track_default(
+        %__MODULE__{active_track_id: track_id} = pattern,
+        namespace,
+        key,
+        direction
+      ) do
+    update_track(pattern, track_id, &Track.adjust_default(&1, namespace, key, direction))
   end
 
   defp update_track(%__MODULE__{tracks: tracks} = pattern, track_id, fun) do

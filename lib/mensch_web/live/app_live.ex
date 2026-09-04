@@ -12,6 +12,12 @@ defmodule MenschWeb.AppLive do
     * Trig Edit Mode — edit parameter locks for one specific trig
       (long-press a trig to enter it).
 
+  Every track has a Harmonic Context (Scale or Chromatic mode) and a
+  SINGLE_NOTE Machine. Both provide Track-level defaults that a Trig may
+  override via namespaced parameter locks (`harmonic_context` or
+  `machine`); this distinction is preserved end-to-end, from the domain
+  model through to the LiveView events below.
+
   State is held in-memory on the socket for now; there is no persistence
   or shared state across connections yet.
   """
@@ -21,17 +27,35 @@ defmodule MenschWeb.AppLive do
   alias Mensch.App
   alias Mensch.Pattern
   alias Mensch.Project
+  alias Mensch.Scale
   alias Mensch.Track
+  alias Mensch.Trig
   alias Mensch.UIState
 
-  @param_keys %{
-    "expression" => :expression,
-    "pressure" => :pressure,
+  @harmonic_keys %{"root" => :root, "scale" => :scale}
+
+  @machine_keys %{
+    "pitch" => :pitch,
+    "octave" => :octave,
     "duration" => :duration,
+    "velocity" => :velocity,
+    "pressure" => :pressure,
+    "aftertouch" => :aftertouch,
+    "pitch_offset" => :pitch_offset,
     "release" => :release
   }
 
-  @param_order [:expression, :pressure, :duration, :release]
+  @harmonic_order [:root, :scale]
+  @machine_order [
+    :pitch,
+    :octave,
+    :duration,
+    :velocity,
+    :pressure,
+    :aftertouch,
+    :pitch_offset,
+    :release
+  ]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -108,25 +132,39 @@ defmodule MenschWeb.AppLive do
   end
 
   @impl true
-  def handle_event("lock_param", %{"key" => key}, socket) do
+  def handle_event("lock_param", %{"namespace" => namespace, "key" => key}, socket) do
     %{app: app, ui: ui} = socket.assigns
-    app = App.lock_param(app, ui.selected_track_id, ui.selected_step, parse_key(key))
+    ns = parse_namespace(namespace)
+    app = App.lock_param(app, ui.selected_track_id, ui.selected_step, ns, parse_key(ns, key))
     {:noreply, assign_app(socket, app)}
   end
 
   @impl true
-  def handle_event("clear_lock", %{"key" => key}, socket) do
+  def handle_event("clear_lock", %{"namespace" => namespace, "key" => key}, socket) do
     %{app: app, ui: ui} = socket.assigns
-    app = App.clear_lock(app, ui.selected_track_id, ui.selected_step, parse_key(key))
+    ns = parse_namespace(namespace)
+    app = App.clear_lock(app, ui.selected_track_id, ui.selected_step, ns, parse_key(ns, key))
     {:noreply, assign_app(socket, app)}
   end
 
   @impl true
-  def handle_event("adjust_lock", %{"key" => key, "direction" => direction}, socket) do
+  def handle_event(
+        "adjust_lock",
+        %{"namespace" => namespace, "key" => key, "direction" => direction},
+        socket
+      ) do
     %{app: app, ui: ui} = socket.assigns
+    ns = parse_namespace(namespace)
 
     app =
-      App.adjust_lock(app, ui.selected_track_id, ui.selected_step, parse_key(key), parse_direction(direction))
+      App.adjust_lock(
+        app,
+        ui.selected_track_id,
+        ui.selected_step,
+        ns,
+        parse_key(ns, key),
+        parse_direction(direction)
+      )
 
     {:noreply, assign_app(socket, app)}
   end
@@ -134,6 +172,30 @@ defmodule MenschWeb.AppLive do
   @impl true
   def handle_event("select_track", %{"track_id" => track_id}, socket) do
     app = App.set_active_track(socket.assigns.app, String.to_integer(track_id))
+    {:noreply, assign_app(socket, app)}
+  end
+
+  @impl true
+  def handle_event("toggle_harmonic_mode", _params, socket) do
+    {:noreply, assign_app(socket, App.toggle_track_harmonic_mode(socket.assigns.app))}
+  end
+
+  @impl true
+  def handle_event(
+        "adjust_track_param",
+        %{"namespace" => namespace, "key" => key, "direction" => direction},
+        socket
+      ) do
+    ns = parse_namespace(namespace)
+
+    app =
+      App.adjust_track_default(
+        socket.assigns.app,
+        ns,
+        parse_key(ns, key),
+        parse_direction(direction)
+      )
+
     {:noreply, assign_app(socket, app)}
   end
 
@@ -147,7 +209,11 @@ defmodule MenschWeb.AppLive do
   defp parse_direction("up"), do: :up
   defp parse_direction("down"), do: :down
 
-  defp parse_key(key), do: Map.fetch!(@param_keys, key)
+  defp parse_namespace("harmonic_context"), do: :harmonic_context
+  defp parse_namespace("machine"), do: :machine
+
+  defp parse_key(:harmonic_context, key), do: Map.fetch!(@harmonic_keys, key)
+  defp parse_key(:machine, key), do: Map.fetch!(@machine_keys, key)
 
   defp landmark?(step), do: step in [1, 5, 9, 13]
 
@@ -169,7 +235,8 @@ defmodule MenschWeb.AppLive do
         "border-red-400 bg-red-600 text-red-50 shadow-[0_0_8px_-1px_rgba(248,113,113,0.5)]",
       trig.type == :lock &&
         "border-amber-300 bg-amber-500 text-neutral-950 shadow-[0_0_8px_-1px_rgba(252,211,77,0.5)]",
-      is_nil(trig.type) && "border-neutral-800 bg-neutral-800/80 text-neutral-600 hover:border-neutral-700",
+      is_nil(trig.type) &&
+        "border-neutral-800 bg-neutral-800/80 text-neutral-600 hover:border-neutral-700",
       selected? && "ring-2 ring-neutral-50 ring-offset-2 ring-offset-neutral-900",
       landmark?(trig.step) && "p-1"
     ]
@@ -188,35 +255,79 @@ defmodule MenschWeb.AppLive do
   defp trig_type_label(:lock), do: "Lock Trig"
   defp trig_type_label(nil), do: "Empty"
 
-  defp label_for(:expression), do: "Expression"
-  defp label_for(:pressure), do: "Pressure"
-  defp label_for(:duration), do: "Duration"
-  defp label_for(:release), do: "Release"
+  defp harmonic_label(:root), do: "Root"
+  defp harmonic_label(:scale), do: "Scale"
 
-  defp format_value(key, value) when key in [:expression, :pressure] do
-    "#{round(value * 100)}%"
+  defp machine_label(:pitch, :scale), do: "Degree"
+  defp machine_label(:pitch, :chromatic), do: "Note"
+  defp machine_label(:octave, _mode), do: "Octave"
+  defp machine_label(:duration, _mode), do: "Duration"
+  defp machine_label(:velocity, _mode), do: "Velocity"
+  defp machine_label(:pressure, _mode), do: "Pressure"
+  defp machine_label(:aftertouch, _mode), do: "Aftertouch"
+  defp machine_label(:pitch_offset, _mode), do: "Pitch Offset"
+  defp machine_label(:release, _mode), do: "Release"
+
+  defp format_scale(scale), do: scale |> Atom.to_string() |> String.capitalize()
+
+  defp format_harmonic_value(:root, root), do: Scale.label(root)
+  defp format_harmonic_value(:scale, scale), do: format_scale(scale)
+
+  defp format_machine_value(:pitch, {:degree, degree}), do: Integer.to_string(degree)
+  defp format_machine_value(:pitch, {:note, note_class}), do: Scale.label(note_class)
+  defp format_machine_value(:octave, octave), do: Integer.to_string(octave)
+  defp format_machine_value(:velocity, velocity), do: Integer.to_string(velocity)
+
+  defp format_machine_value(key, value) when key in [:pressure, :aftertouch],
+    do: "#{round(value * 100)}%"
+
+  defp format_machine_value(:pitch_offset, value) do
+    sign = if value >= 0, do: "+", else: ""
+    "#{sign}#{round(value * 100)}%"
   end
 
-  defp format_value(key, {:beats, beats}) when key in [:duration, :release] do
-    "#{format_beats(beats)} beats"
-  end
+  defp format_machine_value(key, {:beats, beats}) when key in [:duration, :release],
+    do: "#{format_beats(beats)} beats"
 
   defp format_beats(n) when is_integer(n), do: Integer.to_string(n)
 
   defp format_beats(n) when is_float(n) do
-    if n == Float.round(n), do: n |> trunc() |> Integer.to_string(), else: :erlang.float_to_binary(n, decimals: 2)
+    if n == Float.round(n),
+      do: n |> trunc() |> Integer.to_string(),
+      else: :erlang.float_to_binary(n, decimals: 2)
   end
 
-  defp param_rows(track, step) do
-    effective = Track.effective_params(track, step)
+  defp harmonic_rows(track, step) do
+    effective = Track.effective_harmonic_context(track, step)
     trig = Track.trig_at(track, step)
 
-    Enum.map(@param_order, fn key ->
+    if effective.mode == :scale do
+      Enum.map(@harmonic_order, fn key ->
+        %{
+          namespace: :harmonic_context,
+          key: key,
+          label: harmonic_label(key),
+          value: format_harmonic_value(key, Map.fetch!(effective, key)),
+          locked: Trig.locked?(trig, :harmonic_context, key)
+        }
+      end)
+    else
+      []
+    end
+  end
+
+  defp machine_rows(track, step) do
+    harmonic = Track.effective_harmonic_context(track, step)
+    effective = Track.effective_machine(track, step)
+    trig = Track.trig_at(track, step)
+
+    Enum.map(@machine_order, fn key ->
       %{
+        namespace: :machine,
         key: key,
-        label: label_for(key),
-        value: format_value(key, Map.fetch!(effective, key)),
-        locked: Map.has_key?(trig.locks, key)
+        label: machine_label(key, harmonic.mode),
+        value: format_machine_value(key, Map.fetch!(effective, key)),
+        locked: Trig.locked?(trig, :machine, key)
       }
     end)
   end
@@ -231,7 +342,10 @@ defmodule MenschWeb.AppLive do
         assign(assigns,
           edit_track: track,
           edit_trig: trig,
-          edit_rows: param_rows(track, assigns.ui.selected_step)
+          edit_harmonic_rows: harmonic_rows(track, assigns.ui.selected_step),
+          edit_machine_rows: machine_rows(track, assigns.ui.selected_step),
+          edit_resolved_note:
+            trig.type == :note && Track.resolved_note(track, assigns.ui.selected_step)
         )
       else
         assigns
@@ -274,10 +388,17 @@ defmodule MenschWeb.AppLive do
                     "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
                 ]}
               >
-                <.level_label kind="Track" name={track.name} active={track.id == @pattern.active_track_id} />
+                <.level_label
+                  kind="Track"
+                  name={track.name}
+                  active={track.id == @pattern.active_track_id}
+                />
 
                 <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-2">
-                  <div :for={group <- Enum.chunk_every(track.trigs, 4)} class="grid grid-cols-4 gap-2.5 sm:gap-2">
+                  <div
+                    :for={group <- Enum.chunk_every(track.trigs, 4)}
+                    class="grid grid-cols-4 gap-2.5 sm:gap-2"
+                  >
                     <div :for={trig <- group} class="relative">
                       <button
                         id={"trig-#{track.id}-#{trig.step}"}
@@ -299,10 +420,19 @@ defmodule MenschWeb.AppLive do
                     </div>
                   </div>
                 </div>
+
+                <.track_defaults_panel :if={track.id == @pattern.active_track_id} track={track} />
               </div>
             </div>
 
-            <.trig_edit_panel :if={@ui.mode == :edit_trig} track={@edit_track} trig={@edit_trig} rows={@edit_rows} />
+            <.trig_edit_panel
+              :if={@ui.mode == :edit_trig}
+              track={@edit_track}
+              trig={@edit_trig}
+              harmonic_rows={@edit_harmonic_rows}
+              machine_rows={@edit_machine_rows}
+              resolved_note={@edit_resolved_note}
+            />
           </section>
         </section>
       </div>
@@ -435,8 +565,7 @@ defmodule MenschWeb.AppLive do
           "h-1.5 w-1.5 rounded-full",
           @ui.func_active && "bg-amber-200 shadow-[0_0_6px_2px_rgba(252,211,77,0.9)]",
           !@ui.func_active && "bg-black/30"
-        ]} />
-        Func
+        ]} /> Func
       </button>
     </div>
     """
@@ -444,7 +573,9 @@ defmodule MenschWeb.AppLive do
 
   attr :track, :map, required: true
   attr :trig, :map, required: true
-  attr :rows, :list, required: true
+  attr :harmonic_rows, :list, required: true
+  attr :machine_rows, :list, required: true
+  attr :resolved_note, :any, default: nil
 
   defp trig_edit_panel(assigns) do
     ~H"""
@@ -456,6 +587,7 @@ defmodule MenschWeb.AppLive do
           </p>
           <p class="mt-0.5 text-xs text-neutral-400">
             {@track.name} · {trig_type_label(@trig.type)}
+            <span :if={@resolved_note} class="text-amber-400">=&gt; {@resolved_note}</span>
           </p>
         </div>
         <button
@@ -467,76 +599,224 @@ defmodule MenschWeb.AppLive do
         </button>
       </div>
 
-      <table class="w-full text-left text-xs">
-        <thead>
-          <tr class="text-[10px] uppercase tracking-widest text-neutral-600">
-            <th class="pb-2 font-normal">Parameter</th>
-            <th class="pb-2 font-normal">Value</th>
-            <th class="pb-2 font-normal">State</th>
-            <th class="pb-2 text-right font-normal">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr :for={row <- @rows} class="border-t border-neutral-800">
-            <td class="py-2 text-neutral-300">{row.label}</td>
-            <td class="py-2 text-neutral-100">{row.value}</td>
-            <td class="py-2">
-              <span class={[
-                "rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-widest",
-                row.locked && "bg-amber-500/20 text-amber-400",
-                !row.locked && "bg-neutral-800 text-neutral-500"
-              ]}>
-                <%= if row.locked do %>
-                  Locked
-                <% else %>
-                  Inherited
-                <% end %>
-              </span>
-            </td>
-            <td class="py-2 text-right">
+      <div :if={@harmonic_rows != []} class="mb-4">
+        <p class="mb-1 text-[10px] uppercase tracking-widest text-neutral-600">Harmonic</p>
+        <.lock_rows_table rows={@harmonic_rows} />
+      </div>
+
+      <div>
+        <p class="mb-1 text-[10px] uppercase tracking-widest text-neutral-600">
+          Machine · Single Note
+        </p>
+        <.lock_rows_table rows={@machine_rows} />
+      </div>
+    </div>
+    """
+  end
+
+  attr :rows, :list, required: true
+
+  defp lock_rows_table(assigns) do
+    ~H"""
+    <table class="w-full text-left text-xs">
+      <thead>
+        <tr class="text-[10px] uppercase tracking-widest text-neutral-600">
+          <th class="pb-2 font-normal">Parameter</th>
+          <th class="pb-2 font-normal">Value</th>
+          <th class="pb-2 font-normal">State</th>
+          <th class="pb-2 text-right font-normal">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={row <- @rows} class="border-t border-neutral-800">
+          <td class="py-2 text-neutral-300">{row.label}</td>
+          <td class="py-2 text-neutral-100">{row.value}</td>
+          <td class="py-2">
+            <span class={[
+              "rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-widest",
+              row.locked && "bg-amber-500/20 text-amber-400",
+              !row.locked && "bg-neutral-800 text-neutral-500"
+            ]}>
               <%= if row.locked do %>
-                <div class="inline-flex items-center gap-1">
-                  <button
-                    type="button"
-                    phx-click="adjust_lock"
-                    phx-value-key={row.key}
-                    phx-value-direction="down"
-                    class="h-6 w-6 rounded-sm border border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-                  >
-                    -
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="adjust_lock"
-                    phx-value-key={row.key}
-                    phx-value-direction="up"
-                    class="h-6 w-6 rounded-sm border border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="clear_lock"
-                    phx-value-key={row.key}
-                    class="rounded-sm border border-neutral-700 px-2 py-1 text-[10px] uppercase tracking-widest text-neutral-400 hover:bg-neutral-800"
-                  >
-                    Clear
-                  </button>
-                </div>
+                Locked
               <% else %>
+                Inherited
+              <% end %>
+            </span>
+          </td>
+          <td class="py-2 text-right">
+            <%= if row.locked do %>
+              <div class="inline-flex items-center gap-1">
                 <button
                   type="button"
-                  phx-click="lock_param"
+                  phx-click="adjust_lock"
+                  phx-value-namespace={row.namespace}
                   phx-value-key={row.key}
-                  class="rounded-sm border border-amber-500/50 px-2 py-1 text-[10px] uppercase tracking-widest text-amber-400 hover:bg-amber-500/10"
+                  phx-value-direction="down"
+                  class="h-6 w-6 rounded-sm border border-neutral-700 text-neutral-300 hover:bg-neutral-800"
                 >
-                  Lock
+                  -
                 </button>
-              <% end %>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <button
+                  type="button"
+                  phx-click="adjust_lock"
+                  phx-value-namespace={row.namespace}
+                  phx-value-key={row.key}
+                  phx-value-direction="up"
+                  class="h-6 w-6 rounded-sm border border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  phx-click="clear_lock"
+                  phx-value-namespace={row.namespace}
+                  phx-value-key={row.key}
+                  class="rounded-sm border border-neutral-700 px-2 py-1 text-[10px] uppercase tracking-widest text-neutral-400 hover:bg-neutral-800"
+                >
+                  Clear
+                </button>
+              </div>
+            <% else %>
+              <button
+                type="button"
+                phx-click="lock_param"
+                phx-value-namespace={row.namespace}
+                phx-value-key={row.key}
+                class="rounded-sm border border-amber-500/50 px-2 py-1 text-[10px] uppercase tracking-widest text-amber-400 hover:bg-amber-500/10"
+              >
+                Lock
+              </button>
+            <% end %>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    """
+  end
+
+  attr :track, :map, required: true
+
+  defp track_defaults_panel(assigns) do
+    ~H"""
+    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+      <div class="rounded-sm border border-neutral-800 bg-neutral-950/40 p-3">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-[10px] uppercase tracking-widest text-neutral-500">Harmonic</span>
+          <button
+            type="button"
+            phx-click="toggle_harmonic_mode"
+            class="rounded-sm border border-neutral-700 px-2 py-0.5 text-[10px] uppercase tracking-widest text-neutral-300 hover:bg-neutral-800"
+          >
+            {@track.harmonic_context.mode}
+          </button>
+        </div>
+
+        <div :if={@track.harmonic_context.mode == :scale} class="space-y-1.5">
+          <.default_row
+            label="Root"
+            value={Scale.label(@track.harmonic_context.root)}
+            namespace="harmonic_context"
+            param_key="root"
+          />
+          <.default_row
+            label="Scale"
+            value={format_scale(@track.harmonic_context.scale)}
+            namespace="harmonic_context"
+            param_key="scale"
+          />
+        </div>
+      </div>
+
+      <div class="rounded-sm border border-neutral-800 bg-neutral-950/40 p-3">
+        <span class="text-[10px] uppercase tracking-widest text-neutral-500">Machine · Single Note</span>
+        <div class="mt-2 space-y-1.5">
+          <.default_row
+            label={machine_label(:pitch, @track.harmonic_context.mode)}
+            value={format_machine_value(:pitch, @track.machine.pitch)}
+            namespace="machine"
+            param_key="pitch"
+          />
+          <.default_row
+            label="Octave"
+            value={format_machine_value(:octave, @track.machine.octave)}
+            namespace="machine"
+            param_key="octave"
+          />
+          <.default_row
+            label="Duration"
+            value={format_machine_value(:duration, @track.machine.duration)}
+            namespace="machine"
+            param_key="duration"
+          />
+          <.default_row
+            label="Velocity"
+            value={format_machine_value(:velocity, @track.machine.velocity)}
+            namespace="machine"
+            param_key="velocity"
+          />
+          <.default_row
+            label="Pressure"
+            value={format_machine_value(:pressure, @track.machine.pressure)}
+            namespace="machine"
+            param_key="pressure"
+          />
+          <.default_row
+            label="Aftertouch"
+            value={format_machine_value(:aftertouch, @track.machine.aftertouch)}
+            namespace="machine"
+            param_key="aftertouch"
+          />
+          <.default_row
+            label="Pitch Offset"
+            value={format_machine_value(:pitch_offset, @track.machine.pitch_offset)}
+            namespace="machine"
+            param_key="pitch_offset"
+          />
+          <.default_row
+            label="Release"
+            value={format_machine_value(:release, @track.machine.release)}
+            namespace="machine"
+            param_key="release"
+          />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :namespace, :string, required: true
+  attr :param_key, :string, required: true
+
+  defp default_row(assigns) do
+    ~H"""
+    <div class="flex items-center justify-between text-xs">
+      <span class="text-neutral-500">{@label}</span>
+      <div class="flex items-center gap-1.5">
+        <span class="w-16 text-right font-mono tabular-nums text-neutral-200">{@value}</span>
+        <button
+          type="button"
+          phx-click="adjust_track_param"
+          phx-value-namespace={@namespace}
+          phx-value-key={@param_key}
+          phx-value-direction="down"
+          class="h-5 w-5 rounded-sm border border-neutral-700 text-neutral-400 hover:bg-neutral-800"
+        >
+          -
+        </button>
+        <button
+          type="button"
+          phx-click="adjust_track_param"
+          phx-value-namespace={@namespace}
+          phx-value-key={@param_key}
+          phx-value-direction="up"
+          class="h-5 w-5 rounded-sm border border-neutral-700 text-neutral-400 hover:bg-neutral-800"
+        >
+          +
+        </button>
+      </div>
     </div>
     """
   end

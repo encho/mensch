@@ -42,7 +42,8 @@ defmodule Mensch.UIState do
 
   @doc "Toggles the latched FUNC modifier on/off."
   @spec toggle_func(t()) :: t()
-  def toggle_func(%__MODULE__{func_active: func_active} = ui), do: %{ui | func_active: !func_active}
+  def toggle_func(%__MODULE__{func_active: func_active} = ui),
+    do: %{ui | func_active: !func_active}
 
   @doc "The trig type a RECORD-mode tap would create, based on FUNC state."
   @spec trig_type(t()) :: trig_type()

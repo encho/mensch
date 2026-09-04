@@ -8,6 +8,7 @@ defmodule Mensch.App do
   """
 
   alias Mensch.Project
+  alias Mensch.Trig
 
   defstruct [:active_project_id, projects: []]
 
@@ -32,22 +33,26 @@ defmodule Mensch.App do
     update_active_project(app, &Project.apply_program_tap(&1, track_id, step, selected_type))
   end
 
-  @doc "Locks `key`, within the active project's active pattern."
-  @spec lock_param(t(), pos_integer(), pos_integer(), atom()) :: t()
-  def lock_param(%__MODULE__{} = app, track_id, step, key) do
-    update_active_project(app, &Project.lock_param(&1, track_id, step, key))
+  @doc "Locks `key` within `namespace`, within the active project's active pattern."
+  @spec lock_param(t(), pos_integer(), pos_integer(), Trig.lock_namespace(), atom()) :: t()
+  def lock_param(%__MODULE__{} = app, track_id, step, namespace, key) do
+    update_active_project(app, &Project.lock_param(&1, track_id, step, namespace, key))
   end
 
-  @doc "Clears the lock for `key`, within the active project's active pattern."
-  @spec clear_lock(t(), pos_integer(), pos_integer(), atom()) :: t()
-  def clear_lock(%__MODULE__{} = app, track_id, step, key) do
-    update_active_project(app, &Project.clear_lock(&1, track_id, step, key))
+  @doc "Clears the lock for `key` within `namespace`, within the active project's active pattern."
+  @spec clear_lock(t(), pos_integer(), pos_integer(), Trig.lock_namespace(), atom()) :: t()
+  def clear_lock(%__MODULE__{} = app, track_id, step, namespace, key) do
+    update_active_project(app, &Project.clear_lock(&1, track_id, step, namespace, key))
   end
 
   @doc "Nudges a locked value, within the active project's active pattern."
-  @spec adjust_lock(t(), pos_integer(), pos_integer(), atom(), :up | :down) :: t()
-  def adjust_lock(%__MODULE__{} = app, track_id, step, key, direction) do
-    update_active_project(app, &Project.adjust_lock(&1, track_id, step, key, direction))
+  @spec adjust_lock(t(), pos_integer(), pos_integer(), Trig.lock_namespace(), atom(), :up | :down) ::
+          t()
+  def adjust_lock(%__MODULE__{} = app, track_id, step, namespace, key, direction) do
+    update_active_project(
+      app,
+      &Project.adjust_lock(&1, track_id, step, namespace, key, direction)
+    )
   end
 
   @doc "Sets the active track, within the active project's active pattern."
@@ -56,7 +61,22 @@ defmodule Mensch.App do
     update_active_project(app, &Project.set_active_track(&1, track_id))
   end
 
-  defp update_active_project(%__MODULE__{projects: projects, active_project_id: active_id} = app, fun) do
+  @doc "Toggles the active track's Harmonic Context mode, within the active project's active pattern."
+  @spec toggle_track_harmonic_mode(t()) :: t()
+  def toggle_track_harmonic_mode(%__MODULE__{} = app) do
+    update_active_project(app, &Project.toggle_track_harmonic_mode/1)
+  end
+
+  @doc "Nudges a Track default on the active track, within the active project's active pattern."
+  @spec adjust_track_default(t(), Trig.lock_namespace(), atom(), :up | :down) :: t()
+  def adjust_track_default(%__MODULE__{} = app, namespace, key, direction) do
+    update_active_project(app, &Project.adjust_track_default(&1, namespace, key, direction))
+  end
+
+  defp update_active_project(
+         %__MODULE__{projects: projects, active_project_id: active_id} = app,
+         fun
+       ) do
     projects =
       Enum.map(projects, fn
         %Project{id: ^active_id} = project -> fun.(project)
