@@ -26,24 +26,40 @@ defmodule Mensch.App do
     Enum.find(projects, &(&1.id == id))
   end
 
-  @doc "Toggles the trig at `step` on `track_id`, within the active project's active pattern."
-  @spec toggle_trig(t(), pos_integer(), pos_integer()) :: t()
-  def toggle_trig(%__MODULE__{projects: projects, active_project_id: active_id} = app, track_id, step) do
-    projects =
-      Enum.map(projects, fn
-        %Project{id: ^active_id} = project -> Project.toggle_trig(project, track_id, step)
-        project -> project
-      end)
+  @doc "Applies a Program Mode tap, within the active project's active pattern."
+  @spec apply_program_tap(t(), pos_integer(), pos_integer(), atom()) :: t()
+  def apply_program_tap(%__MODULE__{} = app, track_id, step, selected_type) do
+    update_active_project(app, &Project.apply_program_tap(&1, track_id, step, selected_type))
+  end
 
-    %{app | projects: projects}
+  @doc "Locks `key`, within the active project's active pattern."
+  @spec lock_param(t(), pos_integer(), pos_integer(), atom()) :: t()
+  def lock_param(%__MODULE__{} = app, track_id, step, key) do
+    update_active_project(app, &Project.lock_param(&1, track_id, step, key))
+  end
+
+  @doc "Clears the lock for `key`, within the active project's active pattern."
+  @spec clear_lock(t(), pos_integer(), pos_integer(), atom()) :: t()
+  def clear_lock(%__MODULE__{} = app, track_id, step, key) do
+    update_active_project(app, &Project.clear_lock(&1, track_id, step, key))
+  end
+
+  @doc "Nudges a locked value, within the active project's active pattern."
+  @spec adjust_lock(t(), pos_integer(), pos_integer(), atom(), :up | :down) :: t()
+  def adjust_lock(%__MODULE__{} = app, track_id, step, key, direction) do
+    update_active_project(app, &Project.adjust_lock(&1, track_id, step, key, direction))
   end
 
   @doc "Sets the active track, within the active project's active pattern."
   @spec set_active_track(t(), pos_integer()) :: t()
-  def set_active_track(%__MODULE__{projects: projects, active_project_id: active_id} = app, track_id) do
+  def set_active_track(%__MODULE__{} = app, track_id) do
+    update_active_project(app, &Project.set_active_track(&1, track_id))
+  end
+
+  defp update_active_project(%__MODULE__{projects: projects, active_project_id: active_id} = app, fun) do
     projects =
       Enum.map(projects, fn
-        %Project{id: ^active_id} = project -> Project.set_active_track(project, track_id)
+        %Project{id: ^active_id} = project -> fun.(project)
         project -> project
       end)
 
