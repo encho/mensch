@@ -42,6 +42,10 @@ defmodule Mensch.Track do
     Enum.find(trigs, &(&1.step == step))
   end
 
+  @doc "Renames the track."
+  @spec rename(t(), String.t()) :: t()
+  def rename(%__MODULE__{} = track, name), do: %{track | name: name}
+
   @doc "Applies a Program Mode tap at `step` using the given selected trig type."
   @spec apply_program_tap(t(), pos_integer(), Trig.trig_type()) :: t()
   def apply_program_tap(%__MODULE__{} = track, step, selected_type) do

@@ -27,6 +27,24 @@ defmodule Mensch.App do
     Enum.find(projects, &(&1.id == id))
   end
 
+  @doc "Renames the active project."
+  @spec rename_project(t(), String.t()) :: t()
+  def rename_project(%__MODULE__{} = app, name) do
+    update_active_project(app, &Project.rename(&1, name))
+  end
+
+  @doc "Renames the active pattern, within the active project."
+  @spec rename_pattern(t(), String.t()) :: t()
+  def rename_pattern(%__MODULE__{} = app, name) do
+    update_active_project(app, &Project.rename_pattern(&1, name))
+  end
+
+  @doc "Renames the track with the given id, within the active project's active pattern."
+  @spec rename_track(t(), pos_integer(), String.t()) :: t()
+  def rename_track(%__MODULE__{} = app, track_id, name) do
+    update_active_project(app, &Project.rename_track(&1, track_id, name))
+  end
+
   @doc "Applies a Program Mode tap, within the active project's active pattern."
   @spec apply_program_tap(t(), pos_integer(), pos_integer(), atom()) :: t()
   def apply_program_tap(%__MODULE__{} = app, track_id, step, selected_type) do

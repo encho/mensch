@@ -30,6 +30,16 @@ defmodule Mensch.Pattern do
     Enum.find(tracks, &(&1.id == track_id))
   end
 
+  @doc "Renames the pattern."
+  @spec rename(t(), String.t()) :: t()
+  def rename(%__MODULE__{} = pattern, name), do: %{pattern | name: name}
+
+  @doc "Renames the track with the given id."
+  @spec rename_track(t(), pos_integer(), String.t()) :: t()
+  def rename_track(%__MODULE__{} = pattern, track_id, name) do
+    update_track(pattern, track_id, &Track.rename(&1, name))
+  end
+
   @doc "Applies a Program Mode tap at `step` on `track_id`."
   @spec apply_program_tap(t(), pos_integer(), pos_integer(), Trig.trig_type()) :: t()
   def apply_program_tap(%__MODULE__{} = pattern, track_id, step, selected_type) do

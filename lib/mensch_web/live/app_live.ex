@@ -176,6 +176,22 @@ defmodule MenschWeb.AppLive do
   end
 
   @impl true
+  def handle_event("rename_project", %{"name" => name}, socket) do
+    {:noreply, rename(socket, name, &App.rename_project(socket.assigns.app, &1))}
+  end
+
+  @impl true
+  def handle_event("rename_pattern", %{"name" => name}, socket) do
+    {:noreply, rename(socket, name, &App.rename_pattern(socket.assigns.app, &1))}
+  end
+
+  @impl true
+  def handle_event("rename_track", %{"name" => name, "track_id" => track_id}, socket) do
+    track_id = String.to_integer(track_id)
+    {:noreply, rename(socket, name, &App.rename_track(socket.assigns.app, track_id, &1))}
+  end
+
+  @impl true
   def handle_event("toggle_harmonic_mode", _params, socket) do
     {:noreply, assign_app(socket, App.toggle_track_harmonic_mode(socket.assigns.app))}
   end
@@ -204,6 +220,13 @@ defmodule MenschWeb.AppLive do
     pattern = Project.active_pattern(project)
 
     assign(socket, app: app, project: project, pattern: pattern)
+  end
+
+  defp rename(socket, name, fun) do
+    case String.trim(name) do
+      "" -> socket
+      trimmed -> assign_app(socket, fun.(trimmed))
+    end
   end
 
   defp parse_direction("up"), do: :up
@@ -356,7 +379,16 @@ defmodule MenschWeb.AppLive do
       <div class="min-h-screen bg-neutral-950 px-6 py-10 font-sans text-neutral-100">
         <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 class="text-2xl font-semibold tracking-[0.3em] text-neutral-50">MENSCH</h1>
+            <form phx-change="rename_project" phx-submit="rename_project">
+              <input
+                type="text"
+                name="name"
+                value={@project.name}
+                autocomplete="off"
+                phx-debounce="blur"
+                class="w-full min-w-0 border-b border-transparent bg-transparent text-2xl font-semibold uppercase tracking-[0.3em] text-neutral-50 focus:border-neutral-700 focus:outline-none"
+              />
+            </form>
             <p class="mt-1 text-[10px] uppercase tracking-widest text-neutral-600">App</p>
           </div>
 
@@ -365,14 +397,18 @@ defmodule MenschWeb.AppLive do
 
         <section class="rounded-md border border-neutral-800 bg-neutral-900/30 p-4">
           <div class="flex items-baseline justify-between">
-            <.level_label kind="Project" name={@project.name} />
+            <.level_label kind="Project" name={@project.name} rename_event="rename_project" />
             <span class="text-[10px] uppercase tracking-widest text-neutral-500">
               {@project.bpm} BPM
             </span>
           </div>
 
           <section class="mt-4 rounded-md border border-neutral-800 bg-neutral-900/50 p-4">
-            <.level_label kind="Pattern" name={@pattern.name} />
+            <.level_label
+              kind={"Pattern ##{@pattern.id}"}
+              name={@pattern.name}
+              rename_event="rename_pattern"
+            />
 
             <div class="mt-4 space-y-3">
               <div
@@ -389,9 +425,10 @@ defmodule MenschWeb.AppLive do
                 ]}
               >
                 <.level_label
-                  kind="Track"
+                  kind={"Track ##{pad_step(track.id)}"}
                   name={track.name}
-                  active={track.id == @pattern.active_track_id}
+                  rename_event="rename_track"
+                  track_id={track.id}
                 />
 
                 <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-2">
@@ -477,7 +514,8 @@ defmodule MenschWeb.AppLive do
 
   attr :kind, :string, required: true
   attr :name, :string, required: true
-  attr :active, :boolean, default: false
+  attr :rename_event, :string, required: true
+  attr :track_id, :integer, default: nil
 
   defp level_label(assigns) do
     ~H"""
@@ -485,16 +523,17 @@ defmodule MenschWeb.AppLive do
       <span class="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
         {@kind}
       </span>
-      <span class={[
-        "text-xs font-medium",
-        @active && "text-amber-400",
-        !@active && "text-neutral-200"
-      ]}>
-        {@name}
-      </span>
-      <span :if={@active} class="text-[9px] uppercase tracking-widest text-amber-500">
-        active
-      </span>
+      <form phx-change={@rename_event} phx-submit={@rename_event} class="min-w-0">
+        <input :if={@track_id} type="hidden" name="track_id" value={@track_id} />
+        <input
+          type="text"
+          name="name"
+          value={@name}
+          autocomplete="off"
+          phx-debounce="blur"
+          class="w-40 max-w-full truncate border-b border-transparent bg-transparent text-xs font-medium text-neutral-200 focus:border-neutral-600 focus:outline-none"
+        />
+      </form>
     </div>
     """
   end
