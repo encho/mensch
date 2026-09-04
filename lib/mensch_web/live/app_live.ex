@@ -3,12 +3,14 @@ defmodule MenschWeb.AppLive do
   Root LiveView for the Mensch app.
 
   Renders the active project's active pattern as a grid of tracks and
-  16-step trigs, with two interaction modes:
+  16-step trigs, with transport controls (RECORD/PLAY/FUNC) plus a
+  separate Trig Edit Mode:
 
-    * Program Mode — choose a trig type (Note or Lock) and tap steps to
-      create/remove trigs of that type.
+    * Program Mode — RECORD gates whether tapping a trig modifies the
+      pattern. When recording, FUNC selects whether a tap creates a Note
+      Trig (FUNC off) or a Lock Trig (FUNC on).
     * Trig Edit Mode — edit parameter locks for one specific trig
-      (long-press a trig in Program Mode to enter it).
+      (long-press a trig to enter it).
 
   State is held in-memory on the socket for now; there is no persistence
   or shared state across connections yet.
@@ -42,19 +44,45 @@ defmodule MenschWeb.AppLive do
   end
 
   @impl true
-  def handle_event("set_trig_type", %{"type" => type}, socket) do
-    ui = UIState.set_trig_type(socket.assigns.ui, parse_trig_type(type))
-    {:noreply, assign(socket, :ui, ui)}
+  def handle_event("toggle_record", _params, socket) do
+    {:noreply, assign(socket, :ui, UIState.toggle_recording(socket.assigns.ui))}
+  end
+
+  @impl true
+  def handle_event("toggle_play", _params, socket) do
+    {:noreply, assign(socket, :ui, UIState.toggle_playing(socket.assigns.ui))}
+  end
+
+  @impl true
+  def handle_event("stop", _params, socket) do
+    {:noreply, assign(socket, :ui, UIState.stop_playing(socket.assigns.ui))}
+  end
+
+  @impl true
+  def handle_event("toggle_func", _params, socket) do
+    {:noreply, assign(socket, :ui, UIState.toggle_func(socket.assigns.ui))}
   end
 
   @impl true
   def handle_event("toggle_trig", %{"track_id" => track_id, "step" => step}, socket) do
     %{app: app, ui: ui} = socket.assigns
 
-    app =
-      App.apply_program_tap(app, String.to_integer(track_id), String.to_integer(step), ui.trig_type)
+    socket =
+      if ui.recording do
+        app =
+          App.apply_program_tap(
+            app,
+            String.to_integer(track_id),
+            String.to_integer(step),
+            UIState.trig_type(ui)
+          )
 
-    {:noreply, assign_app(socket, app)}
+        assign_app(socket, app)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -116,17 +144,45 @@ defmodule MenschWeb.AppLive do
     assign(socket, app: app, project: project, pattern: pattern)
   end
 
-  defp parse_trig_type("note"), do: :note
-  defp parse_trig_type("lock"), do: :lock
-
   defp parse_direction("up"), do: :up
   defp parse_direction("down"), do: :down
 
   defp parse_key(key), do: Map.fetch!(@param_keys, key)
 
-  defp trig_glyph(:note), do: "●"
-  defp trig_glyph(:lock), do: "◇"
-  defp trig_glyph(nil), do: "·"
+  defp landmark?(step), do: step in [1, 5, 9, 13]
+
+  defp pad_step(step), do: String.pad_leading(Integer.to_string(step), 2, "0")
+
+  defp selected_trig?(
+         %UIState{mode: :edit_trig, selected_track_id: track_id, selected_step: step},
+         track_id,
+         step
+       ),
+       do: true
+
+  defp selected_trig?(_ui, _track_id, _step), do: false
+
+  defp trig_classes(trig, selected?) do
+    [
+      "group relative flex aspect-square w-full select-none items-center justify-center rounded-[3px] border font-mono text-[11px] font-semibold tabular-nums transition-all duration-75 active:translate-y-px active:brightness-90",
+      trig.type == :note &&
+        "border-red-400 bg-red-600 text-red-50 shadow-[0_0_8px_-1px_rgba(248,113,113,0.5)]",
+      trig.type == :lock &&
+        "border-amber-300 bg-amber-500 text-neutral-950 shadow-[0_0_8px_-1px_rgba(252,211,77,0.5)]",
+      is_nil(trig.type) && "border-neutral-800 bg-neutral-800/80 text-neutral-600 hover:border-neutral-700",
+      selected? && "ring-2 ring-neutral-50 ring-offset-2 ring-offset-neutral-900",
+      landmark?(trig.step) && "p-1"
+    ]
+  end
+
+  defp landmark_inner_classes(trig) do
+    [
+      "flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-[2px] border-2",
+      trig.type == :note && "border-red-400",
+      trig.type == :lock && "border-amber-300",
+      is_nil(trig.type) && "border-neutral-600"
+    ]
+  end
 
   defp trig_type_label(:note), do: "Note Trig"
   defp trig_type_label(:lock), do: "Lock Trig"
@@ -184,9 +240,13 @@ defmodule MenschWeb.AppLive do
     ~H"""
     <Layouts.app flash={@flash}>
       <div class="min-h-screen bg-neutral-950 px-6 py-10 font-sans text-neutral-100">
-        <header class="mb-8">
-          <h1 class="text-2xl font-semibold tracking-[0.3em] text-neutral-50">MENSCH</h1>
-          <p class="mt-1 text-[10px] uppercase tracking-widest text-neutral-600">App</p>
+        <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-semibold tracking-[0.3em] text-neutral-50">MENSCH</h1>
+            <p class="mt-1 text-[10px] uppercase tracking-widest text-neutral-600">App</p>
+          </div>
+
+          <.transport_controls ui={@ui} />
         </header>
 
         <section class="rounded-md border border-neutral-800 bg-neutral-900/30 p-4">
@@ -200,50 +260,49 @@ defmodule MenschWeb.AppLive do
           <section class="mt-4 rounded-md border border-neutral-800 bg-neutral-900/50 p-4">
             <.level_label kind="Pattern" name={@pattern.name} />
 
-            <%= if @ui.mode == :edit_trig do %>
-              <.trig_edit_panel track={@edit_track} trig={@edit_trig} rows={@edit_rows} />
-            <% else %>
-              <.program_controls trig_type={@ui.trig_type} />
+            <div class="mt-4 space-y-3">
+              <div
+                :for={track <- @pattern.tracks}
+                id={"track-#{track.id}"}
+                phx-click="select_track"
+                phx-value-track_id={track.id}
+                class={[
+                  "cursor-pointer rounded-md border p-3 transition-colors duration-100",
+                  track.id == @pattern.active_track_id &&
+                    "border-amber-500/70 bg-neutral-900 ring-1 ring-amber-500/40",
+                  track.id != @pattern.active_track_id &&
+                    "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                ]}
+              >
+                <.level_label kind="Track" name={track.name} active={track.id == @pattern.active_track_id} />
 
-              <div class="mt-4 space-y-3 border-l border-neutral-800 pl-4">
-                <div
-                  :for={track <- @pattern.tracks}
-                  id={"track-#{track.id}"}
-                  phx-click="select_track"
-                  phx-value-track_id={track.id}
-                  class={[
-                    "cursor-pointer rounded-md border p-3 transition-colors duration-100",
-                    track.id == @pattern.active_track_id &&
-                      "border-amber-500/70 bg-neutral-900 ring-1 ring-amber-500/40",
-                    track.id != @pattern.active_track_id &&
-                      "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
-                  ]}
-                >
-                  <.level_label kind="Track" name={track.name} active={track.id == @pattern.active_track_id} />
-
-                  <div class="mt-3 flex w-full items-start gap-1 border-l border-neutral-800 pl-4">
-                    <button
-                      :for={trig <- track.trigs}
-                      id={"trig-#{track.id}-#{trig.step}"}
-                      type="button"
-                      phx-hook=".TrigButton"
-                      data-track-id={track.id}
-                      data-step={trig.step}
-                      class={[
-                        "flex aspect-square flex-1 select-none items-center justify-center rounded-sm border text-sm font-medium transition-colors duration-100",
-                        rem(trig.step - 1, 4) == 0 && trig.step > 1 && "ml-2",
-                        trig.type == :note && "border-amber-400 bg-amber-500 text-neutral-950",
-                        trig.type == :lock && "border-sky-400 bg-neutral-900 text-sky-400",
-                        is_nil(trig.type) &&
-                          "border-neutral-700 bg-neutral-800 text-neutral-600 hover:bg-neutral-700"
-                      ]}
-                    >
-                      {trig_glyph(trig.type)}
-                    </button>
+                <div class="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1">
+                  <div :for={group <- Enum.chunk_every(track.trigs, 4)} class="grid grid-cols-4 gap-1.5 sm:gap-1">
+                    <div :for={trig <- group} class="relative">
+                      <button
+                        id={"trig-#{track.id}-#{trig.step}"}
+                        type="button"
+                        phx-hook=".TrigButton"
+                        data-track-id={track.id}
+                        data-step={trig.step}
+                        class={trig_classes(trig, selected_trig?(@ui, track.id, trig.step))}
+                      >
+                        <div :if={landmark?(trig.step)} class={landmark_inner_classes(trig)}>
+                          <span>{pad_step(trig.step)}</span>
+                        </div>
+                        <span :if={!landmark?(trig.step)}>{pad_step(trig.step)}</span>
+                        <span
+                          :if={trig.type == :note and map_size(trig.locks) > 0}
+                          class="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-300 ring-1 ring-red-950"
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            <% end %>
+            </div>
+
+            <.trig_edit_panel :if={@ui.mode == :edit_trig} track={@edit_track} trig={@edit_trig} rows={@edit_rows} />
           </section>
         </section>
       </div>
@@ -310,38 +369,75 @@ defmodule MenschWeb.AppLive do
     """
   end
 
-  attr :trig_type, :atom, required: true
+  attr :ui, UIState, required: true
 
-  defp program_controls(assigns) do
+  defp transport_controls(assigns) do
     ~H"""
-    <div class="mb-3 mt-4 flex items-center gap-2">
-      <span class="text-[10px] uppercase tracking-widest text-neutral-500">Trig Type</span>
-      <div class="flex overflow-hidden rounded-sm border border-neutral-700">
+    <div class="flex items-center gap-5">
+      <div class="flex items-center gap-1.5">
         <button
           type="button"
-          phx-click="set_trig_type"
-          phx-value-type="note"
-          class={[
-            "px-3 py-1 text-[11px] font-semibold uppercase tracking-widest transition-colors duration-100",
-            @trig_type == :note && "bg-amber-500 text-neutral-950",
-            @trig_type != :note && "bg-neutral-900 text-neutral-500 hover:bg-neutral-800"
-          ]}
+          phx-click="toggle_record"
+          aria-label="Record"
+          class="flex h-9 w-9 items-center justify-center rounded-sm border border-neutral-700 bg-neutral-900 transition-all duration-100 hover:bg-neutral-800 active:translate-y-px"
         >
-          Note
+          <span class={[
+            "block h-3 w-3 rounded-full border-2",
+            @ui.recording && "border-red-500",
+            !@ui.recording && "border-neutral-600"
+          ]} />
         </button>
+
         <button
           type="button"
-          phx-click="set_trig_type"
-          phx-value-type="lock"
-          class={[
-            "border-l border-neutral-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest transition-colors duration-100",
-            @trig_type == :lock && "bg-sky-500 text-neutral-950",
-            @trig_type != :lock && "bg-neutral-900 text-neutral-500 hover:bg-neutral-800"
-          ]}
+          phx-click="toggle_play"
+          aria-label="Play"
+          class="flex h-9 w-9 items-center justify-center rounded-sm border border-neutral-700 bg-neutral-900 transition-all duration-100 hover:bg-neutral-800 active:translate-y-px"
         >
-          Lock
+          <.icon
+            name="hero-play"
+            class={[
+              "size-4",
+              @ui.playing && "text-green-400",
+              !@ui.playing && "text-neutral-600"
+            ]}
+          />
+        </button>
+
+        <button
+          type="button"
+          phx-click="stop"
+          aria-label="Stop"
+          class="group flex h-9 w-9 items-center justify-center rounded-sm border border-neutral-700 bg-neutral-900 transition-all duration-75 hover:bg-neutral-800 active:translate-y-px"
+        >
+          <.icon
+            name="hero-stop"
+            class={[
+              "size-4 transition-colors duration-75 group-active:text-white",
+              !@ui.playing && "text-white",
+              @ui.playing && "text-neutral-600"
+            ]}
+          />
         </button>
       </div>
+
+      <button
+        type="button"
+        phx-click="toggle_func"
+        class={[
+          "flex h-9 w-16 items-center justify-center gap-1.5 rounded-sm border text-[10px] font-semibold uppercase tracking-widest transition-all duration-100",
+          @ui.func_active &&
+            "border-amber-300 bg-amber-500 text-neutral-950 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]",
+          !@ui.func_active && "border-amber-950 bg-amber-900 text-amber-600 hover:bg-amber-800"
+        ]}
+      >
+        <span class={[
+          "h-1.5 w-1.5 rounded-full",
+          @ui.func_active && "bg-amber-200 shadow-[0_0_6px_2px_rgba(252,211,77,0.9)]",
+          !@ui.func_active && "bg-black/30"
+        ]} />
+        Func
+      </button>
     </div>
     """
   end
