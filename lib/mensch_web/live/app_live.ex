@@ -276,8 +276,8 @@ defmodule MenschWeb.AppLive do
               >
                 <.level_label kind="Track" name={track.name} active={track.id == @pattern.active_track_id} />
 
-                <div class="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-1">
-                  <div :for={group <- Enum.chunk_every(track.trigs, 4)} class="grid grid-cols-4 gap-1.5 sm:gap-1">
+                <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-2">
+                  <div :for={group <- Enum.chunk_every(track.trigs, 4)} class="grid grid-cols-4 gap-2.5 sm:gap-2">
                     <div :for={trig <- group} class="relative">
                       <button
                         id={"trig-#{track.id}-#{trig.step}"}

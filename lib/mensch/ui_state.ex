@@ -61,4 +61,3 @@ defmodule Mensch.UIState do
     %{ui | mode: :program, selected_track_id: nil, selected_step: nil}
   end
 end
-
