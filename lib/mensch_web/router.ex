@@ -17,7 +17,7 @@ defmodule MenschWeb.Router do
   scope "/", MenschWeb do
     pipe_through :browser
 
-    live "/", AppLive
+    live "/", HomeLive
   end
 
   # Other scopes may use custom stacks.
