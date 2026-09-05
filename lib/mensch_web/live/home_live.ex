@@ -170,12 +170,6 @@ defmodule MenschWeb.HomeLive do
 
   defp playing?(chord_pid), do: is_pid(chord_pid)
 
-  defp midi_status_label({:connected, name}), do: "Connected: #{name}"
-  defp midi_status_label(:disconnected), do: "Disconnected"
-
-  defp status_dot_class({:connected, _name}), do: "bg-emerald-400"
-  defp status_dot_class(:disconnected), do: "bg-red-500"
-
   defp note_label(note, octave) do
     name = Enum.find_value(@root_options, fn {label, value} -> value == note && label end)
     "#{name}#{octave}"
@@ -193,32 +187,8 @@ defmodule MenschWeb.HomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} midi_status={@midi_status}>
       <div class="mx-auto max-w-2xl space-y-8">
-        <div class="border-b border-white/15 pb-4">
-          <h1 class="text-2xl font-bold uppercase tracking-widest text-white">Play</h1>
-          <p class="mt-1 text-xs uppercase tracking-wide text-white/40">
-            Live chords over MPE MIDI
-          </p>
-        </div>
-
-        <div class="flex items-center justify-between border border-white/15 px-4 py-3">
-          <span class="flex items-center gap-2 text-xs uppercase tracking-wide text-white/70">
-            <span class={["inline-block size-2", status_dot_class(@midi_status)]} />
-            <span class="font-mono normal-case tracking-normal">
-              {midi_status_label(@midi_status)}
-            </span>
-          </span>
-          <button
-            type="button"
-            id="reconnect-midi"
-            phx-click="reconnect_midi"
-            class="border border-white/40 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black"
-          >
-            Reconnect
-          </button>
-        </div>
-
         <.form for={@form} id="chord-form" phx-change="validate" phx-submit="play">
           <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
             <.input
