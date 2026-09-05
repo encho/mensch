@@ -73,4 +73,36 @@ defmodule Mensch.Envelope do
       total_ms: total_ms
     }
   end
+
+  @doc """
+  Rescales a milestones map (from `milestones/2`) so its `:total_ms`
+  fits within `max_total_ms`, proportionally shrinking
+  attack/decay/release to match if it would otherwise run over -
+  e.g. so an individual note's own envelope never outlives the
+  containing chord's overall envelope.
+
+  A `nil` `max_total_ms`, or a `milestones` whose own `:total_ms` is
+  already `nil` (an indefinite hold), means there's nothing to
+  constrain against - `milestones` is returned unchanged. Likewise,
+  if `milestones.total_ms` already fits within `max_total_ms`, it's
+  returned unchanged.
+  """
+  def constrain(milestones, nil), do: milestones
+  def constrain(%{total_ms: nil} = milestones, _max_total_ms), do: milestones
+
+  def constrain(%{total_ms: total_ms} = milestones, max_total_ms) when total_ms <= max_total_ms do
+    milestones
+  end
+
+  def constrain(%{total_ms: total_ms} = milestones, max_total_ms) do
+    max_total_ms = max(max_total_ms, 0)
+    scale = if total_ms > 0, do: max_total_ms / total_ms, else: 1.0
+
+    %{
+      attack_end_ms: round(milestones.attack_end_ms * scale),
+      decay_end_ms: round(milestones.decay_end_ms * scale),
+      release_start_ms: round(milestones.release_start_ms * scale),
+      total_ms: max_total_ms
+    }
+  end
 end

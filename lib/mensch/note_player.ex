@@ -32,6 +32,14 @@ defmodule Mensch.NotePlayer do
   Always sends note-off when stopped (whether stopped cooperatively or
   shut down by its parent `Mensch.ChordPlayer`), so a note can never
   get stuck sounding on the hardware.
+
+  An optional `:start_delay_ms` (default `0`) defers the actual
+  note-on and the start of this note's own envelope/tick loop by that
+  many milliseconds - e.g. so a chord's notes can be staggered
+  slightly (a "strum") rather than all starting in perfect unison.
+  The process itself still starts (and can be stopped/linked)
+  immediately; only the sounding of the note is delayed. If stopped
+  before the delay elapses, no note-on/note-off is ever sent.
   """
 
   use GenServer
@@ -74,7 +82,8 @@ defmodule Mensch.NotePlayer do
     emphasis: false,
     pressure: 0,
     bend: 0.0,
-    slide: 0
+    slide: 0,
+    started?: false
   ]
 
   # Client API
@@ -115,31 +124,24 @@ defmodule Mensch.NotePlayer do
       milestones: Keyword.fetch!(opts, :milestones),
       velocity: Keyword.get(opts, :velocity, 100),
       phase: Keyword.get(opts, :phase, 0.0),
-      emphasis: Keyword.get(opts, :emphasis, false),
-      started_at: System.monotonic_time(:millisecond)
+      emphasis: Keyword.get(opts, :emphasis, false)
     }
 
-    Mensch.Midi.Connection.send_message(<<0x90 + state.channel, state.number, state.velocity>>)
+    case Keyword.get(opts, :start_delay_ms, 0) do
+      delay when delay > 0 ->
+        Process.send_after(self(), :begin, delay)
+        {:ok, state}
 
-    initial_pressure = pressure_for(state, 0)
-    send_channel_pressure(state, initial_pressure)
-    send_slide(state, @aftertouch_slide_rest)
-
-    if state.milestones.total_ms do
-      Process.send_after(self(), :envelope_elapsed, state.milestones.total_ms)
+      _ ->
+        {:ok, begin(state)}
     end
-
-    {:ok,
-     %{
-       state
-       | timer_ref: schedule_tick(),
-         pressure: initial_pressure,
-         bend: 0.0,
-         slide: @aftertouch_slide_rest
-     }}
   end
 
   @impl true
+  def handle_info(:begin, state) do
+    {:noreply, begin(state)}
+  end
+
   def handle_info(:tick, state) do
     elapsed_ms = System.monotonic_time(:millisecond) - state.started_at
 
@@ -186,10 +188,40 @@ defmodule Mensch.NotePlayer do
   @impl true
   def terminate(_reason, state) do
     if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
-    send_pitch_bend(state, 0.0)
-    send_slide(state, @aftertouch_slide_rest)
-    Mensch.Midi.Connection.send_message(<<0x80 + state.channel, state.number, 0>>)
+
+    if state.started? do
+      send_pitch_bend(state, 0.0)
+      send_slide(state, @aftertouch_slide_rest)
+      Mensch.Midi.Connection.send_message(<<0x80 + state.channel, state.number, 0>>)
+    end
+
     :ok
+  end
+
+  # Sends note-on and starts this note's own envelope/tick loop, measuring
+  # elapsed time from right now - i.e. from whenever the note actually
+  # starts sounding, not from process start (which may have been earlier,
+  # if :start_delay_ms staggered this note's onset).
+  defp begin(state) do
+    state = %{state | started_at: System.monotonic_time(:millisecond), started?: true}
+
+    Mensch.Midi.Connection.send_message(<<0x90 + state.channel, state.number, state.velocity>>)
+
+    initial_pressure = pressure_for(state, 0)
+    send_channel_pressure(state, initial_pressure)
+    send_slide(state, @aftertouch_slide_rest)
+
+    if state.milestones.total_ms do
+      Process.send_after(self(), :envelope_elapsed, state.milestones.total_ms)
+    end
+
+    %{
+      state
+      | timer_ref: schedule_tick(),
+        pressure: initial_pressure,
+        bend: 0.0,
+        slide: @aftertouch_slide_rest
+    }
   end
 
   # Attack: linear ramp up from silence to the envelope's peak.

@@ -64,4 +64,42 @@ defmodule Mensch.EnvelopeTest do
       assert milestones.total_ms == 8000
     end
   end
+
+  describe "constrain/2" do
+    test "returns milestones unchanged when they already fit within max_total_ms" do
+      milestones = Envelope.milestones(%Envelope{duration_bars: 1}, timing(120))
+
+      assert Envelope.constrain(milestones, 10_000) == milestones
+    end
+
+    test "returns milestones unchanged when max_total_ms is nil" do
+      milestones = Envelope.milestones(%Envelope{duration_bars: 1}, timing(120))
+
+      assert Envelope.constrain(milestones, nil) == milestones
+    end
+
+    test "returns milestones unchanged when they're already an indefinite hold" do
+      milestones = Envelope.milestones(%Envelope{duration_bars: 0}, timing(120))
+
+      assert Envelope.constrain(milestones, 500) == milestones
+    end
+
+    test "proportionally shrinks attack/decay/release to fit within max_total_ms" do
+      envelope = %Envelope{
+        duration_bars: 4,
+        attack_bars: 0.25,
+        decay_bars: 0.25,
+        release_bars: 0.5
+      }
+
+      milestones = Envelope.milestones(envelope, timing(120))
+      # total_ms is 8000; constrain down to a 2000ms budget (1/4 scale).
+      constrained = Envelope.constrain(milestones, 2000)
+
+      assert constrained.total_ms == 2000
+      assert constrained.attack_end_ms == 125
+      assert constrained.decay_end_ms == 250
+      assert constrained.release_start_ms == 1750
+    end
+  end
 end
