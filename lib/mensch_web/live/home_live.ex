@@ -1,6 +1,6 @@
 defmodule MenschWeb.HomeLive do
   @moduledoc """
-  Minimal live-performance UI: pick two chords, then PLAY starts a
+  Minimal live-performance UI: pick three chords, then PLAY starts a
   global loop that holds each chord for 4 bars before automatically
   advancing to the next (wrapping back to the first), sounding live on
   the connected MPE MIDI output (e.g. an Osmose). STOP halts the loop
@@ -46,8 +46,8 @@ defmodule MenschWeb.HomeLive do
 
   @default_chord1_params %{
     "root" => "c",
-    "degree" => "I",
-    "modifier" => "maj7",
+    "degree" => "ii",
+    "modifier" => "min7",
     "octave" => "4"
   }
 
@@ -55,6 +55,13 @@ defmodule MenschWeb.HomeLive do
     "root" => "c",
     "degree" => "V",
     "modifier" => "dom7",
+    "octave" => "4"
+  }
+
+  @default_chord3_params %{
+    "root" => "c",
+    "degree" => "I",
+    "modifier" => "maj7",
     "octave" => "4"
   }
 
@@ -66,6 +73,7 @@ defmodule MenschWeb.HomeLive do
       socket
       |> assign(:form1, to_form(@default_chord1_params, as: :chord1))
       |> assign(:form2, to_form(@default_chord2_params, as: :chord2))
+      |> assign(:form3, to_form(@default_chord3_params, as: :chord3))
       |> assign(:midi_status, Mensch.Midi.Connection.status())
       |> assign(:bpm, Mensch.Tempo.bpm())
       |> assign_loop_snapshot(Sequencer.snapshot())
@@ -74,25 +82,35 @@ defmodule MenschWeb.HomeLive do
   end
 
   @impl true
-  def handle_event("validate", %{"chord1" => c1, "chord2" => c2}, socket) do
+  def handle_event("validate", %{"chord1" => c1, "chord2" => c2, "chord3" => c3}, socket) do
     {:noreply,
      socket
      |> assign(:form1, to_form(c1, as: :chord1))
-     |> assign(:form2, to_form(c2, as: :chord2))}
+     |> assign(:form2, to_form(c2, as: :chord2))
+     |> assign(:form3, to_form(c3, as: :chord3))}
   end
 
   def handle_event("play", _params, %{assigns: %{loop_status: :playing}} = socket) do
     {:noreply, socket}
   end
 
-  def handle_event("play", %{"chord1" => c1_params, "chord2" => c2_params}, socket) do
+  def handle_event(
+        "play",
+        %{"chord1" => c1_params, "chord2" => c2_params, "chord3" => c3_params},
+        socket
+      ) do
     form1 = to_form(c1_params, as: :chord1)
     form2 = to_form(c2_params, as: :chord2)
-    socket = socket |> assign(:form1, form1) |> assign(:form2, form2)
+    form3 = to_form(c3_params, as: :chord3)
+
+    socket =
+      socket |> assign(:form1, form1) |> assign(:form2, form2) |> assign(:form3, form3)
 
     with {:ok, chord1_attrs} <- parse_chord_params(c1_params),
-         {:ok, chord2_attrs} <- parse_chord_params(c2_params) do
-      Sequencer.play([build_chord(chord1_attrs), build_chord(chord2_attrs)])
+         {:ok, chord2_attrs} <- parse_chord_params(c2_params),
+         {:ok, chord3_attrs} <- parse_chord_params(c3_params) do
+      chords = [build_chord(chord1_attrs), build_chord(chord2_attrs), build_chord(chord3_attrs)]
+      Sequencer.play(chords)
       Process.send_after(self(), :refresh_loop, @refresh_interval_ms)
 
       {:noreply, assign_loop_snapshot(socket, Sequencer.snapshot())}
@@ -193,17 +211,17 @@ defmodule MenschWeb.HomeLive do
   defp chord_fields(assigns) do
     ~H"""
     <div class={[
-      "border p-4 transition-colors duration-150",
+      "flex flex-col gap-3 border p-3 transition-colors duration-150 sm:flex-row sm:items-end",
       (@active && "border-white") || "border-white/15"
     ]}>
-      <div class="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/40">
+      <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/40 sm:w-20 sm:shrink-0">
         <span class={[
           "inline-block size-2 rounded-full",
           (@active && "bg-white") || "bg-white/20"
         ]} />
         {@label}
       </div>
-      <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+      <div class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
         <.input
           field={@form[:root]}
           type="select"
@@ -254,7 +272,7 @@ defmodule MenschWeb.HomeLive do
           phx-submit="play"
           onkeydown="if (event.key === 'Enter' && event.target.tagName === 'INPUT') { event.preventDefault(); }"
         >
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="flex flex-col gap-3">
             <.chord_fields
               form={@form1}
               label="Chord 1"
@@ -267,10 +285,16 @@ defmodule MenschWeb.HomeLive do
               active={playing?(@loop_status) and @loop_index == 1}
               disabled={playing?(@loop_status)}
             />
+            <.chord_fields
+              form={@form3}
+              label="Chord 3"
+              active={playing?(@loop_status) and @loop_index == 2}
+              disabled={playing?(@loop_status)}
+            />
           </div>
 
           <p class="mt-2 text-[11px] uppercase tracking-wide text-white/30">
-            Loops Chord 1 → Chord 2 → Chord 1..., 4 bars each, until Stop is pressed
+            Loops Chord 1 → Chord 2 → Chord 3 → Chord 1..., 4 bars each, until Stop is pressed
           </p>
 
           <div class="mt-6 flex gap-3">
