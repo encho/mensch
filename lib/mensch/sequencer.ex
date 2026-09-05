@@ -2,12 +2,14 @@ defmodule Mensch.Sequencer do
   @moduledoc """
   Global chord-progression loop.
 
-  Holds an ordered list of `{%Mensch.Chord{}, %Mensch.Envelope{}}`
+  Holds an ordered list of `{%Mensch.Chord{}, %Mensch.Envelope{}, machine_id}`
   steps and cycles through them forever: each step plays for its own
   envelope's `:duration_bars`, then the loop automatically advances to
-  the next step, wrapping back to the first after the last. PLAY
-  (`play/1`) (re)starts the loop from the first step; STOP (`stop/0`)
-  halts everything immediately, wherever the loop currently is.
+  the next step, wrapping back to the first after the last. `machine_id`
+  (see `Mensch.Machine.options/0`) decides which of the chord's notes
+  actually sound and their individual envelopes. PLAY (`play/1`)
+  (re)starts the loop from the first step; STOP (`stop/0`) halts
+  everything immediately, wherever the loop currently is.
 
   Advancing is fire-and-forget: the loop never waits for (or stops)
   the step it's leaving before starting the next one, so a step's own
@@ -41,7 +43,7 @@ defmodule Mensch.Sequencer do
 
   @doc """
   (Re)starts the loop from the first of `steps` (a list of
-  `{%Mensch.Chord{}, %Mensch.Envelope{}}` pairs).
+  `{%Mensch.Chord{}, %Mensch.Envelope{}, machine_id}` triples).
   """
   def play(steps) when is_list(steps) and steps != [] do
     GenServer.call(__MODULE__, {:play, steps})
@@ -115,9 +117,17 @@ defmodule Mensch.Sequencer do
   end
 
   defp start_step(%{steps: steps, index: index} = state) do
-    {chord, envelope} = Enum.at(steps, index)
+    {chord, envelope, machine} = Enum.at(steps, index)
     timing = Timing.now()
-    {:ok, pid} = ChordSupervisor.start_chord(chord: chord, envelope: envelope, timing: timing)
+
+    {:ok, pid} =
+      ChordSupervisor.start_chord(
+        chord: chord,
+        envelope: envelope,
+        machine: machine,
+        timing: timing
+      )
+
     Process.monitor(pid)
     ref = make_ref()
     Process.send_after(self(), {:advance, ref}, Timing.bars_to_ms(timing, envelope.duration_bars))
@@ -142,7 +152,7 @@ defmodule Mensch.Sequencer do
   defp build_snapshot(%{status: :stopped}), do: stopped_snapshot()
 
   defp build_snapshot(%{status: :playing} = state) do
-    {_chord, envelope} = Enum.at(state.steps, state.index)
+    {_chord, envelope, _machine} = Enum.at(state.steps, state.index)
     bar_ms = Timing.bars_to_ms(state.timing, 1)
     elapsed_bars = div(Timing.elapsed_ms(state.timing), bar_ms)
     bar = min(envelope.duration_bars, elapsed_bars + 1)

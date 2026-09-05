@@ -14,6 +14,14 @@ defmodule Mensch.Chord do
 
   defstruct [:scale, :degree, :modifier, :octave, :resolved]
 
+  @type t :: %__MODULE__{
+          scale: Scale.t(),
+          degree: atom(),
+          modifier: atom(),
+          octave: integer(),
+          resolved: Mensch.Harmony.ResolvedChord.t()
+        }
+
   @doc """
   Builds a `%Mensch.Chord{}`, resolving `degree` and `modifier`
   against `scale` (see `Mensch.Harmony.Resolver`).
@@ -32,4 +40,7 @@ defmodule Mensch.Chord do
 
   @doc "The chord tones (list of note atoms, e.g. `[:c, :e, :g, :b]`)."
   def notes(%__MODULE__{resolved: resolved}), do: resolved.notes
+
+  @doc "The chord's root note (e.g. `:d` for a ii chord in C major)."
+  def root(%__MODULE__{resolved: resolved}), do: resolved.root
 end

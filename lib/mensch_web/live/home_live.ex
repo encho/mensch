@@ -12,6 +12,7 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.Chord
   alias Mensch.Envelope
   alias Mensch.Harmony.{Diatonic, Scale}
+  alias Mensch.Machine
   alias Mensch.Sequencer
 
   @default_envelope %Envelope{}
@@ -75,7 +76,8 @@ defmodule MenschWeb.HomeLive do
     "mode" => "major",
     "degree" => "ii",
     "modifier" => "min7",
-    "octave" => "4"
+    "octave" => "4",
+    "machine" => "simple_chord"
   }
 
   @default_chord2_params %{
@@ -83,7 +85,8 @@ defmodule MenschWeb.HomeLive do
     "mode" => "major",
     "degree" => "V",
     "modifier" => "dom7",
-    "octave" => "4"
+    "octave" => "4",
+    "machine" => "simple_chord"
   }
 
   @default_chord3_params %{
@@ -91,7 +94,8 @@ defmodule MenschWeb.HomeLive do
     "mode" => "major",
     "degree" => "I",
     "modifier" => "maj7",
-    "octave" => "4"
+    "octave" => "4",
+    "machine" => "simple_chord"
   }
 
   @refresh_interval_ms 100
@@ -144,7 +148,7 @@ defmodule MenschWeb.HomeLive do
          {:ok, chord3_attrs} <- parse_chord_params(c3_params) do
       steps =
         [chord1_attrs, chord2_attrs, chord3_attrs]
-        |> Enum.map(&{build_chord(&1), @default_envelope})
+        |> Enum.map(&{build_chord(&1), @default_envelope, &1.machine})
 
       Sequencer.play(steps)
       Process.send_after(self(), :refresh_loop, @refresh_interval_ms)
@@ -224,8 +228,18 @@ defmodule MenschWeb.HomeLive do
          degree when not is_nil(degree) <- find_value(degree_value_options(), params["degree"]),
          modifier when not is_nil(modifier) <-
            find_value(modifier_options(mode, degree), params["modifier"]),
+         machine when not is_nil(machine) <-
+           find_value(machine_options(), params["machine"]),
          {octave, ""} <- Integer.parse(params["octave"] || "") do
-      {:ok, %{root: root, mode: mode, degree: degree, modifier: modifier, octave: octave}}
+      {:ok,
+       %{
+         root: root,
+         mode: mode,
+         degree: degree,
+         modifier: modifier,
+         octave: octave,
+         machine: machine
+       }}
     else
       _ -> :error
     end
@@ -237,6 +251,7 @@ defmodule MenschWeb.HomeLive do
 
   defp root_options, do: @root_options
   defp mode_options, do: @mode_options
+  defp machine_options, do: Machine.options()
   defp degree_value_options, do: Enum.map(@degree_values, &{to_string(&1), &1})
 
   defp degree_options(mode) do
@@ -286,6 +301,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:mode_opts, mode_options())
       |> assign(:degree_opts, degree_options(mode))
       |> assign(:modifier_opts, modifier_options(mode, degree))
+      |> assign(:machine_opts, machine_options())
 
     ~H"""
     <div class={[
@@ -299,7 +315,7 @@ defmodule MenschWeb.HomeLive do
         ]} />
         {@label}
       </div>
-      <div class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
+      <div class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-6">
         <.input
           field={@form[:root]}
           type="select"
@@ -338,6 +354,14 @@ defmodule MenschWeb.HomeLive do
           label="Octave"
           min="0"
           max="8"
+          class={input_class()}
+          disabled={@disabled}
+        />
+        <.input
+          field={@form[:machine]}
+          type="select"
+          label="Machine"
+          options={@machine_opts}
           class={input_class()}
           disabled={@disabled}
         />
