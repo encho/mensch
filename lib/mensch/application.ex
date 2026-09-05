@@ -12,10 +12,7 @@ defmodule Mensch.Application do
       {DNSCluster, query: Application.get_env(:mensch, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Mensch.PubSub},
       Mensch.Midi.Connection,
-      Mensch.Midi.ChannelPool,
-      Mensch.Tempo,
-      Mensch.ChordSupervisor,
-      Mensch.Sequencer,
+      Mensch.Player,
       # Start to serve requests, typically the last entry
       MenschWeb.Endpoint
     ]
