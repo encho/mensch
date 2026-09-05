@@ -22,7 +22,7 @@ defmodule Mensch.ChordPlayer do
   use GenServer
 
   alias Mensch.Chord
-  alias Mensch.Harmony.Key
+  alias Mensch.Harmony.Scale
   alias Mensch.Midi.Connection
   alias Mensch.NotePlayer
   alias Mensch.Timing
@@ -163,7 +163,7 @@ defmodule Mensch.ChordPlayer do
   end
 
   defp midi_note_number(note, octave) do
-    semitone = Enum.find_index(Key.notes(), &(&1 == note))
+    semitone = Enum.find_index(Scale.notes(), &(&1 == note))
     (octave + 1) * 12 + semitone
   end
 end

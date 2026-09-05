@@ -10,7 +10,7 @@ defmodule MenschWeb.HomeLive do
   use MenschWeb, :live_view
 
   alias Mensch.Chord
-  alias Mensch.Harmony.Key
+  alias Mensch.Harmony.{Diatonic, Scale}
   alias Mensch.Sequencer
 
   @root_options [
@@ -28,24 +28,48 @@ defmodule MenschWeb.HomeLive do
     {"B", :b}
   ]
 
-  @degree_options [
-    {"I", :I},
-    {"ii", :ii},
-    {"iii", :iii},
-    {"IV", :IV},
-    {"V", :V},
-    {"vi", :vi},
-    {"vii", :vii}
+  @mode_options [
+    {"Major", :major},
+    {"Minor", :minor}
   ]
 
-  @modifier_options [
-    {"maj7", :maj7},
-    {"dom7 (7)", :dom7},
-    {"min7", :min7}
+  @degree_values [:I, :ii, :iii, :IV, :V, :vi, :vii]
+
+  @modifier_labels %{
+    maj7: "maj7",
+    maj9: "maj9",
+    maj11: "maj11",
+    maj13: "maj13",
+    dom7: "dom7 (7)",
+    dom9: "dom9",
+    dom11: "dom11",
+    dom13: "dom13",
+    min7: "min7",
+    min9: "min9",
+    min11: "min11",
+    min13: "min13",
+    m7b5: "m7b5 (ø7)"
+  }
+
+  @modifier_order [
+    :maj7,
+    :maj9,
+    :maj11,
+    :maj13,
+    :dom7,
+    :dom9,
+    :dom11,
+    :dom13,
+    :min7,
+    :min9,
+    :min11,
+    :min13,
+    :m7b5
   ]
 
   @default_chord1_params %{
     "root" => "c",
+    "mode" => "major",
     "degree" => "ii",
     "modifier" => "min7",
     "octave" => "4"
@@ -53,6 +77,7 @@ defmodule MenschWeb.HomeLive do
 
   @default_chord2_params %{
     "root" => "c",
+    "mode" => "major",
     "degree" => "V",
     "modifier" => "dom7",
     "octave" => "4"
@@ -60,6 +85,7 @@ defmodule MenschWeb.HomeLive do
 
   @default_chord3_params %{
     "root" => "c",
+    "mode" => "major",
     "degree" => "I",
     "modifier" => "maj7",
     "octave" => "4"
@@ -85,9 +111,9 @@ defmodule MenschWeb.HomeLive do
   def handle_event("validate", %{"chord1" => c1, "chord2" => c2, "chord3" => c3}, socket) do
     {:noreply,
      socket
-     |> assign(:form1, to_form(c1, as: :chord1))
-     |> assign(:form2, to_form(c2, as: :chord2))
-     |> assign(:form3, to_form(c3, as: :chord3))}
+     |> assign(:form1, to_form(normalize_chord_params(c1), as: :chord1))
+     |> assign(:form2, to_form(normalize_chord_params(c2), as: :chord2))
+     |> assign(:form3, to_form(normalize_chord_params(c3), as: :chord3))}
   end
 
   def handle_event("play", _params, %{assigns: %{loop_status: :playing}} = socket) do
@@ -99,6 +125,10 @@ defmodule MenschWeb.HomeLive do
         %{"chord1" => c1_params, "chord2" => c2_params, "chord3" => c3_params},
         socket
       ) do
+    c1_params = normalize_chord_params(c1_params)
+    c2_params = normalize_chord_params(c2_params)
+    c3_params = normalize_chord_params(c3_params)
+
     form1 = to_form(c1_params, as: :chord1)
     form2 = to_form(c2_params, as: :chord2)
     form3 = to_form(c3_params, as: :chord3)
@@ -161,17 +191,35 @@ defmodule MenschWeb.HomeLive do
     |> assign(:chord_notes, snapshot.notes)
   end
 
-  defp build_chord(%{root: root, degree: degree, modifier: modifier, octave: octave}) do
-    key = %Key{root: root, scale: :major}
-    Chord.new(key, degree, modifier, octave)
+  defp build_chord(%{root: root, mode: mode, degree: degree, modifier: modifier, octave: octave}) do
+    scale = %Scale{key: root, mode: mode}
+    Chord.new(scale, degree, modifier, octave)
+  end
+
+  # Re-derives a chord's params after any change, falling back to the
+  # first diatonically-correct modifier whenever the mode/degree change
+  # made the previously-selected modifier no longer valid.
+  defp normalize_chord_params(params) do
+    mode = find_value(@mode_options, params["mode"]) || :major
+    degree = find_value(degree_value_options(), params["degree"]) || :I
+    options = modifier_options(mode, degree)
+
+    if Enum.any?(options, fn {_label, value} -> to_string(value) == params["modifier"] end) do
+      params
+    else
+      {_label, fallback} = List.first(options)
+      Map.put(params, "modifier", to_string(fallback))
+    end
   end
 
   defp parse_chord_params(params) do
     with root when not is_nil(root) <- find_value(@root_options, params["root"]),
-         degree when not is_nil(degree) <- find_value(@degree_options, params["degree"]),
-         modifier when not is_nil(modifier) <- find_value(@modifier_options, params["modifier"]),
+         mode when not is_nil(mode) <- find_value(@mode_options, params["mode"]),
+         degree when not is_nil(degree) <- find_value(degree_value_options(), params["degree"]),
+         modifier when not is_nil(modifier) <-
+           find_value(modifier_options(mode, degree), params["modifier"]),
          {octave, ""} <- Integer.parse(params["octave"] || "") do
-      {:ok, %{root: root, degree: degree, modifier: modifier, octave: octave}}
+      {:ok, %{root: root, mode: mode, degree: degree, modifier: modifier, octave: octave}}
     else
       _ -> :error
     end
@@ -182,8 +230,23 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp root_options, do: @root_options
-  defp degree_options, do: @degree_options
-  defp modifier_options, do: @modifier_options
+  defp mode_options, do: @mode_options
+  defp degree_value_options, do: Enum.map(@degree_values, &{to_string(&1), &1})
+
+  defp degree_options(mode) do
+    Enum.map(@degree_values, &{Scale.roman_numeral(mode, &1), &1})
+  end
+
+  defp modifier_options(mode, degree) do
+    valid = MapSet.new(Diatonic.valid_modifiers(mode, degree))
+
+    @modifier_order
+    |> Enum.filter(&(&1 in valid))
+    |> Enum.map(&{Map.fetch!(@modifier_labels, &1), &1})
+  end
+
+  defp selected_mode(form), do: find_value(@mode_options, form[:mode].value) || :major
+  defp selected_degree(form), do: find_value(degree_value_options(), form[:degree].value) || :I
 
   defp playing?(loop_status), do: loop_status == :playing
 
@@ -209,6 +272,15 @@ defmodule MenschWeb.HomeLive do
   attr :disabled, :boolean, default: false
 
   defp chord_fields(assigns) do
+    mode = selected_mode(assigns.form)
+    degree = selected_degree(assigns.form)
+
+    assigns =
+      assigns
+      |> assign(:mode_opts, mode_options())
+      |> assign(:degree_opts, degree_options(mode))
+      |> assign(:modifier_opts, modifier_options(mode, degree))
+
     ~H"""
     <div class={[
       "flex flex-col gap-3 border p-3 transition-colors duration-150 sm:flex-row sm:items-end",
@@ -221,7 +293,7 @@ defmodule MenschWeb.HomeLive do
         ]} />
         {@label}
       </div>
-      <div class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+      <div class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
         <.input
           field={@form[:root]}
           type="select"
@@ -231,10 +303,18 @@ defmodule MenschWeb.HomeLive do
           disabled={@disabled}
         />
         <.input
+          field={@form[:mode]}
+          type="select"
+          label="Mode"
+          options={@mode_opts}
+          class={input_class()}
+          disabled={@disabled}
+        />
+        <.input
           field={@form[:degree]}
           type="select"
           label="Degree"
-          options={degree_options()}
+          options={@degree_opts}
           class={input_class()}
           disabled={@disabled}
         />
@@ -242,7 +322,7 @@ defmodule MenschWeb.HomeLive do
           field={@form[:modifier]}
           type="select"
           label="Quality"
-          options={modifier_options()}
+          options={@modifier_opts}
           class={input_class()}
           disabled={@disabled}
         />

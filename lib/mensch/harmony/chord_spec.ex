@@ -11,7 +11,20 @@ defmodule Mensch.Harmony.ChordSpec do
 
   @type degree ::
           :i | :ii | :iii | :iv | :v | :vi | :vii | :I | :II | :III | :IV | :V | :VI | :VII
-  @type modifier :: :min7 | :dom7 | :maj7
+  @type modifier ::
+          :maj7
+          | :maj9
+          | :maj11
+          | :maj13
+          | :dom7
+          | :dom9
+          | :dom11
+          | :dom13
+          | :min7
+          | :min9
+          | :min11
+          | :min13
+          | :m7b5
 
   @type t :: %__MODULE__{degree: degree(), modifier: modifier()}
 end
