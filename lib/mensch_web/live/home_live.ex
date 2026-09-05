@@ -155,15 +155,24 @@ defmodule MenschWeb.HomeLive do
               <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
                 Note matrix
               </div>
-              <div class="space-y-1 px-3 py-2">
-                <div :for={row <- @note_matrix} class="flex items-center gap-3">
-                  <div class="w-10 shrink-0 font-mono text-[11px] text-white">{row.label}</div>
-                  <div class="relative h-3 flex-1 bg-white/5">
-                    <div class="absolute inset-y-0 rounded-[1px]" style={row.style}></div>
-                  </div>
+              <div class="py-2">
+                <div
+                  :for={{row, index} <- Enum.with_index(@note_matrix)}
+                  class={[
+                    "relative flex h-2.5 items-center border-b border-white/20 last:border-0",
+                    rem(index, 2) == 0 && "bg-white/[0.03]"
+                  ]}
+                >
+                  <div :if={row.style} class="absolute inset-0" style={row.style}></div>
+                  <span class={[
+                    "relative z-10 px-1 font-mono text-[5px] uppercase",
+                    (row.style && "text-white") || "text-white/30"
+                  ]}>
+                    {row.label}
+                  </span>
                 </div>
               </div>
-              <div class="flex justify-between px-3 pb-2 font-mono text-[10px] text-white/30">
+              <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-white/30">
                 <span>0ms</span>
                 <span>{@render_data.duration_ms}ms</span>
               </div>
@@ -271,34 +280,48 @@ defmodule MenschWeb.HomeLive do
     |> Enum.sort_by(& &1.channel)
   end
 
-  # A piano-roll style matrix: one row per discrete note (highest pitch
-  # on top), spanning from its own (possibly staggered) note-on to its
-  # note-off, so note events can be read off by eye against a shared
-  # time axis alongside the line charts above.
+  # A piano-roll style matrix: one row per semitone between the lowest
+  # and highest sounding note (highest pitch on top), so the vertical
+  # spacing between rows visually matches the actual chromatic distance
+  # between the two chords - not just the notes that happen to sound.
+  # Silent in-between notes get a row (dim label, no bar); sounding
+  # notes get a bar spanning from their own (possibly staggered)
+  # note-on to their note-off.
   defp build_note_matrix(music, duration_ms) do
     colors = note_color_map(music)
     duration_ms = max(duration_ms, 1)
 
-    music
-    |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_ms}) end)
-    |> Enum.group_by(fn {note, _at_ms} -> {note.channel, note.note} end)
-    |> Enum.map(fn {{channel, note_number}, entries} ->
-      {sample, _at_ms} = hd(entries)
-      start_ms = entries |> Enum.find(fn {note, _} -> note.note_on end) |> elem(1)
-      end_ms = entries |> Enum.find(fn {note, _} -> note.note_off end) |> elem(1)
-      left_pct = start_ms / duration_ms * 100
-      width_pct = max((end_ms - start_ms) / duration_ms * 100, 0.5)
+    sounding =
+      music
+      |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_ms}) end)
+      |> Enum.group_by(fn {note, _at_ms} -> note.note end)
+      |> Map.new(fn {note_number, entries} ->
+        {sample, _at_ms} = hd(entries)
+        start_ms = entries |> Enum.find(fn {note, _} -> note.note_on end) |> elem(1)
+        end_ms = entries |> Enum.find(fn {note, _} -> note.note_off end) |> elem(1)
+        left_pct = start_ms / duration_ms * 100
+        width_pct = max((end_ms - start_ms) / duration_ms * 100, 0.5)
 
-      %{
-        note: note_number,
-        label: "#{sample.note_name}#{sample.octave}",
-        style:
+        style =
           "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
             "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
-            "background-color: #{Map.fetch!(colors, {channel, note_number})};"
-      }
-    end)
-    |> Enum.sort_by(& &1.note, :desc)
+            "background-color: #{Map.fetch!(colors, {sample.channel, note_number})};"
+
+        {note_number, %{label: "#{sample.note_name}#{sample.octave}", style: style}}
+      end)
+
+    {min_note, max_note} = sounding |> Map.keys() |> Enum.min_max()
+
+    for note_number <- max_note..min_note//-1 do
+      case Map.fetch(sounding, note_number) do
+        {:ok, row} ->
+          Map.put(row, :note, note_number)
+
+        :error ->
+          {note_name, octave} = Render.note_name(note_number)
+          %{note: note_number, label: "#{note_name}#{octave}", style: nil}
+      end
+    end
   end
 
   # Assigns each distinct `{channel, note}` a stable color (ordered by
