@@ -14,7 +14,6 @@ defmodule MenschWeb.HomeLive do
 
   @refresh_interval_ms 100
   @chart_colors ["#22c55e", "#3b82f6", "#f97316", "#ec4899"]
-  @debug_frame_limit 10
 
   @impl true
   def mount(_params, _session, socket) do
@@ -113,39 +112,41 @@ defmodule MenschWeb.HomeLive do
 
             <div id="debug-frames" class="border border-white/10">
               <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
-                First 10 frames
+                All frames
               </div>
-              <table class="w-full text-left font-mono text-[11px]">
-                <thead>
-                  <tr class="border-b border-white/10 text-white/40">
-                    <th class="px-3 py-1.5 font-normal">ms</th>
-                    <th class="px-3 py-1.5 font-normal">note</th>
-                    <th class="px-3 py-1.5 font-normal">ch</th>
-                    <th class="px-3 py-1.5 font-normal">phase</th>
-                    <th class="px-3 py-1.5 font-normal">on</th>
-                    <th class="px-3 py-1.5 font-normal">off</th>
-                    <th class="px-3 py-1.5 font-normal">pressure</th>
-                    <th class="px-3 py-1.5 font-normal">bend</th>
-                    <th class="px-3 py-1.5 font-normal">slide</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    :for={row <- @debug_rows}
-                    class="border-b border-white/5 text-white/70 last:border-0"
-                  >
-                    <td class="px-3 py-1.5">{row.at_ms}</td>
-                    <td class="px-3 py-1.5 text-white">{row.note_name}{row.octave}</td>
-                    <td class="px-3 py-1.5">{row.channel}</td>
-                    <td class="px-3 py-1.5">{row.phase}</td>
-                    <td class="px-3 py-1.5">{row.note_on}</td>
-                    <td class="px-3 py-1.5">{row.note_off}</td>
-                    <td class="px-3 py-1.5">{row.pressure}</td>
-                    <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
-                    <td class="px-3 py-1.5">{row.slide}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="max-h-48 overflow-y-auto">
+                <table class="w-full text-left font-mono text-[11px]">
+                  <thead class="sticky top-0 bg-black">
+                    <tr class="border-b border-white/10 text-white/40">
+                      <th class="px-3 py-1.5 font-normal">ms</th>
+                      <th class="px-3 py-1.5 font-normal">note</th>
+                      <th class="px-3 py-1.5 font-normal">ch</th>
+                      <th class="px-3 py-1.5 font-normal">phase</th>
+                      <th class="px-3 py-1.5 font-normal">on</th>
+                      <th class="px-3 py-1.5 font-normal">off</th>
+                      <th class="px-3 py-1.5 font-normal">pressure</th>
+                      <th class="px-3 py-1.5 font-normal">bend</th>
+                      <th class="px-3 py-1.5 font-normal">slide</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      :for={row <- @debug_rows}
+                      class="border-b border-white/5 text-white/70 last:border-0"
+                    >
+                      <td class="px-3 py-1.5">{row.at_ms}</td>
+                      <td class="px-3 py-1.5 text-white">{row.note_name}{row.octave}</td>
+                      <td class="px-3 py-1.5">{row.channel}</td>
+                      <td class="px-3 py-1.5">{row.phase}</td>
+                      <td class="px-3 py-1.5">{row.note_on}</td>
+                      <td class="px-3 py-1.5">{row.note_off}</td>
+                      <td class="px-3 py-1.5">{row.pressure}</td>
+                      <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
+                      <td class="px-3 py-1.5">{row.slide}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <.chart title="Pressure" chart={@pressure_chart} />
@@ -214,13 +215,11 @@ defmodule MenschWeb.HomeLive do
 
   defp playing?(player_status), do: player_status == :playing
 
-  # Flattens the first `@debug_frame_limit` frames (one row per note)
-  # for a raw, at-a-glance table of exactly what a note-on/pressure/
-  # bend/slide sequence looks like at the very start of the chord.
+  # Flattens every frame (one row per note) for a raw, at-a-glance table
+  # of exactly what the note-on/pressure/bend/slide sequence looks like
+  # across the whole chord performance.
   defp debug_rows(music) do
-    music
-    |> Enum.take(@debug_frame_limit)
-    |> Enum.flat_map(fn frame ->
+    Enum.flat_map(music, fn frame ->
       Enum.map(frame.notes, &Map.put(&1, :at_ms, frame.at_ms))
     end)
   end
