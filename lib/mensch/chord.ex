@@ -5,11 +5,12 @@ defmodule Mensch.Chord do
   octave to play it in.
 
   On start, resolves the chord tones against the key/degree/modifier
-  and starts one `Mensch.Note` child per chord tone (all on the same
-  MIDI channel - see `Mensch.Midi.Connection`). On stop, tells every
-  child note to stop (sending note-off for each) before terminating
-  itself, so a chord can never leave notes stuck sounding on the
-  hardware.
+  and starts one `Mensch.Note` child per chord tone, each on its own
+  MPE member channel with a distinct vibrato phase so their modulation
+  is audibly independent (see `Mensch.Midi.Connection`). On stop,
+  tells every child note to stop (sending note-off for each) before
+  terminating itself, so a chord can never leave notes stuck sounding
+  on the hardware.
   """
 
   use GenServer
@@ -49,15 +50,20 @@ defmodule Mensch.Chord do
     octave = Keyword.fetch!(opts, :octave)
 
     resolved = Resolver.resolve(key, %ChordSpec{degree: degree, modifier: modifier})
-    channel = Connection.channel()
+    channels = Connection.member_channels()
+    note_count = length(resolved.notes)
 
     notes =
-      Enum.map(resolved.notes, fn note ->
+      resolved.notes
+      |> Enum.zip(Enum.take(channels, note_count))
+      |> Enum.with_index()
+      |> Enum.map(fn {{note, channel}, index} ->
         {:ok, pid} =
           Mensch.Note.start_link(
             number: midi_note_number(note, octave),
             channel: channel,
-            velocity: @default_velocity
+            velocity: @default_velocity,
+            phase: index / max(note_count, 1) * 2 * :math.pi()
           )
 
         pid

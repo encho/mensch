@@ -11,17 +11,17 @@ defmodule Mensch.Midi.Connection do
 
       config :mensch, :midi_output_port_pattern, ~r/some other name/i
 
-  Notes are sent on a single, plain MIDI channel ("legacy" mode,
-  channel 1 / index 0 by default) rather than as true MPE. Osmose's
-  MPE+ implementation ignores Note On velocity entirely and instead
-  requires a continuous stream of Channel Pressure messages to shape
-  each note's attack/sustain - since this app only needs to hold a
-  plain chord until STOP is clicked, legacy mode (where velocity is
-  used directly as the note's initial pressure) is enough to produce
-  sound with a single Note On/Note Off pair per note. The channel can
-  be overridden with:
+  Each note is sent on its own MIDI channel (true MPE) so it can carry
+  independent per-note modulation (Channel Pressure, Pitch Bend). Per
+  Osmose's own MIDI implementation notes, individual notes must be
+  sent on channels #2-#14 (channel #1 is reserved/Master, #15-#16 are
+  reserved for Haken Editor communication), and velocity ("MPE
+  Strike") is ignored entirely by the EaganMatrix - a continuous
+  stream of Channel Pressure messages is required to shape (and even
+  produce) each note's sound, which `Mensch.Note` sends on a timer.
+  The member channel range can be overridden with:
 
-      config :mensch, :midi_channel, 0
+      config :mensch, :midi_member_channels, [1, 2, 3]
 
   If no matching port is found (e.g. the hardware isn't plugged in,
   or in test/CI environments), the connection stays `:disconnected`
@@ -33,6 +33,8 @@ defmodule Mensch.Midi.Connection do
 
   require Logger
 
+  @default_member_channels Enum.to_list(1..13)
+
   defstruct [:out_conn, :port_name, :port_pattern]
 
   # Client API
@@ -41,8 +43,10 @@ defmodule Mensch.Midi.Connection do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc "The MIDI channel (index 0-15) notes are sent on."
-  def channel, do: Application.get_env(:mensch, :midi_channel, 0)
+  @doc "The MPE member channels (index 1-15) available for per-note allocation."
+  def member_channels do
+    Application.get_env(:mensch, :midi_member_channels, @default_member_channels)
+  end
 
   @doc "Sends a raw MIDI message (binary) to the connected output device."
   @spec send_message(binary()) :: :ok | {:error, :disconnected}
