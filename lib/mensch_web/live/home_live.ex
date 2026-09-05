@@ -1,13 +1,17 @@
 defmodule MenschWeb.HomeLive do
   @moduledoc """
-  Minimal live-performance UI: pick a key, a scale degree and a chord
-  quality, then hold it down with PLAY/STOP while it sounds live on
-  the connected MPE MIDI output (e.g. an Osmose).
+  Minimal live-performance UI: pick two chords, then PLAY starts a
+  global loop that holds each chord for 4 bars before automatically
+  advancing to the next (wrapping back to the first), sounding live on
+  the connected MPE MIDI output (e.g. an Osmose). STOP halts the loop
+  immediately, wherever it currently is.
   """
 
   use MenschWeb, :live_view
 
+  alias Mensch.Chord
   alias Mensch.Harmony.Key
+  alias Mensch.Sequencer
 
   @root_options [
     {"C", :c},
@@ -40,7 +44,19 @@ defmodule MenschWeb.HomeLive do
     {"min7", :min7}
   ]
 
-  @default_params %{"root" => "c", "degree" => "I", "modifier" => "maj7", "octave" => "4"}
+  @default_chord1_params %{
+    "root" => "c",
+    "degree" => "I",
+    "modifier" => "maj7",
+    "octave" => "4"
+  }
+
+  @default_chord2_params %{
+    "root" => "c",
+    "degree" => "V",
+    "modifier" => "dom7",
+    "octave" => "4"
+  }
 
   @refresh_interval_ms 100
 
@@ -48,106 +64,88 @@ defmodule MenschWeb.HomeLive do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> assign(:form, to_form(@default_params, as: :chord))
-      |> assign(:chord_pid, nil)
-      |> assign(:chord_ref, nil)
-      |> assign(:chord_notes, [])
+      |> assign(:form1, to_form(@default_chord1_params, as: :chord1))
+      |> assign(:form2, to_form(@default_chord2_params, as: :chord2))
       |> assign(:midi_status, Mensch.Midi.Connection.status())
+      |> assign(:bpm, Mensch.Tempo.bpm())
+      |> assign_loop_snapshot(Sequencer.snapshot())
 
     {:ok, socket}
   end
 
   @impl true
-  def terminate(_reason, socket) do
-    case socket.assigns[:chord_pid] do
-      pid when is_pid(pid) -> Mensch.ChordSupervisor.stop_chord(pid)
-      _ -> :ok
-    end
-
-    :ok
-  end
-
-  @impl true
-  def handle_event("validate", %{"chord" => params}, socket) do
-    {:noreply, assign(socket, :form, to_form(params, as: :chord))}
-  end
-
-  def handle_event("play", %{"chord" => params}, %{assigns: %{chord_pid: pid}} = socket)
-      when is_pid(pid) do
-    {:noreply, assign(socket, :form, to_form(params, as: :chord))}
-  end
-
-  def handle_event("play", %{"chord" => params}, socket) do
-    form = to_form(params, as: :chord)
-
-    case parse_chord_params(params) do
-      {:ok, %{root: root, degree: degree, modifier: modifier, octave: octave}} ->
-        key = %Key{root: root, scale: :major}
-
-        case Mensch.ChordSupervisor.start_chord(
-               key: key,
-               degree: degree,
-               modifier: modifier,
-               octave: octave
-             ) do
-          {:ok, pid} ->
-            ref = Process.monitor(pid)
-            Process.send_after(self(), :refresh_chord, @refresh_interval_ms)
-
-            {:noreply,
-             socket
-             |> assign(:form, form)
-             |> assign(:chord_pid, pid)
-             |> assign(:chord_ref, ref)
-             |> assign(:chord_notes, Mensch.Chord.snapshot(pid))}
-
-          {:error, reason} ->
-            {:noreply,
-             socket
-             |> assign(:form, form)
-             |> put_flash(:error, "Could not start chord: #{inspect(reason)}")}
-        end
-
-      :error ->
-        {:noreply,
-         socket
-         |> assign(:form, form)
-         |> put_flash(:error, "Invalid chord selection")}
-    end
-  end
-
-  def handle_event("stop", _params, %{assigns: %{chord_pid: pid, chord_ref: ref}} = socket)
-      when is_pid(pid) do
-    Mensch.ChordSupervisor.stop_chord(pid)
-    if ref, do: Process.demonitor(ref, [:flush])
-
+  def handle_event("validate", %{"chord1" => c1, "chord2" => c2}, socket) do
     {:noreply,
-     socket |> assign(:chord_pid, nil) |> assign(:chord_ref, nil) |> assign(:chord_notes, [])}
+     socket
+     |> assign(:form1, to_form(c1, as: :chord1))
+     |> assign(:form2, to_form(c2, as: :chord2))}
   end
 
-  def handle_event("stop", _params, socket), do: {:noreply, socket}
+  def handle_event("play", _params, %{assigns: %{loop_status: :playing}} = socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("play", %{"chord1" => c1_params, "chord2" => c2_params}, socket) do
+    form1 = to_form(c1_params, as: :chord1)
+    form2 = to_form(c2_params, as: :chord2)
+    socket = socket |> assign(:form1, form1) |> assign(:form2, form2)
+
+    with {:ok, chord1_attrs} <- parse_chord_params(c1_params),
+         {:ok, chord2_attrs} <- parse_chord_params(c2_params) do
+      Sequencer.play([build_chord(chord1_attrs), build_chord(chord2_attrs)])
+      Process.send_after(self(), :refresh_loop, @refresh_interval_ms)
+
+      {:noreply, assign_loop_snapshot(socket, Sequencer.snapshot())}
+    else
+      :error -> {:noreply, put_flash(socket, :error, "Invalid chord selection")}
+    end
+  end
+
+  def handle_event("stop", _params, socket) do
+    Sequencer.stop()
+    {:noreply, assign_loop_snapshot(socket, Sequencer.snapshot())}
+  end
 
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
   end
 
+  def handle_event("set_bpm", %{"bpm" => bpm_str}, socket) do
+    case Integer.parse(bpm_str) do
+      {bpm, ""} when bpm > 0 ->
+        Mensch.Tempo.set_bpm(bpm)
+        {:noreply, assign(socket, :bpm, bpm)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   @impl true
-  def handle_info(
-        {:DOWN, ref, :process, _pid, _reason},
-        %{assigns: %{chord_ref: ref}} = socket
-      ) do
-    {:noreply,
-     socket |> assign(:chord_pid, nil) |> assign(:chord_ref, nil) |> assign(:chord_notes, [])}
+  def handle_info(:refresh_loop, socket) do
+    snapshot = Sequencer.snapshot()
+    socket = assign_loop_snapshot(socket, snapshot)
+
+    if snapshot.status == :playing do
+      Process.send_after(self(), :refresh_loop, @refresh_interval_ms)
+    end
+
+    {:noreply, socket}
   end
 
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, socket), do: {:noreply, socket}
-
-  def handle_info(:refresh_chord, %{assigns: %{chord_pid: pid}} = socket) when is_pid(pid) do
-    Process.send_after(self(), :refresh_chord, @refresh_interval_ms)
-    {:noreply, assign(socket, :chord_notes, Mensch.Chord.snapshot(pid))}
+  defp assign_loop_snapshot(socket, snapshot) do
+    socket
+    |> assign(:loop_status, snapshot.status)
+    |> assign(:loop_index, snapshot.index)
+    |> assign(:loop_bar, snapshot.bar)
+    |> assign(:bars_per_step, snapshot.bars_per_step)
+    |> assign(:chord_notes, snapshot.notes)
   end
 
-  def handle_info(:refresh_chord, socket), do: {:noreply, socket}
+  defp build_chord(%{root: root, degree: degree, modifier: modifier, octave: octave}) do
+    key = %Key{root: root, scale: :major}
+    Chord.new(key, degree, modifier, octave)
+  end
 
   defp parse_chord_params(params) do
     with root when not is_nil(root) <- find_value(@root_options, params["root"]),
@@ -168,7 +166,7 @@ defmodule MenschWeb.HomeLive do
   defp degree_options, do: @degree_options
   defp modifier_options, do: @modifier_options
 
-  defp playing?(chord_pid), do: is_pid(chord_pid)
+  defp playing?(loop_status), do: loop_status == :playing
 
   defp note_label(note, octave) do
     name = Enum.find_value(@root_options, fn {label, value} -> value == note && label end)
@@ -184,54 +182,100 @@ defmodule MenschWeb.HomeLive do
 
   defp input_class, do: @input_class
 
+  attr :form, :any, required: true
+  attr :label, :string, required: true
+  attr :active, :boolean, default: false
+  attr :disabled, :boolean, default: false
+
+  defp chord_fields(assigns) do
+    ~H"""
+    <div class={[
+      "border p-4 transition-colors duration-150",
+      (@active && "border-white") || "border-white/15"
+    ]}>
+      <div class="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/40">
+        <span class={[
+          "inline-block size-2 rounded-full",
+          (@active && "bg-white") || "bg-white/20"
+        ]} />
+        {@label}
+      </div>
+      <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+        <.input
+          field={@form[:root]}
+          type="select"
+          label="Key"
+          options={root_options()}
+          class={input_class()}
+          disabled={@disabled}
+        />
+        <.input
+          field={@form[:degree]}
+          type="select"
+          label="Degree"
+          options={degree_options()}
+          class={input_class()}
+          disabled={@disabled}
+        />
+        <.input
+          field={@form[:modifier]}
+          type="select"
+          label="Quality"
+          options={modifier_options()}
+          class={input_class()}
+          disabled={@disabled}
+        />
+        <.input
+          field={@form[:octave]}
+          type="number"
+          label="Octave"
+          min="0"
+          max="8"
+          class={input_class()}
+          disabled={@disabled}
+        />
+      </div>
+    </div>
+    """
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status}>
+    <Layouts.app flash={@flash} midi_status={@midi_status} bpm={@bpm}>
       <div class="mx-auto max-w-2xl space-y-8">
-        <.form for={@form} id="chord-form" phx-change="validate" phx-submit="play">
-          <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
-            <.input
-              field={@form[:root]}
-              type="select"
-              label="Key"
-              options={root_options()}
-              class={input_class()}
-              disabled={playing?(@chord_pid)}
+        <.form
+          for={@form1}
+          id="chord-form"
+          phx-change="validate"
+          phx-submit="play"
+          onkeydown="if (event.key === 'Enter' && event.target.tagName === 'INPUT') { event.preventDefault(); }"
+        >
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <.chord_fields
+              form={@form1}
+              label="Chord 1"
+              active={playing?(@loop_status) and @loop_index == 0}
+              disabled={playing?(@loop_status)}
             />
-            <.input
-              field={@form[:degree]}
-              type="select"
-              label="Degree"
-              options={degree_options()}
-              class={input_class()}
-              disabled={playing?(@chord_pid)}
-            />
-            <.input
-              field={@form[:modifier]}
-              type="select"
-              label="Quality"
-              options={modifier_options()}
-              class={input_class()}
-              disabled={playing?(@chord_pid)}
-            />
-            <.input
-              field={@form[:octave]}
-              type="number"
-              label="Octave"
-              min="0"
-              max="8"
-              class={input_class()}
-              disabled={playing?(@chord_pid)}
+            <.chord_fields
+              form={@form2}
+              label="Chord 2"
+              active={playing?(@loop_status) and @loop_index == 1}
+              disabled={playing?(@loop_status)}
             />
           </div>
+
+          <p class="mt-2 text-[11px] uppercase tracking-wide text-white/30">
+            Loops Chord 1 → Chord 2 → Chord 1..., 4 bars each, until Stop is pressed
+          </p>
 
           <div class="mt-6 flex gap-3">
             <button
               type="submit"
               id="play-button"
               class="flex-1 border border-white py-3 text-sm font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white"
-              disabled={playing?(@chord_pid)}
+              disabled={playing?(@loop_status)}
             >
               Play
             </button>
@@ -240,12 +284,30 @@ defmodule MenschWeb.HomeLive do
               id="stop-button"
               phx-click="stop"
               class="flex-1 border border-red-500 py-3 text-sm font-bold uppercase tracking-widest text-red-500 transition-colors duration-150 hover:bg-red-500 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-red-500"
-              disabled={!playing?(@chord_pid)}
+              disabled={!playing?(@loop_status)}
             >
               Stop
             </button>
           </div>
         </.form>
+
+        <div id="loop-position" class="border border-white/15 p-4">
+          <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-white/40">
+            <span>Loop position</span>
+            <span class="font-mono text-white/70">
+              Chord {@loop_index + 1} · Bar {@loop_bar}/{@bars_per_step}
+            </span>
+          </div>
+          <div class="mt-3 grid grid-cols-4 gap-1.5">
+            <div
+              :for={bar <- 1..@bars_per_step}
+              class={[
+                "h-2",
+                (playing?(@loop_status) && bar == @loop_bar && "bg-white") || "bg-white/15"
+              ]}
+            />
+          </div>
+        </div>
 
         <div :if={@chord_notes != []} id="chord-notes" class="border border-white/15">
           <table class="w-full text-left text-sm">

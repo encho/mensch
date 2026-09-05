@@ -18,7 +18,7 @@ defmodule Mensch.Midi.Connection do
   reserved for Haken Editor communication), and velocity ("MPE
   Strike") is ignored entirely by the EaganMatrix - a continuous
   stream of Channel Pressure messages is required to shape (and even
-  produce) each note's sound, which `Mensch.Note` sends on a timer.
+  produce) each note's sound, which `Mensch.NotePlayer` sends on a timer.
   The member channel range can be overridden with:
 
       config :mensch, :midi_member_channels, [1, 2, 3]

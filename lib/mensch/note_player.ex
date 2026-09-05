@@ -1,4 +1,4 @@
-defmodule Mensch.Note do
+defmodule Mensch.NotePlayer do
   @moduledoc """
   Represents a single sounding MIDI note on a dedicated MPE member
   channel.
@@ -20,8 +20,8 @@ defmodule Mensch.Note do
   just breathes gently like every other note.
 
   Always sends note-off when stopped (whether stopped cooperatively or
-  shut down by its parent `Mensch.Chord`), so a note can never get
-  stuck sounding on the hardware.
+  shut down by its parent `Mensch.ChordPlayer`), so a note can never
+  get stuck sounding on the hardware.
   """
 
   use GenServer

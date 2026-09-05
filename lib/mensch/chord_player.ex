@@ -1,33 +1,43 @@
-defmodule Mensch.Chord do
+defmodule Mensch.ChordPlayer do
   @moduledoc """
-  Represents one currently-playing chord: a key, a scale degree (e.g.
-  `:ii`, `:V`) and a quality modifier (e.g. `:min7`, `:maj7`), plus the
-  octave to play it in.
+  Plays one `%Mensch.Chord{}` live over MIDI.
 
-  On start, resolves the chord tones against the key/degree/modifier
-  and starts one `Mensch.Note` child per chord tone, each on its own
+  Starts one `Mensch.NotePlayer` child per chord tone, each on its own
   MPE member channel with a distinct vibrato phase so their modulation
   is audibly independent (see `Mensch.Midi.Connection`). On stop,
   tells every child note to stop (sending note-off for each) before
   terminating itself, so a chord can never leave notes stuck sounding
   on the hardware.
+
+  Takes a `:chord` (`%Mensch.Chord{}`), an optional `:timing`
+  (`%Mensch.Timing{}` snapshot of the global tempo/clock - defaults to
+  `Mensch.Timing.now/0` if omitted), and an optional `:duration_bars`
+  (musical time, not raw milliseconds). If `:duration_bars` is
+  positive, the player automatically stops itself once that many bars
+  have elapsed (per `:timing`'s bpm). A `:duration_bars` of `0` (the
+  default) means the chord holds indefinitely, until `stop/1` is
+  called.
   """
 
   use GenServer
 
-  alias Mensch.Harmony.{ChordSpec, Key, Resolver}
+  alias Mensch.Chord
+  alias Mensch.Harmony.Key
   alias Mensch.Midi.Connection
+  alias Mensch.NotePlayer
+  alias Mensch.Timing
 
-  defstruct [:key, :degree, :modifier, :octave, :resolved, notes: []]
+  defstruct [:chord, :timing, duration_bars: 0, notes: []]
 
   @default_velocity 100
 
   # Client API
 
   @doc """
-  Starts a chord. `opts` must include `:key` (`%Mensch.Harmony.Key{}`),
-  `:degree` and `:modifier` (see `Mensch.Harmony.ChordSpec`), and
-  `:octave` (integer; 4 is the octave containing middle C).
+  Starts playing a chord. `opts` must include `:chord`
+  (`%Mensch.Chord{}`). Optionally takes `:timing` (`%Mensch.Timing{}`,
+  defaults to `Mensch.Timing.now/0`) and `:duration_bars` (number,
+  default `0` = hold indefinitely).
   """
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
@@ -55,23 +65,22 @@ defmodule Mensch.Chord do
   def init(opts) do
     Process.flag(:trap_exit, true)
 
-    key = Keyword.fetch!(opts, :key)
-    degree = Keyword.fetch!(opts, :degree)
-    modifier = Keyword.fetch!(opts, :modifier)
-    octave = Keyword.fetch!(opts, :octave)
+    chord = Keyword.fetch!(opts, :chord)
+    timing = Keyword.get(opts, :timing, Timing.now())
+    duration_bars = Keyword.get(opts, :duration_bars, 0)
 
-    resolved = Resolver.resolve(key, %ChordSpec{degree: degree, modifier: modifier})
     channels = Connection.member_channels()
-    note_count = length(resolved.notes)
+    tones = Chord.notes(chord)
+    note_count = length(tones)
 
     notes =
-      resolved.notes
+      tones
       |> Enum.zip(Enum.take(channels, note_count))
       |> Enum.with_index()
       |> Enum.map(fn {{note, channel}, index} ->
         {:ok, pid} =
-          Mensch.Note.start_link(
-            number: midi_note_number(note, octave),
+          NotePlayer.start_link(
+            number: midi_note_number(note, chord.octave),
             channel: channel,
             velocity: @default_velocity,
             phase: index / max(note_count, 1) * 2 * :math.pi(),
@@ -81,12 +90,14 @@ defmodule Mensch.Chord do
         pid
       end)
 
+    if duration_bars > 0 do
+      Process.send_after(self(), :duration_elapsed, Timing.bars_to_ms(timing, duration_bars))
+    end
+
     state = %__MODULE__{
-      key: key,
-      degree: degree,
-      modifier: modifier,
-      octave: octave,
-      resolved: resolved,
+      chord: chord,
+      timing: timing,
+      duration_bars: duration_bars,
       notes: notes
     }
 
@@ -98,15 +109,20 @@ defmodule Mensch.Chord do
     {:stop, :normal, state}
   end
 
+  def handle_info(:duration_elapsed, state) do
+    {:stop, :normal, state}
+  end
+
   @impl true
   def handle_call(:snapshot, _from, state) do
     notes_info =
-      state.resolved.notes
+      state.chord
+      |> Chord.notes()
       |> Enum.zip(state.notes)
       |> Enum.map(fn {note, pid} ->
-        case Mensch.Note.snapshot(pid) do
+        case NotePlayer.snapshot(pid) do
           nil -> nil
-          info -> Map.merge(info, %{note: note, octave: state.octave})
+          info -> Map.merge(info, %{note: note, octave: state.chord.octave})
         end
       end)
       |> Enum.reject(&is_nil/1)
@@ -117,7 +133,7 @@ defmodule Mensch.Chord do
   @impl true
   def terminate(_reason, state) do
     Enum.each(state.notes, fn pid ->
-      if Process.alive?(pid), do: Mensch.Note.stop(pid)
+      if Process.alive?(pid), do: NotePlayer.stop(pid)
     end)
 
     :ok

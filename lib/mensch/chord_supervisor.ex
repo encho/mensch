@@ -1,6 +1,6 @@
 defmodule Mensch.ChordSupervisor do
   @moduledoc """
-  DynamicSupervisor for `Mensch.Chord` processes: one child per
+  DynamicSupervisor for `Mensch.ChordPlayer` processes: one child per
   currently-playing chord, started when PLAY is clicked and terminated
   when STOP is clicked.
   """
@@ -16,9 +16,9 @@ defmodule Mensch.ChordSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  @doc "Starts a `Mensch.Chord` child. See `Mensch.Chord.start_link/1` for `opts`."
+  @doc "Starts a `Mensch.ChordPlayer` child. See `Mensch.ChordPlayer.start_link/1` for `opts`."
   def start_chord(opts) do
-    DynamicSupervisor.start_child(__MODULE__, {Mensch.Chord, opts})
+    DynamicSupervisor.start_child(__MODULE__, {Mensch.ChordPlayer, opts})
   end
 
   @doc "Stops a running chord."

@@ -35,6 +35,10 @@ defmodule MenschWeb.Layouts do
     default: nil,
     doc: "current MIDI connection status, e.g. {:connected, name} or :disconnected"
 
+  attr :bpm, :integer,
+    default: nil,
+    doc: "current global tempo (beats per minute), shared by every chord"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -45,39 +49,57 @@ defmodule MenschWeb.Layouts do
           <img src={~p"/images/logo.svg"} width="20" />
           <span class="text-base font-bold text-white">mensch</span>
         </a>
-        <div :if={@midi_status} class="relative">
-          <button
-            type="button"
-            id="midi-status-button"
-            phx-click={JS.toggle(to: "#midi-popup", display: "flex")}
-            class="flex items-center gap-2 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 hover:text-white"
+        <div class="flex items-center gap-3">
+          <form
+            :if={@bpm}
+            phx-change="set_bpm"
+            class="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 focus-within:border-white/50"
+            title="Global tempo"
           >
-            <span class={["inline-block size-2.5 rounded-full", midi_status_dot_class(@midi_status)]} />
-            Osmose
-          </button>
-
-          <div
-            id="midi-popup"
-            phx-click-away={JS.hide(to: "#midi-popup")}
-            class="absolute right-0 top-full z-10 mt-3 hidden w-64 flex-col gap-3 border border-white/15 bg-black p-4"
-          >
-            <div class="flex items-center gap-2">
-              <span class={[
-                "inline-block size-2 rounded-full",
-                midi_status_dot_class(@midi_status)
-              ]} />
-              <span class="font-mono text-sm text-white">
-                {midi_status_label(@midi_status)}
-              </span>
-            </div>
+            <label for="global-bpm" class="text-white/40">BPM</label>
+            <input
+              type="number"
+              name="bpm"
+              id="global-bpm"
+              min="1"
+              value={@bpm}
+              class="w-10 appearance-none border-0 bg-transparent p-0 text-right font-mono text-white [appearance:textfield] focus:outline-none focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+          </form>
+          <div :if={@midi_status} class="relative">
             <button
               type="button"
-              id="reconnect-midi"
-              phx-click="reconnect_midi"
-              class="border border-white/40 py-1.5 text-xs font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black"
+              id="midi-status-button"
+              phx-click={JS.toggle(to: "#midi-popup", display: "flex")}
+              class="flex items-center gap-2 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 hover:text-white"
             >
-              Reconnect
+              <span class={["inline-block size-2.5 rounded-full", midi_status_dot_class(@midi_status)]} />
+              Osmose
             </button>
+
+            <div
+              id="midi-popup"
+              phx-click-away={JS.hide(to: "#midi-popup")}
+              class="absolute right-0 top-full z-10 mt-3 hidden w-64 flex-col gap-3 border border-white/15 bg-black p-4"
+            >
+              <div class="flex items-center gap-2">
+                <span class={[
+                  "inline-block size-2 rounded-full",
+                  midi_status_dot_class(@midi_status)
+                ]} />
+                <span class="font-mono text-sm text-white">
+                  {midi_status_label(@midi_status)}
+                </span>
+              </div>
+              <button
+                type="button"
+                id="reconnect-midi"
+                phx-click="reconnect_midi"
+                class="border border-white/40 py-1.5 text-xs font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black"
+              >
+                Reconnect
+              </button>
+            </div>
           </div>
         </div>
       </div>
