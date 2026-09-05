@@ -38,6 +38,17 @@ defmodule Mensch.Chord do
     GenServer.stop(pid, :normal)
   end
 
+  @doc """
+  Returns a list of `%{note:, octave:, number:, channel:, pressure:, bend:}`
+  maps, one per currently sounding note, in the same order as the
+  chord's tones.
+  """
+  def snapshot(pid) do
+    GenServer.call(pid, :snapshot)
+  catch
+    :exit, _ -> []
+  end
+
   # Server callbacks
 
   @impl true
@@ -84,6 +95,22 @@ defmodule Mensch.Chord do
   @impl true
   def handle_info({:EXIT, _pid, _reason}, state) do
     {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_call(:snapshot, _from, state) do
+    notes_info =
+      state.resolved.notes
+      |> Enum.zip(state.notes)
+      |> Enum.map(fn {note, pid} ->
+        case Mensch.Note.snapshot(pid) do
+          nil -> nil
+          info -> Map.merge(info, %{note: note, octave: state.octave})
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    {:reply, notes_info, state}
   end
 
   @impl true

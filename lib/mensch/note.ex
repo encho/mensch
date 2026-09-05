@@ -28,7 +28,16 @@ defmodule Mensch.Note do
   # modulation is independent per note, without detuning the chord.
   @vibrato_depth 0.0004
 
-  defstruct [:number, :channel, :velocity, :phase, :started_at, :timer_ref]
+  defstruct [
+    :number,
+    :channel,
+    :velocity,
+    :phase,
+    :started_at,
+    :timer_ref,
+    pressure: 0,
+    bend: 0.0
+  ]
 
   # Client API
 
@@ -45,6 +54,13 @@ defmodule Mensch.Note do
   @doc "Stops the note, sending note-off before terminating."
   def stop(pid) do
     GenServer.stop(pid, :normal)
+  end
+
+  @doc "Returns the note's current `%{number:, channel:, pressure:, bend:}`."
+  def snapshot(pid) do
+    GenServer.call(pid, :snapshot)
+  catch
+    :exit, _ -> nil
   end
 
   # Server callbacks
@@ -64,22 +80,35 @@ defmodule Mensch.Note do
     Mensch.Midi.Connection.send_message(<<0x90 + state.channel, state.number, state.velocity>>)
     send_channel_pressure(state, @sustain_pressure)
 
-    {:ok, %{state | timer_ref: schedule_tick()}}
+    {:ok, %{state | timer_ref: schedule_tick(), pressure: @sustain_pressure, bend: 0.0}}
   end
 
   @impl true
   def handle_info(:tick, state) do
     elapsed_seconds = (System.monotonic_time(:millisecond) - state.started_at) / 1000
     angle = 2 * :math.pi() * @vibrato_rate_hz * elapsed_seconds + state.phase
+    bend = :math.sin(angle) * @vibrato_depth
 
-    send_pitch_bend(state, :math.sin(angle) * @vibrato_depth)
+    send_pitch_bend(state, bend)
     send_channel_pressure(state, @sustain_pressure)
 
-    {:noreply, %{state | timer_ref: schedule_tick()}}
+    {:noreply, %{state | timer_ref: schedule_tick(), pressure: @sustain_pressure, bend: bend}}
   end
 
   def handle_info({:EXIT, _pid, _reason}, state) do
     {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_call(:snapshot, _from, state) do
+    snapshot = %{
+      number: state.number,
+      channel: state.channel,
+      pressure: state.pressure,
+      bend: state.bend
+    }
+
+    {:reply, snapshot, state}
   end
 
   @impl true

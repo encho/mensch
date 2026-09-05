@@ -42,6 +42,8 @@ defmodule MenschWeb.HomeLive do
 
   @default_params %{"root" => "c", "degree" => "I", "modifier" => "maj7", "octave" => "4"}
 
+  @refresh_interval_ms 100
+
   @impl true
   def mount(_params, _session, socket) do
     socket =
@@ -49,6 +51,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:form, to_form(@default_params, as: :chord))
       |> assign(:chord_pid, nil)
       |> assign(:chord_ref, nil)
+      |> assign(:chord_notes, [])
       |> assign(:midi_status, Mensch.Midi.Connection.status())
 
     {:ok, socket}
@@ -89,12 +92,14 @@ defmodule MenschWeb.HomeLive do
              ) do
           {:ok, pid} ->
             ref = Process.monitor(pid)
+            Process.send_after(self(), :refresh_chord, @refresh_interval_ms)
 
             {:noreply,
              socket
              |> assign(:form, form)
              |> assign(:chord_pid, pid)
-             |> assign(:chord_ref, ref)}
+             |> assign(:chord_ref, ref)
+             |> assign(:chord_notes, Mensch.Chord.snapshot(pid))}
 
           {:error, reason} ->
             {:noreply,
@@ -115,7 +120,9 @@ defmodule MenschWeb.HomeLive do
       when is_pid(pid) do
     Mensch.ChordSupervisor.stop_chord(pid)
     if ref, do: Process.demonitor(ref, [:flush])
-    {:noreply, socket |> assign(:chord_pid, nil) |> assign(:chord_ref, nil)}
+
+    {:noreply,
+     socket |> assign(:chord_pid, nil) |> assign(:chord_ref, nil) |> assign(:chord_notes, [])}
   end
 
   def handle_event("stop", _params, socket), do: {:noreply, socket}
@@ -129,10 +136,18 @@ defmodule MenschWeb.HomeLive do
         {:DOWN, ref, :process, _pid, _reason},
         %{assigns: %{chord_ref: ref}} = socket
       ) do
-    {:noreply, socket |> assign(:chord_pid, nil) |> assign(:chord_ref, nil)}
+    {:noreply,
+     socket |> assign(:chord_pid, nil) |> assign(:chord_ref, nil) |> assign(:chord_notes, [])}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, socket), do: {:noreply, socket}
+
+  def handle_info(:refresh_chord, %{assigns: %{chord_pid: pid}} = socket) when is_pid(pid) do
+    Process.send_after(self(), :refresh_chord, @refresh_interval_ms)
+    {:noreply, assign(socket, :chord_notes, Mensch.Chord.snapshot(pid))}
+  end
+
+  def handle_info(:refresh_chord, socket), do: {:noreply, socket}
 
   defp parse_chord_params(params) do
     with root when not is_nil(root) <- find_value(@root_options, params["root"]),
@@ -157,6 +172,16 @@ defmodule MenschWeb.HomeLive do
 
   defp midi_status_label({:connected, name}), do: "Connected: #{name}"
   defp midi_status_label(:disconnected), do: "Disconnected"
+
+  defp note_label(note, octave) do
+    name = Enum.find_value(@root_options, fn {label, value} -> value == note && label end)
+    "#{name}#{octave}"
+  end
+
+  defp format_bend(bend) do
+    percent = Float.round(bend * 100, 3)
+    if percent >= 0, do: "+#{percent}%", else: "#{percent}%"
+  end
 
   @impl true
   def render(assigns) do
@@ -228,6 +253,29 @@ defmodule MenschWeb.HomeLive do
             </button>
           </div>
         </.form>
+
+        <div :if={@chord_notes != []} id="chord-notes" class="rounded-lg border border-base-300">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-base-300 text-left text-xs uppercase text-base-content/60">
+                <th class="px-3 py-2">Note</th>
+                <th class="px-3 py-2">MIDI #</th>
+                <th class="px-3 py-2">Channel</th>
+                <th class="px-3 py-2">Pressure</th>
+                <th class="px-3 py-2">Bend</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={info <- @chord_notes} class="border-b border-base-300 last:border-0">
+                <td class="px-3 py-2 font-medium">{note_label(info.note, info.octave)}</td>
+                <td class="px-3 py-2">{info.number}</td>
+                <td class="px-3 py-2">{info.channel + 1}</td>
+                <td class="px-3 py-2">{info.pressure}</td>
+                <td class="px-3 py-2">{format_bend(info.bend)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </Layouts.app>
     """
