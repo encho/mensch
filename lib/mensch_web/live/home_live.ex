@@ -173,6 +173,9 @@ defmodule MenschWeb.HomeLive do
   defp midi_status_label({:connected, name}), do: "Connected: #{name}"
   defp midi_status_label(:disconnected), do: "Disconnected"
 
+  defp status_dot_class({:connected, _name}), do: "bg-emerald-400"
+  defp status_dot_class(:disconnected), do: "bg-red-500"
+
   defp note_label(note, octave) do
     name = Enum.find_value(@root_options, fn {label, value} -> value == note && label end)
     "#{name}#{octave}"
@@ -183,61 +186,81 @@ defmodule MenschWeb.HomeLive do
     if percent >= 0, do: "+#{percent}%", else: "#{percent}%"
   end
 
+  @input_class "w-full appearance-none rounded-none border-0 border-b border-white/30 bg-black py-2 text-sm uppercase tracking-wide text-white focus:border-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-30"
+
+  defp input_class, do: @input_class
+
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash}>
-      <div class="mx-auto max-w-lg space-y-6">
-        <.header>
-          Mensch
-          <:subtitle>Play a chord live over MPE MIDI</:subtitle>
-        </.header>
+      <div class="mx-auto max-w-2xl space-y-8">
+        <div class="border-b border-white/15 pb-4">
+          <h1 class="text-2xl font-bold uppercase tracking-widest text-white">Play</h1>
+          <p class="mt-1 text-xs uppercase tracking-wide text-white/40">
+            Live chords over MPE MIDI
+          </p>
+        </div>
 
-        <div class="flex items-center justify-between rounded-lg border border-base-300 px-4 py-3">
-          <span class="text-sm">
-            MIDI output: <span class="font-medium">{midi_status_label(@midi_status)}</span>
+        <div class="flex items-center justify-between border border-white/15 px-4 py-3">
+          <span class="flex items-center gap-2 text-xs uppercase tracking-wide text-white/70">
+            <span class={["inline-block size-2", status_dot_class(@midi_status)]} />
+            <span class="font-mono normal-case tracking-normal">
+              {midi_status_label(@midi_status)}
+            </span>
           </span>
-          <button type="button" id="reconnect-midi" phx-click="reconnect_midi" class="btn btn-sm">
+          <button
+            type="button"
+            id="reconnect-midi"
+            phx-click="reconnect_midi"
+            class="border border-white/40 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black"
+          >
             Reconnect
           </button>
         </div>
 
         <.form for={@form} id="chord-form" phx-change="validate" phx-submit="play">
-          <.input
-            field={@form[:root]}
-            type="select"
-            label="Key"
-            options={root_options()}
-            disabled={playing?(@chord_pid)}
-          />
-          <.input
-            field={@form[:degree]}
-            type="select"
-            label="Degree"
-            options={degree_options()}
-            disabled={playing?(@chord_pid)}
-          />
-          <.input
-            field={@form[:modifier]}
-            type="select"
-            label="Quality"
-            options={modifier_options()}
-            disabled={playing?(@chord_pid)}
-          />
-          <.input
-            field={@form[:octave]}
-            type="number"
-            label="Octave"
-            min="0"
-            max="8"
-            disabled={playing?(@chord_pid)}
-          />
+          <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+            <.input
+              field={@form[:root]}
+              type="select"
+              label="Key"
+              options={root_options()}
+              class={input_class()}
+              disabled={playing?(@chord_pid)}
+            />
+            <.input
+              field={@form[:degree]}
+              type="select"
+              label="Degree"
+              options={degree_options()}
+              class={input_class()}
+              disabled={playing?(@chord_pid)}
+            />
+            <.input
+              field={@form[:modifier]}
+              type="select"
+              label="Quality"
+              options={modifier_options()}
+              class={input_class()}
+              disabled={playing?(@chord_pid)}
+            />
+            <.input
+              field={@form[:octave]}
+              type="number"
+              label="Octave"
+              min="0"
+              max="8"
+              class={input_class()}
+              disabled={playing?(@chord_pid)}
+            />
+          </div>
 
-          <div class="mt-4 flex gap-3">
+          <div class="mt-6 flex gap-3">
             <button
               type="submit"
               id="play-button"
-              class="btn btn-primary flex-1"
+              class="flex-1 border border-white py-3 text-sm font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white"
               disabled={playing?(@chord_pid)}
             >
               Play
@@ -246,7 +269,7 @@ defmodule MenschWeb.HomeLive do
               type="button"
               id="stop-button"
               phx-click="stop"
-              class="btn btn-error flex-1"
+              class="flex-1 border border-red-500 py-3 text-sm font-bold uppercase tracking-widest text-red-500 transition-colors duration-150 hover:bg-red-500 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-red-500"
               disabled={!playing?(@chord_pid)}
             >
               Stop
@@ -254,31 +277,34 @@ defmodule MenschWeb.HomeLive do
           </div>
         </.form>
 
-        <div :if={@chord_notes != []} id="chord-notes" class="rounded-lg border border-base-300">
-          <table class="w-full text-sm">
+        <div :if={@chord_notes != []} id="chord-notes" class="border border-white/15">
+          <table class="w-full text-left text-sm">
             <thead>
-              <tr class="border-b border-base-300 text-left text-xs uppercase text-base-content/60">
-                <th class="px-3 py-2">Note</th>
-                <th class="px-3 py-2">MIDI #</th>
-                <th class="px-3 py-2">Channel</th>
-                <th class="px-3 py-2">Pressure</th>
-                <th class="px-3 py-2">Bend</th>
-                <th class="px-3 py-2">Slide</th>
+              <tr class="border-b border-white/15 text-[11px] uppercase tracking-wide text-white/40">
+                <th class="px-3 py-2 font-normal">Note</th>
+                <th class="px-3 py-2 font-normal">MIDI #</th>
+                <th class="px-3 py-2 font-normal">Channel</th>
+                <th class="px-3 py-2 font-normal">Pressure</th>
+                <th class="px-3 py-2 font-normal">Bend</th>
+                <th class="px-3 py-2 font-normal">Slide</th>
               </tr>
             </thead>
-            <tbody>
-              <tr :for={info <- @chord_notes} class="border-b border-base-300 last:border-0">
-                <td class="px-3 py-2 font-medium">
+            <tbody class="font-mono">
+              <tr :for={info <- @chord_notes} class="border-b border-white/10 last:border-0">
+                <td class="px-3 py-2 font-medium text-white">
                   {note_label(info.note, info.octave)}
-                  <span :if={info.emphasis} class="badge badge-sm badge-secondary ml-1">
+                  <span
+                    :if={info.emphasis}
+                    class="ml-2 border border-red-500 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-red-500"
+                  >
                     aftertouch
                   </span>
                 </td>
-                <td class="px-3 py-2">{info.number}</td>
-                <td class="px-3 py-2">{info.channel + 1}</td>
-                <td class="px-3 py-2">{info.pressure}</td>
-                <td class="px-3 py-2">{format_bend(info.bend)}</td>
-                <td class="px-3 py-2">{info.slide}</td>
+                <td class="px-3 py-2 text-white/70">{info.number}</td>
+                <td class="px-3 py-2 text-white/70">{info.channel + 1}</td>
+                <td class="px-3 py-2 text-white/70">{info.pressure}</td>
+                <td class="px-3 py-2 text-white/70">{format_bend(info.bend)}</td>
+                <td class="px-3 py-2 text-white/70">{info.slide}</td>
               </tr>
             </tbody>
           </table>
