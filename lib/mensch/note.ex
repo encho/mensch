@@ -21,8 +21,12 @@ defmodule Mensch.Note do
 
   @tick_ms 30
   @sustain_pressure 100
-  @vibrato_rate_hz 5.0
-  @vibrato_depth 0.03
+  @vibrato_rate_hz 4.0
+  # Fraction of the full 14-bit pitch bend range. Kept tiny on purpose:
+  # assuming Osmose's typical +/-48 semitone MPE bend range, this is
+  # roughly +/-2 cents - just enough per-note drift to prove the
+  # modulation is independent per note, without detuning the chord.
+  @vibrato_depth 0.0004
 
   defstruct [:number, :channel, :velocity, :phase, :started_at, :timer_ref]
 
