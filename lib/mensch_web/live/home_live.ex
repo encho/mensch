@@ -411,19 +411,32 @@ defmodule MenschWeb.HomeLive do
             <button
               type="submit"
               id="play-button"
-              class="flex-1 border border-white py-3 text-sm font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-white"
+              aria-label="Play"
+              class={[
+                "flex flex-1 items-center justify-center border py-3 transition-colors duration-150",
+                (playing?(@loop_status) && "border-white/15 text-white/15") ||
+                  "border-green-500 text-green-500 hover:bg-green-500 hover:text-black",
+                "disabled:cursor-not-allowed"
+              ]}
               disabled={playing?(@loop_status)}
             >
-              Play
+              <.icon name="hero-play-solid" class="size-6" />
             </button>
             <button
               type="button"
               id="stop-button"
+              aria-label="Stop"
               phx-click="stop"
-              class="flex-1 border border-red-500 py-3 text-sm font-bold uppercase tracking-widest text-red-500 transition-colors duration-150 hover:bg-red-500 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-red-500"
+              class={[
+                "flex flex-1 items-center justify-center border py-3 transition-colors duration-150",
+                (playing?(@loop_status) &&
+                   "border-red-500 text-red-500 hover:bg-red-500 hover:text-black") ||
+                  "border-white/15 text-white/15",
+                "disabled:cursor-not-allowed"
+              ]}
               disabled={!playing?(@loop_status)}
             >
-              Stop
+              <.icon name="hero-stop-solid" class="size-6" />
             </button>
           </div>
         </.form>
