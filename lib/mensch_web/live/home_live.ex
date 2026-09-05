@@ -272,9 +272,9 @@ defmodule MenschWeb.HomeLive do
   end
 
   # A piano-roll style matrix: one row per discrete note (highest pitch
-  # on top), spanning the ms range it's actually sounding, so note
-  # events can be read off by eye against a shared time axis alongside
-  # the line charts above.
+  # on top), spanning from its own (possibly staggered) note-on to its
+  # note-off, so note events can be read off by eye against a shared
+  # time axis alongside the line charts above.
   defp build_note_matrix(music, duration_ms) do
     colors = note_color_map(music)
     duration_ms = max(duration_ms, 1)
@@ -284,9 +284,8 @@ defmodule MenschWeb.HomeLive do
     |> Enum.group_by(fn {note, _at_ms} -> {note.channel, note.note} end)
     |> Enum.map(fn {{channel, note_number}, entries} ->
       {sample, _at_ms} = hd(entries)
-      at_ms_values = Enum.map(entries, fn {_note, at_ms} -> at_ms end)
-      start_ms = Enum.min(at_ms_values)
-      end_ms = Enum.max(at_ms_values)
+      start_ms = entries |> Enum.find(fn {note, _} -> note.note_on end) |> elem(1)
+      end_ms = entries |> Enum.find(fn {note, _} -> note.note_off end) |> elem(1)
       left_pct = start_ms / duration_ms * 100
       width_pct = max((end_ms - start_ms) / duration_ms * 100, 0.5)
 
