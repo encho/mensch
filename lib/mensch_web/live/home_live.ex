@@ -139,6 +139,7 @@ defmodule MenschWeb.HomeLive do
     |> assign(:loop_index, snapshot.index)
     |> assign(:loop_bar, snapshot.bar)
     |> assign(:bars_per_step, snapshot.bars_per_step)
+    |> assign(:loop_progress, snapshot.progress)
     |> assign(:chord_notes, snapshot.notes)
   end
 
@@ -177,6 +178,8 @@ defmodule MenschWeb.HomeLive do
     percent = Float.round(bend * 100, 3)
     if percent >= 0, do: "+#{percent}%", else: "#{percent}%"
   end
+
+  defp percent(fraction), do: Float.round(fraction * 100, 1)
 
   @input_class "w-full appearance-none rounded-none border-0 border-b border-white/30 bg-black py-2 text-sm uppercase tracking-wide text-white focus:border-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-30"
 
@@ -295,7 +298,7 @@ defmodule MenschWeb.HomeLive do
           <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-white/40">
             <span>Loop position</span>
             <span class="font-mono text-white/70">
-              Chord {@loop_index + 1} · Bar {@loop_bar}/{@bars_per_step}
+              Chord {@loop_index + 1} · Bar {@loop_bar}/{@bars_per_step} · {percent(@loop_progress)}%
             </span>
           </div>
           <div class="mt-3 grid grid-cols-4 gap-1.5">
@@ -305,6 +308,17 @@ defmodule MenschWeb.HomeLive do
                 "h-2",
                 (playing?(@loop_status) && bar == @loop_bar && "bg-white") || "bg-white/15"
               ]}
+            />
+          </div>
+          <div id="loop-progress-bar" class="relative mt-3 h-1 bg-white/15">
+            <div
+              class="absolute inset-y-0 left-0 bg-white/30"
+              style={"width: #{percent(@loop_progress)}%"}
+            />
+            <div
+              id="loop-progress-crosshair"
+              class="absolute inset-y-0 w-px -translate-x-1/2 bg-white"
+              style={"left: #{percent(@loop_progress)}%"}
             />
           </div>
         </div>

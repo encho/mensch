@@ -11,10 +11,10 @@ defmodule Mensch.Sequencer do
 
   This is the global scheduler alluded to in `Mensch.Tempo` and
   `Mensch.ChordPlayer`'s docs: the loop itself owns all scheduling
-  and bar-position bookkeeping, so each step's `Mensch.ChordPlayer` is
-  simply told to hold indefinitely (`duration_bars: 0`) and is
-  explicitly stopped by the loop - never by itself - when it's time to
-  advance.
+  and bar-position bookkeeping. Each step's `Mensch.ChordPlayer` is
+  given the step's real `:duration_bars` (so it can report its own
+  `Mensch.ChordPlayer.progress/1`), but is always explicitly stopped
+  by the loop - never by itself - when it's time to advance.
   """
 
   use GenServer
@@ -49,12 +49,14 @@ defmodule Mensch.Sequencer do
   end
 
   @doc """
-  Returns a snapshot: `%{status:, index:, bars_per_step:, bar:, notes:}`.
+  Returns a snapshot: `%{status:, index:, bars_per_step:, bar:, progress:, notes:}`.
 
   `index` is the (0-based) currently playing step, `bar` is the
-  current (1-based) bar within that step's `bars_per_step`, and
-  `notes` is the currently sounding chord's note info (see
-  `Mensch.ChordPlayer.snapshot/1`) - empty when stopped.
+  current (1-based) bar within that step's `bars_per_step`,
+  `progress` is how far (0.0..1.0) the loop as a whole has gotten
+  through a full cycle of every step, and `notes` is the currently
+  sounding chord's note info (see `Mensch.ChordPlayer.snapshot/1`) -
+  empty when stopped.
   """
   def snapshot do
     GenServer.call(__MODULE__, :snapshot)
@@ -111,7 +113,7 @@ defmodule Mensch.Sequencer do
 
   defp start_step(%{chords: chords, index: index} = state) do
     chord = Enum.at(chords, index)
-    {:ok, pid} = ChordSupervisor.start_chord(chord: chord, duration_bars: 0)
+    {:ok, pid} = ChordSupervisor.start_chord(chord: chord, duration_bars: @bars_per_step)
     timing = Timing.now()
     ref = make_ref()
     Process.send_after(self(), {:advance, ref}, Timing.bars_to_ms(timing, @bars_per_step))
@@ -132,17 +134,20 @@ defmodule Mensch.Sequencer do
     bar_ms = Timing.bars_to_ms(state.timing, 1)
     elapsed_bars = div(Timing.elapsed_ms(state.timing), bar_ms)
     bar = min(@bars_per_step, elapsed_bars + 1)
+    step_progress = ChordPlayer.progress(state.chord_pid) || 0.0
+    progress = (state.index + step_progress) / length(state.chords)
 
     %{
       status: :playing,
       index: state.index,
       bars_per_step: @bars_per_step,
       bar: bar,
+      progress: progress,
       notes: ChordPlayer.snapshot(state.chord_pid)
     }
   end
 
   defp stopped_snapshot do
-    %{status: :stopped, index: 0, bars_per_step: @bars_per_step, bar: 1, notes: []}
+    %{status: :stopped, index: 0, bars_per_step: @bars_per_step, bar: 1, progress: 0.0, notes: []}
   end
 end

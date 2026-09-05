@@ -59,6 +59,18 @@ defmodule Mensch.ChordPlayer do
     :exit, _ -> []
   end
 
+  @doc """
+  Returns how far along (0.0..1.0) this chord is through its own
+  `:duration_bars`, based on the global tempo/clock captured in
+  `:timing` - or `nil` when `:duration_bars` is `0` (holds
+  indefinitely, so it has no total duration to measure against).
+  """
+  def progress(pid) do
+    GenServer.call(pid, :progress)
+  catch
+    :exit, _ -> nil
+  end
+
   # Server callbacks
 
   @impl true
@@ -128,6 +140,17 @@ defmodule Mensch.ChordPlayer do
       |> Enum.reject(&is_nil/1)
 
     {:reply, notes_info, state}
+  end
+
+  def handle_call(:progress, _from, %{duration_bars: duration_bars} = state)
+      when duration_bars <= 0 do
+    {:reply, nil, state}
+  end
+
+  def handle_call(:progress, _from, state) do
+    total_ms = Timing.bars_to_ms(state.timing, state.duration_bars)
+    percent = Timing.elapsed_ms(state.timing) / total_ms
+    {:reply, percent |> max(0.0) |> min(1.0), state}
   end
 
   @impl true
