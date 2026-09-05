@@ -1,0 +1,96 @@
+defmodule Mensch.Chord do
+  @moduledoc """
+  Represents one currently-playing chord: a key, a scale degree (e.g.
+  `:ii`, `:V`) and a quality modifier (e.g. `:min7`, `:maj7`), plus the
+  octave to play it in.
+
+  On start, resolves the chord tones against the key/degree/modifier
+  and starts one `Mensch.Note` child per chord tone (all on the same
+  MIDI channel - see `Mensch.Midi.Connection`). On stop, tells every
+  child note to stop (sending note-off for each) before terminating
+  itself, so a chord can never leave notes stuck sounding on the
+  hardware.
+  """
+
+  use GenServer
+
+  alias Mensch.Harmony.{ChordSpec, Key, Resolver}
+  alias Mensch.Midi.Connection
+
+  defstruct [:key, :degree, :modifier, :octave, :resolved, notes: []]
+
+  @default_velocity 100
+
+  # Client API
+
+  @doc """
+  Starts a chord. `opts` must include `:key` (`%Mensch.Harmony.Key{}`),
+  `:degree` and `:modifier` (see `Mensch.Harmony.ChordSpec`), and
+  `:octave` (integer; 4 is the octave containing middle C).
+  """
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts)
+  end
+
+  @doc "Stops the chord, stopping every note (sending note-off for each)."
+  def stop(pid) do
+    GenServer.stop(pid, :normal)
+  end
+
+  # Server callbacks
+
+  @impl true
+  def init(opts) do
+    Process.flag(:trap_exit, true)
+
+    key = Keyword.fetch!(opts, :key)
+    degree = Keyword.fetch!(opts, :degree)
+    modifier = Keyword.fetch!(opts, :modifier)
+    octave = Keyword.fetch!(opts, :octave)
+
+    resolved = Resolver.resolve(key, %ChordSpec{degree: degree, modifier: modifier})
+    channel = Connection.channel()
+
+    notes =
+      Enum.map(resolved.notes, fn note ->
+        {:ok, pid} =
+          Mensch.Note.start_link(
+            number: midi_note_number(note, octave),
+            channel: channel,
+            velocity: @default_velocity
+          )
+
+        pid
+      end)
+
+    state = %__MODULE__{
+      key: key,
+      degree: degree,
+      modifier: modifier,
+      octave: octave,
+      resolved: resolved,
+      notes: notes
+    }
+
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_info({:EXIT, _pid, _reason}, state) do
+    {:stop, :normal, state}
+  end
+
+  @impl true
+  def terminate(_reason, state) do
+    Enum.each(state.notes, fn pid ->
+      if Process.alive?(pid), do: Mensch.Note.stop(pid)
+    end)
+
+    :ok
+  end
+
+  defp midi_note_number(note, octave) do
+    semitone = Enum.find_index(Key.notes(), &(&1 == note))
+    (octave + 1) * 12 + semitone
+  end
+end

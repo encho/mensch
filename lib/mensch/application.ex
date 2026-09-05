@@ -11,8 +11,8 @@ defmodule Mensch.Application do
       MenschWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:mensch, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Mensch.PubSub},
-      # Start a worker by calling: Mensch.Worker.start_link(arg)
-      # {Mensch.Worker, arg},
+      Mensch.Midi.Connection,
+      Mensch.ChordSupervisor,
       # Start to serve requests, typically the last entry
       MenschWeb.Endpoint
     ]
