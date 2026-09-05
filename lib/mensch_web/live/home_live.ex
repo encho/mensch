@@ -10,8 +10,11 @@ defmodule MenschWeb.HomeLive do
   use MenschWeb, :live_view
 
   alias Mensch.Chord
+  alias Mensch.Envelope
   alias Mensch.Harmony.{Diatonic, Scale}
   alias Mensch.Sequencer
+
+  @default_envelope %Envelope{}
 
   @root_options [
     {"C", :c},
@@ -139,8 +142,11 @@ defmodule MenschWeb.HomeLive do
     with {:ok, chord1_attrs} <- parse_chord_params(c1_params),
          {:ok, chord2_attrs} <- parse_chord_params(c2_params),
          {:ok, chord3_attrs} <- parse_chord_params(c3_params) do
-      chords = [build_chord(chord1_attrs), build_chord(chord2_attrs), build_chord(chord3_attrs)]
-      Sequencer.play(chords)
+      steps =
+        [chord1_attrs, chord2_attrs, chord3_attrs]
+        |> Enum.map(&{build_chord(&1), @default_envelope})
+
+      Sequencer.play(steps)
       Process.send_after(self(), :refresh_loop, @refresh_interval_ms)
 
       {:noreply, assign_loop_snapshot(socket, Sequencer.snapshot())}
