@@ -263,15 +263,22 @@ defmodule MenschWeb.HomeLive do
                 <th class="px-3 py-2">Channel</th>
                 <th class="px-3 py-2">Pressure</th>
                 <th class="px-3 py-2">Bend</th>
+                <th class="px-3 py-2">Slide</th>
               </tr>
             </thead>
             <tbody>
               <tr :for={info <- @chord_notes} class="border-b border-base-300 last:border-0">
-                <td class="px-3 py-2 font-medium">{note_label(info.note, info.octave)}</td>
+                <td class="px-3 py-2 font-medium">
+                  {note_label(info.note, info.octave)}
+                  <span :if={info.emphasis} class="badge badge-sm badge-secondary ml-1">
+                    aftertouch
+                  </span>
+                </td>
                 <td class="px-3 py-2">{info.number}</td>
                 <td class="px-3 py-2">{info.channel + 1}</td>
                 <td class="px-3 py-2">{info.pressure}</td>
                 <td class="px-3 py-2">{format_bend(info.bend)}</td>
+                <td class="px-3 py-2">{info.slide}</td>
               </tr>
             </tbody>
           </table>

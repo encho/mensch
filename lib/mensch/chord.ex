@@ -74,7 +74,8 @@ defmodule Mensch.Chord do
             number: midi_note_number(note, octave),
             channel: channel,
             velocity: @default_velocity,
-            phase: index / max(note_count, 1) * 2 * :math.pi()
+            phase: index / max(note_count, 1) * 2 * :math.pi(),
+            emphasis: index == 0
           )
 
         pid
