@@ -72,6 +72,7 @@ defmodule MenschWeb.HomeLive do
           |> assign(:slide_chart, [])
           |> assign(:bend_chart, [])
           |> assign(:debug_rows, [])
+          |> assign(:note_matrix, [])
 
         %{music: music, duration_ms: duration_ms} ->
           assigns
@@ -82,6 +83,7 @@ defmodule MenschWeb.HomeLive do
           |> assign(:slide_chart, build_chart(music, duration_ms, :slide, {0, 127}))
           |> assign(:bend_chart, build_chart(music, duration_ms, :bend, value_range(music)))
           |> assign(:debug_rows, debug_rows(music))
+          |> assign(:note_matrix, build_note_matrix(music, duration_ms))
       end
 
     ~H"""
@@ -146,6 +148,24 @@ defmodule MenschWeb.HomeLive do
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <div id="note-matrix" class="border border-white/10">
+              <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
+                Note matrix
+              </div>
+              <div class="space-y-1 px-3 py-2">
+                <div :for={row <- @note_matrix} class="flex items-center gap-3">
+                  <div class="w-10 shrink-0 font-mono text-[11px] text-white">{row.label}</div>
+                  <div class="relative h-3 flex-1 bg-white/5">
+                    <div class="absolute inset-y-0 rounded-[1px]" style={row.style}></div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex justify-between px-3 pb-2 font-mono text-[10px] text-white/30">
+                <span>0ms</span>
+                <span>{@render_data.duration_ms}ms</span>
               </div>
             </div>
 
@@ -230,6 +250,8 @@ defmodule MenschWeb.HomeLive do
   # note}`), one polyline per note, for an SVG line chart of `value_key`
   # (`:pressure`, `:bend`, or `:slide`) over time.
   defp build_chart(music, duration_ms, value_key, {min_v, max_v}) do
+    colors = note_color_map(music)
+
     music
     |> Enum.flat_map(fn frame ->
       Enum.map(frame.notes, &{{&1.channel, &1.note}, frame.at_ms, Map.fetch!(&1, value_key)})
@@ -238,15 +260,59 @@ defmodule MenschWeb.HomeLive do
       fn {id, _at_ms, _value} -> id end,
       fn {_id, at_ms, value} -> {at_ms, value} end
     )
-    |> Enum.sort_by(fn {{channel, _note}, _points} -> channel end)
-    |> Enum.with_index()
-    |> Enum.map(fn {{{channel, note}, points}, index} ->
+    |> Enum.map(fn {{channel, note}, points} ->
       %{
         channel: channel,
         note: note,
-        color: Enum.at(@chart_colors, rem(index, length(@chart_colors))),
+        color: Map.fetch!(colors, {channel, note}),
         points: chart_points(points, duration_ms, min_v, max_v)
       }
+    end)
+    |> Enum.sort_by(& &1.channel)
+  end
+
+  # A piano-roll style matrix: one row per discrete note (highest pitch
+  # on top), spanning the ms range it's actually sounding, so note
+  # events can be read off by eye against a shared time axis alongside
+  # the line charts above.
+  defp build_note_matrix(music, duration_ms) do
+    colors = note_color_map(music)
+    duration_ms = max(duration_ms, 1)
+
+    music
+    |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_ms}) end)
+    |> Enum.group_by(fn {note, _at_ms} -> {note.channel, note.note} end)
+    |> Enum.map(fn {{channel, note_number}, entries} ->
+      {sample, _at_ms} = hd(entries)
+      at_ms_values = Enum.map(entries, fn {_note, at_ms} -> at_ms end)
+      start_ms = Enum.min(at_ms_values)
+      end_ms = Enum.max(at_ms_values)
+      left_pct = start_ms / duration_ms * 100
+      width_pct = max((end_ms - start_ms) / duration_ms * 100, 0.5)
+
+      %{
+        note: note_number,
+        label: "#{sample.note_name}#{sample.octave}",
+        style:
+          "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
+            "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
+            "background-color: #{Map.fetch!(colors, {channel, note_number})};"
+      }
+    end)
+    |> Enum.sort_by(& &1.note, :desc)
+  end
+
+  # Assigns each distinct `{channel, note}` a stable color (ordered by
+  # channel) shared by both the line charts and the note matrix, so the
+  # same note always reads as the same color across visualizations.
+  defp note_color_map(music) do
+    music
+    |> Enum.flat_map(& &1.notes)
+    |> Enum.uniq_by(&{&1.channel, &1.note})
+    |> Enum.sort_by(& &1.channel)
+    |> Enum.with_index()
+    |> Map.new(fn {%{channel: channel, note: note}, index} ->
+      {{channel, note}, Enum.at(@chart_colors, rem(index, length(@chart_colors)))}
     end)
   end
 
