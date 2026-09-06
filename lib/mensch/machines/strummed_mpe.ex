@@ -16,7 +16,7 @@ defmodule Mensch.Machines.StrummedMpe do
   alias Mensch.ChordSpec
   alias Mensch.NoteShape
   alias Mensch.Performance
-  alias Mensch.SongContext
+  alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
   @ticks_per_frame 6
@@ -43,54 +43,54 @@ defmodule Mensch.Machines.StrummedMpe do
   @impl true
   def render(
         %ChordSpec{} = chord_spec,
-        %SongContext{} = song_context,
+        %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
         _opts \\ []
       ) do
     note_stagger_ticks =
       @note_stagger_ms
-      |> then(&SongContext.ms_to_ticks(song_context, &1))
+      |> then(&SampleContext.ms_to_ticks(sample_context, &1))
       |> snap_ticks(@ticks_per_frame)
 
     chord_duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
 
-    song_start_tick =
+    sample_start_tick =
       timeline_context
-      |> TimelineContext.start_tick(song_context)
+      |> TimelineContext.start_tick(sample_context)
       |> snap_ticks(@ticks_per_frame)
 
-    chord_end_tick = song_start_tick + chord_duration_ticks
+    chord_end_tick = sample_start_tick + chord_duration_ticks
 
     notes =
       build_notes(
         chord_spec,
-        song_start_tick,
+        sample_start_tick,
         note_stagger_ticks,
         chord_end_tick,
-        song_context
+        sample_context
       )
 
     duration_ticks =
       notes |> Enum.map(&(&1.delay_ticks + &1.milestones.total_ticks)) |> Enum.max()
 
-    duration_ms = SongContext.ticks_to_ms(song_context, duration_ticks)
-    granularity_ms = SongContext.ticks_to_ms(song_context, @ticks_per_frame)
+    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
+    granularity_ms = SampleContext.ticks_to_ms(sample_context, @ticks_per_frame)
 
     %Performance{
-      bpm: song_context.bpm,
-      time_signature: song_context.time_signature,
+      bpm: sample_context.bpm,
+      time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(notes, duration_ticks, song_context)
+      music: build_music(notes, duration_ticks, sample_context)
     }
   end
 
   defp build_notes(
          chord_spec,
-         song_start_tick,
+         sample_start_tick,
          note_stagger_ticks,
          chord_end_tick,
-         song_context
+         sample_context
        ) do
     chord_notes = ChordSpec.to_midi_notes(chord_spec)
     note_count = max(length(chord_notes), 1)
@@ -99,11 +99,11 @@ defmodule Mensch.Machines.StrummedMpe do
     |> Enum.with_index()
     |> Enum.map(fn {note_number, note_index} ->
       note_delay_ticks = note_index * note_stagger_ticks
-      note_start_tick = song_start_tick + note_delay_ticks
+      note_start_tick = sample_start_tick + note_delay_ticks
       note_duration_ticks = max(chord_end_tick - note_start_tick, 0)
       {note_name, octave} = ChordSpec.note_name(note_number)
 
-      milestones = build_milestones(note_duration_ticks, song_context)
+      milestones = build_milestones(note_duration_ticks, sample_context)
 
       %{
         note_name: note_name,
@@ -122,8 +122,8 @@ defmodule Mensch.Machines.StrummedMpe do
     end)
   end
 
-  defp build_milestones(note_duration_ticks, %SongContext{} = song_context) do
-    note_duration_ms = SongContext.ticks_to_ms(song_context, note_duration_ticks)
+  defp build_milestones(note_duration_ticks, %SampleContext{} = sample_context) do
+    note_duration_ms = SampleContext.ticks_to_ms(sample_context, note_duration_ticks)
 
     %{
       attack_end_ms: @attack_ms,
@@ -134,19 +134,19 @@ defmodule Mensch.Machines.StrummedMpe do
     }
   end
 
-  defp build_music(notes, duration_ticks, song_context) do
+  defp build_music(notes, duration_ticks, sample_context) do
     for at_tick <- 0..duration_ticks//@ticks_per_frame do
-      at_ms = SongContext.ticks_to_ms(song_context, at_tick)
+      at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
 
       %{
         at_ms: at_ms,
         at_tick: at_tick,
-        notes: Enum.map(notes, &note_frame(&1, at_tick, song_context))
+        notes: Enum.map(notes, &note_frame(&1, at_tick, sample_context))
       }
     end
   end
 
-  defp note_frame(note, at_tick, _song_context) when at_tick < note.delay_ticks do
+  defp note_frame(note, at_tick, _sample_context) when at_tick < note.delay_ticks do
     %{
       note_name: note.note_name,
       octave: note.octave,
@@ -165,9 +165,9 @@ defmodule Mensch.Machines.StrummedMpe do
     }
   end
 
-  defp note_frame(note, at_tick, song_context) do
+  defp note_frame(note, at_tick, sample_context) do
     local_elapsed_ticks = at_tick - note.delay_ticks
-    local_elapsed_ms = SongContext.ticks_to_ms(song_context, local_elapsed_ticks)
+    local_elapsed_ms = SampleContext.ticks_to_ms(sample_context, local_elapsed_ticks)
 
     %{
       note_name: note.note_name,

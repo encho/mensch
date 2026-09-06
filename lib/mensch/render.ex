@@ -2,25 +2,25 @@ defmodule Mensch.Render do
   @moduledoc """
   Facade that renders a performance via a concrete `Mensch.Machine`.
 
-  Use `generate_song/0` or `generate_song/2` to render and aggregate a
-  full multi-entry song timeline.
+  Use `generate_sample/0` or `generate_sample/2` to render and aggregate a
+  full multi-entry sample timeline.
   """
 
   alias Mensch.ChordSpec
   alias Mensch.Machines.StrummedMpe
   alias Mensch.Midi.Connection
   alias Mensch.Performance
-  alias Mensch.SongContext
+  alias Mensch.SampleContext
   alias Mensch.TimelineContext
   alias Mensch.BeatPosition
 
-  @default_song_context %SongContext{bpm: 120, time_signature: {4, 4}, ppq: 96}
+  @default_sample_context %SampleContext{bpm: 120, time_signature: {4, 4}, ppq: 96}
   @default_timeline_context %TimelineContext{
     start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
     duration_ticks: 384
   }
 
-  @default_song_entries [
+  @default_sample_entries [
     %{
       chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
       timeline_context: %TimelineContext{
@@ -47,8 +47,8 @@ defmodule Mensch.Render do
     }
   ]
 
-  @default_song_two_context %SongContext{bpm: 80, time_signature: {4, 4}, ppq: 96}
-  @default_song_two_entries [
+  @default_sample_two_context %SampleContext{bpm: 80, time_signature: {4, 4}, ppq: 96}
+  @default_sample_two_entries [
     %{
       chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
       timeline_context: %TimelineContext{
@@ -59,30 +59,30 @@ defmodule Mensch.Render do
     }
   ]
 
-  @default_songs [
+  @default_samples [
     %{
-      id: "song-1",
-      name: "Song 1 · Dm7 G7 Cmaj7",
-      song_context: @default_song_context,
-      song_entries: @default_song_entries
+      id: "sample-1",
+      name: "Sample 1 · Dm7 G7 Cmaj7",
+      sample_context: @default_sample_context,
+      sample_entries: @default_sample_entries
     },
     %{
-      id: "song-2",
-      name: "Song 2 · Cmaj7 Drone",
-      song_context: @default_song_two_context,
-      song_entries: @default_song_two_entries
+      id: "sample-2",
+      name: "Sample 2 · Cmaj7 Drone",
+      sample_context: @default_sample_two_context,
+      sample_entries: @default_sample_two_entries
     }
   ]
 
-  @doc "Default multi-entry song render (aggregated timeline)."
-  @spec generate_song() :: Performance.t()
-  def generate_song do
-    generate_song(@default_song_entries, @default_song_context)
+  @doc "Default multi-entry sample render (aggregated timeline)."
+  @spec generate_sample() :: Performance.t()
+  def generate_sample do
+    generate_sample(@default_sample_entries, @default_sample_context)
   end
 
-  @doc "Renders and aggregates a full song timeline from entry maps."
-  @spec generate_song([map()], SongContext.t()) :: Performance.t()
-  def generate_song(entries, %SongContext{} = song_context) when is_list(entries) do
+  @doc "Renders and aggregates a full sample timeline from entry maps."
+  @spec generate_sample([map()], SampleContext.t()) :: Performance.t()
+  def generate_sample(entries, %SampleContext{} = sample_context) when is_list(entries) do
     entries
     |> Enum.with_index()
     |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context} = entry,
@@ -94,54 +94,55 @@ defmodule Mensch.Render do
         chord_spec,
         timeline_context,
         machine_module,
-        song_context,
+        sample_context,
         entry_index
       )
     end)
-    |> merge_performances(song_context)
+    |> merge_performances(sample_context)
     |> rechannelize_performance()
   end
 
-  @doc "Returns the default song entries for UI/debug display."
-  @spec default_song_entries() :: [map()]
-  def default_song_entries, do: @default_song_entries
+  @doc "Returns the default sample entries for UI/debug display."
+  @spec default_sample_entries() :: [map()]
+  def default_sample_entries, do: @default_sample_entries
 
-  @doc "Returns the default song catalog for UI selection."
-  @spec default_songs() :: [map()]
-  def default_songs, do: @default_songs
+  @doc "Returns the default sample catalog for UI selection."
+  @spec default_samples() :: [map()]
+  def default_samples, do: @default_samples
 
-  @doc "Returns the default song context used by `generate_song/0`."
-  @spec default_song_context() :: SongContext.t()
-  def default_song_context, do: @default_song_context
+  @doc "Returns the default sample context used by `generate_sample/0`."
+  @spec default_sample_context() :: SampleContext.t()
+  def default_sample_context, do: @default_sample_context
 
-  @doc "Renders the given chord spec using default song/timeline contexts."
+  @doc "Renders the given chord spec using default sample/timeline contexts."
   @spec generate(ChordSpec.t()) :: Performance.t()
   def generate(%ChordSpec{} = chord_spec) do
-    StrummedMpe.render(chord_spec, @default_song_context, @default_timeline_context)
+    StrummedMpe.render(chord_spec, @default_sample_context, @default_timeline_context)
     |> rechannelize_performance()
   end
 
-  @doc "Renders a chord spec with an explicit song/timeline context via the default machine."
-  @spec generate(ChordSpec.t(), SongContext.t(), TimelineContext.t()) :: Performance.t()
+  @doc "Renders a chord spec with an explicit sample/timeline context via the default machine."
+  @spec generate(ChordSpec.t(), SampleContext.t(), TimelineContext.t()) :: Performance.t()
   def generate(
         %ChordSpec{} = chord_spec,
-        %SongContext{} = song_context,
+        %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context
       ) do
-    StrummedMpe.render(chord_spec, song_context, timeline_context)
+    StrummedMpe.render(chord_spec, sample_context, timeline_context)
     |> rechannelize_performance()
   end
 
   @doc "Renders a chord spec via a specific machine module implementing `Mensch.Machine`."
-  @spec generate(ChordSpec.t(), SongContext.t(), TimelineContext.t(), module()) :: Performance.t()
+  @spec generate(ChordSpec.t(), SampleContext.t(), TimelineContext.t(), module()) ::
+          Performance.t()
   def generate(
         %ChordSpec{} = chord_spec,
-        %SongContext{} = song_context,
+        %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
         machine_module
       )
       when is_atom(machine_module) do
-    machine_module.render(chord_spec, song_context, timeline_context)
+    machine_module.render(chord_spec, sample_context, timeline_context)
     |> rechannelize_performance()
   end
 
@@ -154,7 +155,7 @@ defmodule Mensch.Render do
          %ChordSpec{} = chord_spec,
          %TimelineContext{} = timeline_context,
          machine_module,
-         %SongContext{} = song_context,
+         %SampleContext{} = sample_context,
          entry_index
        )
        when is_atom(machine_module) and is_integer(entry_index) do
@@ -165,17 +166,17 @@ defmodule Mensch.Render do
 
     local_performance =
       chord_spec
-      |> machine_module.render(song_context, local_timeline_context)
-      |> tag_song_entry_index(entry_index)
+      |> machine_module.render(sample_context, local_timeline_context)
+      |> tag_sample_entry_index(entry_index)
 
-    start_tick = TimelineContext.start_tick(timeline_context, song_context)
-    shift_performance(local_performance, start_tick, song_context)
+    start_tick = TimelineContext.start_tick(timeline_context, sample_context)
+    shift_performance(local_performance, start_tick, sample_context)
   end
 
   defp shift_performance(
          %Performance{} = performance,
          start_tick,
-         %SongContext{} = song_context
+         %SampleContext{} = sample_context
        ) do
     shifted_music =
       Enum.map(performance.music, fn frame ->
@@ -183,7 +184,7 @@ defmodule Mensch.Render do
 
         %{
           at_tick: shifted_tick,
-          at_ms: SongContext.ticks_to_ms(song_context, shifted_tick),
+          at_ms: SampleContext.ticks_to_ms(sample_context, shifted_tick),
           notes: frame.notes
         }
       end)
@@ -192,17 +193,17 @@ defmodule Mensch.Render do
 
     %Performance{
       performance
-      | duration_ms: SongContext.ticks_to_ms(song_context, last_tick),
+      | duration_ms: SampleContext.ticks_to_ms(sample_context, last_tick),
         music: shifted_music
     }
   end
 
-  defp tag_song_entry_index(%Performance{} = performance, entry_index) do
+  defp tag_sample_entry_index(%Performance{} = performance, entry_index) do
     tagged_music =
       Enum.map(performance.music, fn frame ->
         tagged_notes =
           Enum.map(frame.notes, fn note ->
-            Map.put(note, :song_entry_index, entry_index)
+            Map.put(note, :sample_entry_index, entry_index)
           end)
 
         %{frame | notes: tagged_notes}
@@ -211,17 +212,17 @@ defmodule Mensch.Render do
     %Performance{performance | music: tagged_music}
   end
 
-  defp merge_performances([], %SongContext{} = song_context) do
+  defp merge_performances([], %SampleContext{} = sample_context) do
     %Performance{
-      bpm: song_context.bpm,
-      time_signature: song_context.time_signature,
-      granularity_ms: SongContext.ticks_to_ms(song_context, 6),
+      bpm: sample_context.bpm,
+      time_signature: sample_context.time_signature,
+      granularity_ms: SampleContext.ticks_to_ms(sample_context, 6),
       duration_ms: 0,
       music: []
     }
   end
 
-  defp merge_performances(performances, %SongContext{} = song_context) do
+  defp merge_performances(performances, %SampleContext{} = sample_context) do
     merged_music =
       performances
       |> Enum.flat_map(& &1.music)
@@ -229,15 +230,15 @@ defmodule Mensch.Render do
       |> Enum.map(fn {at_tick, frames} ->
         %{
           at_tick: at_tick,
-          at_ms: SongContext.ticks_to_ms(song_context, at_tick),
+          at_ms: SampleContext.ticks_to_ms(sample_context, at_tick),
           notes: Enum.flat_map(frames, & &1.notes)
         }
       end)
       |> Enum.sort_by(& &1.at_tick)
 
     %Performance{
-      bpm: song_context.bpm,
-      time_signature: song_context.time_signature,
+      bpm: sample_context.bpm,
+      time_signature: sample_context.time_signature,
       granularity_ms: performances |> Enum.map(& &1.granularity_ms) |> Enum.min(),
       duration_ms: performances |> Enum.map(& &1.duration_ms) |> Enum.max(),
       music: merged_music
@@ -316,7 +317,7 @@ defmodule Mensch.Render do
 
   defp logical_note_id(note) do
     {
-      Map.get(note, :song_entry_index, -1),
+      Map.get(note, :sample_entry_index, -1),
       Map.get(note, :machine_id, :unknown),
       Map.get(note, :chord_instance_id, 0),
       Map.get(note, :event_index, 0),

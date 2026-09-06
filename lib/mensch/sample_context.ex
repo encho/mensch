@@ -1,6 +1,6 @@
-defmodule Mensch.SongContext do
+defmodule Mensch.SampleContext do
   @moduledoc """
-  Global song timing context.
+  Global sample timing context.
 
   PPQ means pulses per quarter note (ticks per beat). This module keeps
   PPQ internal, while exposing helpers to convert to/from human-friendly
@@ -41,7 +41,7 @@ defmodule Mensch.SongContext do
   def new!(attrs) do
     case new(attrs) do
       {:ok, ctx} -> ctx
-      {:error, reason} -> raise ArgumentError, "invalid song context: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "invalid sample context: #{inspect(reason)}"
     end
   end
 
@@ -55,8 +55,8 @@ defmodule Mensch.SongContext do
 
   @doc "Ticks per bar."
   @spec ticks_per_bar(t()) :: pos_integer()
-  def ticks_per_bar(%__MODULE__{} = song_context) do
-    beats_per_bar(song_context) * ticks_per_beat(song_context)
+  def ticks_per_bar(%__MODULE__{} = sample_context) do
+    beats_per_bar(sample_context) * ticks_per_beat(sample_context)
   end
 
   @doc "Milliseconds per beat."
@@ -65,36 +65,36 @@ defmodule Mensch.SongContext do
 
   @doc "Milliseconds per PPQ tick."
   @spec ms_per_tick(t()) :: float()
-  def ms_per_tick(%__MODULE__{} = song_context) do
-    ms_per_beat(song_context) / ticks_per_beat(song_context)
+  def ms_per_tick(%__MODULE__{} = sample_context) do
+    ms_per_beat(sample_context) / ticks_per_beat(sample_context)
   end
 
-  @doc "Converts absolute ticks to milliseconds from song start."
+  @doc "Converts absolute ticks to milliseconds from sample start."
   @spec ticks_to_ms(t(), non_neg_integer()) :: non_neg_integer()
-  def ticks_to_ms(%__MODULE__{} = song_context, ticks) when is_integer(ticks) and ticks >= 0 do
-    round(ticks * ms_per_tick(song_context))
+  def ticks_to_ms(%__MODULE__{} = sample_context, ticks) when is_integer(ticks) and ticks >= 0 do
+    round(ticks * ms_per_tick(sample_context))
   end
 
-  @doc "Converts milliseconds from song start to nearest absolute tick."
+  @doc "Converts milliseconds from sample start to nearest absolute tick."
   @spec ms_to_ticks(t(), non_neg_integer()) :: non_neg_integer()
-  def ms_to_ticks(%__MODULE__{} = song_context, ms) when is_integer(ms) and ms >= 0 do
-    round(ms / ms_per_tick(song_context))
+  def ms_to_ticks(%__MODULE__{} = sample_context, ms) when is_integer(ms) and ms >= 0 do
+    round(ms / ms_per_tick(sample_context))
   end
 
   @doc "Converts a beat position (`bar`/`beat`/`tick`) to absolute tick."
   @spec position_to_tick(t(), BeatPosition.t()) :: non_neg_integer()
-  def position_to_tick(%__MODULE__{} = song_context, %BeatPosition{} = beat_position) do
-    beat_position.bar * ticks_per_bar(song_context) +
-      beat_position.beat * ticks_per_beat(song_context) +
+  def position_to_tick(%__MODULE__{} = sample_context, %BeatPosition{} = beat_position) do
+    beat_position.bar * ticks_per_bar(sample_context) +
+      beat_position.beat * ticks_per_beat(sample_context) +
       beat_position.tick
   end
 
   @doc "Converts an absolute tick to zero-based `bar`/`beat`/`tick`."
   @spec tick_to_position(t(), non_neg_integer()) :: BeatPosition.t()
-  def tick_to_position(%__MODULE__{} = song_context, absolute_tick)
+  def tick_to_position(%__MODULE__{} = sample_context, absolute_tick)
       when is_integer(absolute_tick) and absolute_tick >= 0 do
-    ticks_per_bar = ticks_per_bar(song_context)
-    ticks_per_beat = ticks_per_beat(song_context)
+    ticks_per_bar = ticks_per_bar(sample_context)
+    ticks_per_beat = ticks_per_beat(sample_context)
 
     bar = div(absolute_tick, ticks_per_bar)
     in_bar = rem(absolute_tick, ticks_per_bar)

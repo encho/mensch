@@ -54,7 +54,7 @@ defmodule Mensch.Performance do
   """
 
   alias Mensch.BeatPosition
-  alias Mensch.SongContext
+  alias Mensch.SampleContext
 
   @type note_event :: %{
           at_ms: non_neg_integer(),
@@ -159,23 +159,23 @@ defmodule Mensch.Performance do
     * `:position` => `%Mensch.BeatPosition{bar, beat, tick}` (zero-based)
     * `:timestamp` => `MM:SS.mmm`
   """
-  @spec frame_time_index(t(), SongContext.t(), BeatPosition.t()) :: [map()]
+  @spec frame_time_index(t(), SampleContext.t(), BeatPosition.t()) :: [map()]
   def frame_time_index(
         %__MODULE__{music: music},
-        %SongContext{} = song_context,
+        %SampleContext{} = sample_context,
         %BeatPosition{} = start_beat
       ) do
-    start_tick = SongContext.position_to_tick(song_context, start_beat)
+    start_tick = SampleContext.position_to_tick(sample_context, start_beat)
 
     Enum.map(music, fn frame ->
-      absolute_tick = start_tick + SongContext.ms_to_ticks(song_context, frame.at_ms)
-      position = SongContext.tick_to_position(song_context, absolute_tick)
+      absolute_tick = start_tick + SampleContext.ms_to_ticks(sample_context, frame.at_ms)
+      position = SampleContext.tick_to_position(sample_context, absolute_tick)
 
       %{
         at_ms: frame.at_ms,
         absolute_tick: absolute_tick,
         position: position,
-        timestamp: SongContext.format_timestamp(frame.at_ms)
+        timestamp: SampleContext.format_timestamp(frame.at_ms)
       }
     end)
   end

@@ -1,13 +1,13 @@
 defmodule Mensch.TimelineContext do
   @moduledoc """
-  Placement of a chord event on a song timeline.
+  Placement of a chord event on a sample timeline.
 
   `start_beat` is human-readable (bar/beat/tick), while duration is
   stored in PPQ ticks for precise internal math.
   """
 
   alias Mensch.BeatPosition
-  alias Mensch.SongContext
+  alias Mensch.SampleContext
 
   @type t :: %__MODULE__{start_beat: BeatPosition.t(), duration_ticks: non_neg_integer()}
 
@@ -39,14 +39,14 @@ defmodule Mensch.TimelineContext do
   end
 
   @doc "Absolute start tick for this timeline context."
-  @spec start_tick(t(), SongContext.t()) :: non_neg_integer()
-  def start_tick(%__MODULE__{} = timeline_context, %SongContext{} = song_context) do
-    SongContext.position_to_tick(song_context, timeline_context.start_beat)
+  @spec start_tick(t(), SampleContext.t()) :: non_neg_integer()
+  def start_tick(%__MODULE__{} = timeline_context, %SampleContext{} = sample_context) do
+    SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
   end
 
   @doc "Absolute end tick for this timeline context."
-  @spec end_tick(t(), SongContext.t()) :: non_neg_integer()
-  def end_tick(%__MODULE__{} = timeline_context, %SongContext{} = song_context) do
-    start_tick(timeline_context, song_context) + timeline_context.duration_ticks
+  @spec end_tick(t(), SampleContext.t()) :: non_neg_integer()
+  def end_tick(%__MODULE__{} = timeline_context, %SampleContext{} = sample_context) do
+    start_tick(timeline_context, sample_context) + timeline_context.duration_ticks
   end
 end

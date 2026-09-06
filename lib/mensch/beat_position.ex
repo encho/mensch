@@ -1,6 +1,6 @@
 defmodule Mensch.BeatPosition do
   @moduledoc """
-  Human-readable musical position on a song grid.
+  Human-readable musical position on a sample grid.
 
   Bars are zero-based (`bar: 0` is the first bar), as requested.
   `beat` is zero-based within the bar, and `tick` is the fine PPQ

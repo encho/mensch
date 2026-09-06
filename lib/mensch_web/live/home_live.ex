@@ -13,7 +13,7 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.ChordSpec
   alias Mensch.Player
   alias Mensch.Render
-  alias Mensch.SongContext
+  alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
   @refresh_interval_ms 100
@@ -21,11 +21,11 @@ defmodule MenschWeb.HomeLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    songs = Render.default_songs()
-    active_song_index = 0
-    active_song = Enum.at(songs, active_song_index, %{})
-    song_entries = Map.get(active_song, :song_entries, [])
-    song_context = Map.get(active_song, :song_context, Render.default_song_context())
+    samples = Render.default_samples()
+    active_sample_index = 0
+    active_sample = Enum.at(samples, active_sample_index, %{})
+    sample_entries = Map.get(active_sample, :sample_entries, [])
+    sample_context = Map.get(active_sample, :sample_context, Render.default_sample_context())
 
     socket =
       socket
@@ -34,62 +34,62 @@ defmodule MenschWeb.HomeLive do
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)
       |> assign(:playhead_pct, nil)
-      |> assign(:songs, songs)
-      |> assign(:active_song_index, active_song_index)
-      |> assign(:song_entries, song_entries)
-      |> assign(:song_context, song_context)
+      |> assign(:samples, samples)
+      |> assign(:active_sample_index, active_sample_index)
+      |> assign(:sample_entries, sample_entries)
+      |> assign(:sample_context, sample_context)
       |> assign(:view_modal_open, false)
       |> assign(:view_title, nil)
-      |> assign(:render_scope, :full_song)
-      |> assign(:loop_full_song, false)
+      |> assign(:render_scope, :full_sample)
+      |> assign(:loop_full_sample, false)
       |> assign(:manual_stop, false)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("view_full_song", _params, socket) do
-    render_data = full_song_render_data(socket)
+  def handle_event("view_full_sample", _params, socket) do
+    render_data = full_sample_render_data(socket)
 
     {:noreply,
      socket
      |> assign(:render_data, render_data)
-     |> assign(:view_title, "Full Song")
-     |> assign(:render_scope, :full_song)
+     |> assign(:view_title, "Full Sample")
+     |> assign(:render_scope, :full_sample)
      |> assign(:view_modal_open, true)}
   end
 
-  def handle_event("play_full_song", _params, socket) do
-    render_data = full_song_render_data(socket)
+  def handle_event("play_full_sample", _params, socket) do
+    render_data = full_sample_render_data(socket)
 
     {:noreply,
      socket
      |> assign(:render_data, render_data)
-     |> assign(:render_scope, :full_song)
+     |> assign(:render_scope, :full_sample)
      |> assign(:manual_stop, false)
      |> start_playback(render_data)}
   end
 
-  def handle_event("toggle_loop_full_song", _params, socket) do
-    {:noreply, update(socket, :loop_full_song, &(!&1))}
+  def handle_event("toggle_loop_full_sample", _params, socket) do
+    {:noreply, update(socket, :loop_full_sample, &(!&1))}
   end
 
-  def handle_event("activate_song", %{"index" => index_str}, socket) do
+  def handle_event("activate_sample", %{"index" => index_str}, socket) do
     case Integer.parse(index_str) do
       {index, ""} ->
-        case Enum.at(socket.assigns.songs, index) do
-          %{song_entries: song_entries, song_context: song_context} ->
+        case Enum.at(socket.assigns.samples, index) do
+          %{sample_entries: sample_entries, sample_context: sample_context} ->
             Player.stop()
 
             {:noreply,
              socket
-             |> assign(:active_song_index, index)
-             |> assign(:song_entries, song_entries)
-             |> assign(:song_context, song_context)
+             |> assign(:active_sample_index, index)
+             |> assign(:sample_entries, sample_entries)
+             |> assign(:sample_context, sample_context)
              |> assign(:render_data, nil)
              |> assign(:view_modal_open, false)
              |> assign(:view_title, nil)
-             |> assign(:render_scope, :full_song)
+             |> assign(:render_scope, :full_sample)
              |> assign(:player_status, Player.status())
              |> assign(:play_started_at, nil)
              |> assign(:playhead_pct, nil)
@@ -107,7 +107,7 @@ defmodule MenschWeb.HomeLive do
   def handle_event("view_entry", %{"index" => index_str}, socket) do
     case Integer.parse(index_str) do
       {index, ""} ->
-        case Enum.at(socket.assigns.song_entries, index) do
+        case Enum.at(socket.assigns.sample_entries, index) do
           %{chord_spec: %ChordSpec{} = chord_spec} ->
             render_data = entry_render_data(socket, index)
 
@@ -130,7 +130,7 @@ defmodule MenschWeb.HomeLive do
   def handle_event("play_entry", %{"index" => index_str}, socket) do
     case Integer.parse(index_str) do
       {index, ""} ->
-        case Enum.at(socket.assigns.song_entries, index) do
+        case Enum.at(socket.assigns.sample_entries, index) do
           %{chord_spec: %ChordSpec{}} ->
             render_data = entry_render_data(socket, index)
 
@@ -197,7 +197,7 @@ defmodule MenschWeb.HomeLive do
         Process.send_after(self(), :refresh_player, @refresh_interval_ms)
         {:noreply, socket}
 
-      loop_full_song?(socket) ->
+      loop_full_sample?(socket) ->
         {:noreply,
          socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
 
@@ -223,7 +223,8 @@ defmodule MenschWeb.HomeLive do
           |> assign(:detail_matrix_playhead_pct, nil)
 
         %{music: music, duration_ms: duration_ms} ->
-          detail_total_ticks = max(SongContext.ms_to_ticks(assigns.song_context, duration_ms), 1)
+          detail_total_ticks =
+            max(SampleContext.ms_to_ticks(assigns.sample_context, duration_ms), 1)
 
           assigns
           |> assign(
@@ -233,7 +234,7 @@ defmodule MenschWeb.HomeLive do
               :pressure,
               {0, 127},
               assigns.render_scope,
-              assigns.song_context,
+              assigns.sample_context,
               detail_total_ticks
             )
           )
@@ -244,7 +245,7 @@ defmodule MenschWeb.HomeLive do
               :slide,
               {0, 127},
               assigns.render_scope,
-              assigns.song_context,
+              assigns.sample_context,
               detail_total_ticks
             )
           )
@@ -255,7 +256,7 @@ defmodule MenschWeb.HomeLive do
               :bend,
               value_range(music),
               assigns.render_scope,
-              assigns.song_context,
+              assigns.sample_context,
               detail_total_ticks
             )
           )
@@ -265,14 +266,14 @@ defmodule MenschWeb.HomeLive do
             build_note_matrix(
               music,
               assigns.render_scope,
-              assigns.song_context,
+              assigns.sample_context,
               detail_total_ticks
             )
           )
-          |> assign(:chart_grid, chart_grid_model(assigns.song_context, detail_total_ticks))
+          |> assign(:chart_grid, chart_grid_model(assigns.sample_context, detail_total_ticks))
           |> assign(
             :note_matrix_grid,
-            note_matrix_grid_model(assigns.song_context, detail_total_ticks)
+            note_matrix_grid_model(assigns.sample_context, detail_total_ticks)
           )
           |> assign(
             :detail_chart_playhead_x,
@@ -287,10 +288,10 @@ defmodule MenschWeb.HomeLive do
     assigns =
       assign(
         assigns,
-        :song_timeline,
-        song_timeline_model(
-          assigns.song_entries,
-          assigns.song_context,
+        :sample_timeline,
+        sample_timeline_model(
+          assigns.sample_entries,
+          assigns.sample_context,
           assigns.playhead_pct,
           assigns.render_scope
         )
@@ -299,8 +300,8 @@ defmodule MenschWeb.HomeLive do
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
       <div class="mx-auto max-w-6xl space-y-6">
-        <div id="songs-section" class="space-y-3 border border-zinc-700/70 bg-zinc-950/85 p-4">
-          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Songs</div>
+        <div id="samples-section" class="space-y-3 border border-zinc-700/70 bg-zinc-950/85 p-4">
+          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Samples</div>
 
           <div class="overflow-x-auto border border-zinc-700/60">
             <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
@@ -316,41 +317,41 @@ defmodule MenschWeb.HomeLive do
               </thead>
               <tbody>
                 <tr
-                  :for={{song, index} <- Enum.with_index(@songs)}
+                  :for={{sample, index} <- Enum.with_index(@samples)}
                   class={[
                     "text-zinc-200",
-                    @active_song_index == index && "bg-amber-500/10"
+                    @active_sample_index == index && "bg-amber-500/10"
                   ]}
                 >
-                  <td class="px-2 py-1.5 text-zinc-100">{Map.get(song, :name, "Unnamed")}</td>
-                  <td class="px-2 py-1.5">{Map.get(song.song_context, :bpm, 0)} bpm</td>
+                  <td class="px-2 py-1.5 text-zinc-100">{Map.get(sample, :name, "Unnamed")}</td>
+                  <td class="px-2 py-1.5">{Map.get(sample.sample_context, :bpm, 0)} bpm</td>
                   <td class="px-2 py-1.5">
-                    {elem(song.song_context.time_signature, 0)}/{elem(
-                      song.song_context.time_signature,
+                    {elem(sample.sample_context.time_signature, 0)}/{elem(
+                      sample.sample_context.time_signature,
                       1
                     )}
                   </td>
-                  <td class="px-2 py-1.5">{length(Map.get(song, :song_entries, []))}</td>
+                  <td class="px-2 py-1.5">{length(Map.get(sample, :sample_entries, []))}</td>
                   <td class="px-2 py-1.5">
-                    {song_duration_label(
-                      Map.get(song, :song_entries, []),
-                      Map.get(song, :song_context, @song_context)
+                    {sample_duration_label(
+                      Map.get(sample, :sample_entries, []),
+                      Map.get(sample, :sample_context, @sample_context)
                     )}
                   </td>
                   <td class="px-2 py-1.5 text-right">
                     <button
                       type="button"
-                      id={"activate-song-#{index}"}
-                      phx-click="activate_song"
+                      id={"activate-sample-#{index}"}
+                      phx-click="activate_sample"
                       phx-value-index={index}
                       class={[
                         "h-9 border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
-                        (@active_song_index == index &&
+                        (@active_sample_index == index &&
                            "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
                           "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
                       ]}
                     >
-                      {if @active_song_index == index, do: "Active", else: "Activate"}
+                      {if @active_sample_index == index, do: "Active", else: "Activate"}
                     </button>
                   </td>
                 </tr>
@@ -363,49 +364,49 @@ defmodule MenschWeb.HomeLive do
           <div class="text-[11px] uppercase tracking-wide text-zinc-400">Render Context</div>
 
           <div class="font-mono text-[11px] text-zinc-300">
-            SongCtx: {song_context_label(@song_context)}
+            SampleCtx: {sample_context_label(@sample_context)}
           </div>
 
           <div class="font-mono text-[11px] text-zinc-400">
-            Song duration: {song_duration_label(@song_entries, @song_context)}
+            Sample duration: {sample_duration_label(@sample_entries, @sample_context)}
           </div>
 
           <div class="flex items-center justify-end gap-2">
             <button
               type="button"
-              id="toggle-loop-full-song"
-              phx-click="toggle_loop_full_song"
-              aria-pressed={@loop_full_song}
+              id="toggle-loop-full-sample"
+              phx-click="toggle_loop_full_sample"
+              aria-pressed={@loop_full_sample}
               class={[
                 "flex h-9 items-center border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
-                (@loop_full_song &&
+                (@loop_full_sample &&
                    "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
                   "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
               ]}
             >
-              Loop {if(@loop_full_song, do: "On", else: "Off")}
+              Loop {if(@loop_full_sample, do: "On", else: "Off")}
             </button>
             <button
               type="button"
-              id="view-full-song"
-              phx-click="view_full_song"
+              id="view-full-sample"
+              phx-click="view_full_sample"
               class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
             >
               View
             </button>
             <button
               type="button"
-              id="play-full-song"
-              aria-label="Play full song"
-              phx-click="play_full_song"
+              id="play-full-sample"
+              aria-label="Play full sample"
+              phx-click="play_full_sample"
               class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
             >
               <.icon name="hero-play-solid" class="size-4" />
             </button>
             <button
               type="button"
-              id="stop-full-song"
-              aria-label="Stop full song"
+              id="stop-full-sample"
+              aria-label="Stop full sample"
               phx-click="stop"
               class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
             >
@@ -425,7 +426,7 @@ defmodule MenschWeb.HomeLive do
                 </tr>
               </thead>
               <tbody>
-                <tr :for={{entry, index} <- Enum.with_index(@song_entries)} class="text-zinc-200">
+                <tr :for={{entry, index} <- Enum.with_index(@sample_entries)} class="text-zinc-200">
                   <td class="px-2 py-1.5 text-zinc-100">
                     <div class="flex items-center gap-2">
                       <span
@@ -438,15 +439,15 @@ defmodule MenschWeb.HomeLive do
                   <td class="px-2 py-1.5">{machine_label(entry.machine_module)}</td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
-                      {start_label_primary(@song_context, entry.timeline_context.start_beat)}
+                      {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
                     </div>
                     <div class="leading-tight text-zinc-500">
-                      {start_label_secondary(@song_context, entry.timeline_context.start_beat)}
+                      {start_label_secondary(@sample_context, entry.timeline_context.start_beat)}
                     </div>
                   </td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
-                      {duration_label_primary(@song_context, entry.timeline_context.duration_ticks)}
+                      {duration_label_primary(@sample_context, entry.timeline_context.duration_ticks)}
                     </div>
                     <div class="leading-tight text-zinc-500">
                       {duration_label_secondary(entry.timeline_context.duration_ticks)}
@@ -489,7 +490,7 @@ defmodule MenschWeb.HomeLive do
             </table>
           </div>
 
-          <.song_timeline model={@song_timeline} />
+          <.sample_timeline model={@sample_timeline} />
         </div>
       </div>
       <div
@@ -610,7 +611,7 @@ defmodule MenschWeb.HomeLive do
             </div>
             <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-zinc-500">
               <span>{local_timeline_start_label()}</span>
-              <span>{local_timeline_end_label(@song_context, @render_data.duration_ms)}</span>
+              <span>{local_timeline_end_label(@sample_context, @render_data.duration_ms)}</span>
             </div>
           </div>
 
@@ -674,9 +675,9 @@ defmodule MenschWeb.HomeLive do
 
   attr :model, :map, required: true
 
-  defp song_timeline(assigns) do
+  defp sample_timeline(assigns) do
     ~H"""
-    <div id="song-timeline" class="space-y-2 border border-zinc-700/60 bg-zinc-950/70 p-3">
+    <div id="sample-timeline" class="space-y-2 border border-zinc-700/60 bg-zinc-950/70 p-3">
       <div class="flex items-center justify-between font-mono text-[11px] text-zinc-400">
         <span class="uppercase tracking-wide">Timeline</span>
         <span>
@@ -860,8 +861,8 @@ defmodule MenschWeb.HomeLive do
     |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, render_data))
   end
 
-  defp loop_full_song?(socket) do
-    socket.assigns.loop_full_song and
+  defp loop_full_sample?(socket) do
+    socket.assigns.loop_full_sample and
       not socket.assigns.manual_stop and
       not is_nil(socket.assigns.render_data)
   end
@@ -894,9 +895,9 @@ defmodule MenschWeb.HomeLive do
 
   defp format_bend(bend), do: Float.round(bend * 1.0, 5)
 
-  defp song_context_label(%SongContext{} = song_context) do
-    {num, den} = song_context.time_signature
-    "#{song_context.bpm} bpm · #{num}/#{den} · ppq #{song_context.ppq}"
+  defp sample_context_label(%SampleContext{} = sample_context) do
+    {num, den} = sample_context.time_signature
+    "#{sample_context.bpm} bpm · #{num}/#{den} · ppq #{sample_context.ppq}"
   end
 
   defp chord_label(%ChordSpec{} = chord_spec) do
@@ -912,22 +913,22 @@ defmodule MenschWeb.HomeLive do
     |> Macro.underscore()
   end
 
-  defp start_label_primary(%SongContext{} = song_context, %BeatPosition{} = start_beat) do
-    tick = SongContext.position_to_tick(song_context, start_beat)
-    ms = SongContext.ticks_to_ms(song_context, tick)
+  defp start_label_primary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
+    tick = SampleContext.position_to_tick(sample_context, start_beat)
+    ms = SampleContext.ticks_to_ms(sample_context, tick)
 
-    "bar #{start_beat.bar} · beat #{start_beat.beat} · #{SongContext.format_timestamp(ms)}"
+    "bar #{start_beat.bar} · beat #{start_beat.beat} · #{SampleContext.format_timestamp(ms)}"
   end
 
-  defp start_label_secondary(%SongContext{} = song_context, %BeatPosition{} = start_beat) do
-    tick = SongContext.position_to_tick(song_context, start_beat)
+  defp start_label_secondary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
+    tick = SampleContext.position_to_tick(sample_context, start_beat)
     "tick #{tick}"
   end
 
-  defp duration_label_primary(%SongContext{} = song_context, duration_ticks) do
-    ticks_per_bar = SongContext.ticks_per_bar(song_context)
-    ticks_per_beat = SongContext.ticks_per_beat(song_context)
-    duration_ms = SongContext.ticks_to_ms(song_context, duration_ticks)
+  defp duration_label_primary(%SampleContext{} = sample_context, duration_ticks) do
+    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
+    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
+    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
     duration_s = duration_ms / 1000
 
     musical =
@@ -953,9 +954,9 @@ defmodule MenschWeb.HomeLive do
     "#{duration_ticks} ticks"
   end
 
-  defp song_duration_label(song_entries, %SongContext{} = song_context)
-       when is_list(song_entries) do
-    duration_ms = song_duration_ms(song_entries, song_context)
+  defp sample_duration_label(sample_entries, %SampleContext{} = sample_context)
+       when is_list(sample_entries) do
+    duration_ms = sample_duration_ms(sample_entries, sample_context)
     minutes = div(duration_ms, 60_000)
     seconds = div(rem(duration_ms, 60_000), 1000)
     millis = rem(duration_ms, 1000)
@@ -963,41 +964,46 @@ defmodule MenschWeb.HomeLive do
     "#{minutes}m #{seconds}s #{millis}ms"
   end
 
-  defp song_duration_ms(song_entries, %SongContext{} = song_context) when is_list(song_entries) do
+  defp sample_duration_ms(sample_entries, %SampleContext{} = sample_context)
+       when is_list(sample_entries) do
     max_end_tick =
-      case song_entries do
-        [] -> 0
+      case sample_entries do
+        [] ->
+          0
+
         _ ->
-          song_entries
+          sample_entries
           |> Enum.map(fn %{timeline_context: timeline_context} ->
-            start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
+            start_tick =
+              SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
+
             start_tick + timeline_context.duration_ticks
           end)
           |> Enum.max()
       end
 
-    SongContext.ticks_to_ms(song_context, max_end_tick)
+    SampleContext.ticks_to_ms(sample_context, max_end_tick)
   end
 
-  defp full_song_render_data(socket) do
-    Render.generate_song(socket.assigns.song_entries, socket.assigns.song_context)
+  defp full_sample_render_data(socket) do
+    Render.generate_sample(socket.assigns.sample_entries, socket.assigns.sample_context)
   end
 
   defp entry_render_data(socket, entry_index) when is_integer(entry_index) do
-    case Enum.at(socket.assigns.song_entries, entry_index) do
+    case Enum.at(socket.assigns.sample_entries, entry_index) do
       %{timeline_context: %TimelineContext{} = timeline_context} ->
-        song_context = socket.assigns.song_context
-        song_render_data = full_song_render_data(socket)
+        sample_context = socket.assigns.sample_context
+        sample_render_data = full_sample_render_data(socket)
 
-        start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
+        start_tick = SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
         end_tick = start_tick + timeline_context.duration_ticks
 
         scoped_music =
-          song_render_data.music
+          sample_render_data.music
           |> Enum.map(fn frame ->
             notes =
               Enum.filter(frame.notes, fn note ->
-                Map.get(note, :song_entry_index) == entry_index
+                Map.get(note, :sample_entry_index) == entry_index
               end)
 
             {frame, notes}
@@ -1010,14 +1016,15 @@ defmodule MenschWeb.HomeLive do
 
             %{
               at_tick: local_tick,
-              at_ms: SongContext.ticks_to_ms(song_context, local_tick),
+              at_ms: SampleContext.ticks_to_ms(sample_context, local_tick),
               notes: notes
             }
           end)
 
         %{
-          song_render_data
-          | duration_ms: SongContext.ticks_to_ms(song_context, timeline_context.duration_ticks),
+          sample_render_data
+          | duration_ms:
+              SampleContext.ticks_to_ms(sample_context, timeline_context.duration_ticks),
             music: scoped_music
         }
 
@@ -1030,10 +1037,10 @@ defmodule MenschWeb.HomeLive do
     "bar 0 · beat 0 · 0ms"
   end
 
-  defp local_timeline_end_label(%SongContext{} = song_context, duration_ms) do
-    total_ticks = SongContext.ms_to_ticks(song_context, duration_ms)
-    ticks_per_bar = SongContext.ticks_per_bar(song_context)
-    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+  defp local_timeline_end_label(%SampleContext{} = sample_context, duration_ms) do
+    total_ticks = SampleContext.ms_to_ticks(sample_context, duration_ms)
+    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
+    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
 
     bar = div(total_ticks, ticks_per_bar)
     bar_remainder = rem(total_ticks, ticks_per_bar)
@@ -1050,9 +1057,9 @@ defmodule MenschWeb.HomeLive do
     "#{musical_label} · #{duration_ms}ms"
   end
 
-  defp song_timeline_model(
-         song_entries,
-         %SongContext{} = song_context,
+  defp sample_timeline_model(
+         sample_entries,
+         %SampleContext{} = sample_context,
          playhead_pct,
          render_scope
        ) do
@@ -1062,13 +1069,13 @@ defmodule MenschWeb.HomeLive do
     lanes_top = 22
     lanes_bottom = 12
 
-    ticks_per_bar = SongContext.ticks_per_bar(song_context)
-    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
+    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
     ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
 
     entries =
-      Enum.map(song_entries, fn %{chord_spec: chord_spec, timeline_context: timeline_context} ->
-        start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
+      Enum.map(sample_entries, fn %{chord_spec: chord_spec, timeline_context: timeline_context} ->
+        start_tick = SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
         end_tick = start_tick + timeline_context.duration_ticks
 
         %{label: short_chord_label(chord_spec), start_tick: start_tick, end_tick: end_tick}
@@ -1082,7 +1089,7 @@ defmodule MenschWeb.HomeLive do
 
     bar_count = max(div(max_end_tick + ticks_per_bar - 1, ticks_per_bar), 2)
     total_ticks = bar_count * ticks_per_bar
-    beat_count = bar_count * SongContext.beats_per_bar(song_context)
+    beat_count = bar_count * SampleContext.beats_per_bar(sample_context)
     total_ticks = max(total_ticks, 1)
     row_count = max(length(entries), 1)
     lanes_height = row_count * lane_height + (row_count - 1) * lane_gap
@@ -1138,7 +1145,7 @@ defmodule MenschWeb.HomeLive do
 
   defp timeline_playhead_x(nil, _render_scope, _entries, _total_ticks), do: nil
 
-  defp timeline_playhead_x(playhead_pct, :full_song, _entries, total_ticks)
+  defp timeline_playhead_x(playhead_pct, :full_sample, _entries, total_ticks)
        when is_number(playhead_pct) do
     tick_to_svg_x(total_ticks * (playhead_pct / 100), total_ticks)
   end
@@ -1186,10 +1193,10 @@ defmodule MenschWeb.HomeLive do
     |> Float.round(2)
   end
 
-  defp chart_grid_model(%SongContext{} = song_context, total_ticks) do
+  defp chart_grid_model(%SampleContext{} = sample_context, total_ticks) do
     width = 600
-    ticks_per_bar = SongContext.ticks_per_bar(song_context)
-    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
+    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
     ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
     total_ticks = max(total_ticks, 1)
 
@@ -1200,9 +1207,9 @@ defmodule MenschWeb.HomeLive do
     }
   end
 
-  defp note_matrix_grid_model(%SongContext{} = song_context, total_ticks) do
-    ticks_per_bar = SongContext.ticks_per_bar(song_context)
-    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+  defp note_matrix_grid_model(%SampleContext{} = sample_context, total_ticks) do
+    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
+    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
     ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
     total_ticks = max(total_ticks, 1)
 
@@ -1231,7 +1238,7 @@ defmodule MenschWeb.HomeLive do
          value_key,
          {min_v, max_v},
          render_scope,
-         %SongContext{} = song_context,
+         %SampleContext{} = sample_context,
          total_ticks
        ) do
     colors = note_color_map(music, render_scope)
@@ -1239,7 +1246,7 @@ defmodule MenschWeb.HomeLive do
 
     music
     |> Enum.flat_map(fn frame ->
-      local_tick = SongContext.ms_to_ticks(song_context, frame.at_ms)
+      local_tick = SampleContext.ms_to_ticks(sample_context, frame.at_ms)
       x = local_tick / total_ticks * 600
 
       Enum.map(frame.notes, &{{&1.channel, &1.note}, x, Map.fetch!(&1, value_key)})
@@ -1263,7 +1270,7 @@ defmodule MenschWeb.HomeLive do
   # and highest sounding note (highest pitch on top), so vertical
   # spacing matches real chromatic distance. A row may contain multiple
   # bars (same pitch reused later by another chord/channel).
-  defp build_note_matrix(music, render_scope, %SongContext{} = song_context, total_ticks) do
+  defp build_note_matrix(music, render_scope, %SampleContext{} = sample_context, total_ticks) do
     colors = note_color_map(music, render_scope)
     total_ticks = max(total_ticks, 1)
 
@@ -1280,8 +1287,8 @@ defmodule MenschWeb.HomeLive do
           start_ms = elem(start_entry, 1)
           end_ms = elem(end_entry, 1)
 
-          start_tick = SongContext.ms_to_ticks(song_context, start_ms)
-          end_tick = SongContext.ms_to_ticks(song_context, end_ms)
+          start_tick = SampleContext.ms_to_ticks(sample_context, start_ms)
+          end_tick = SampleContext.ms_to_ticks(sample_context, end_ms)
           left_pct = start_tick / total_ticks * 100
           width_pct = max((end_tick - start_tick) / total_ticks * 100, 0.5)
 
@@ -1343,10 +1350,10 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp note_color_map(music, :full_song) do
+  defp note_color_map(music, :full_sample) do
     music
     |> distinct_note_events()
-    |> Enum.group_by(&Map.get(&1, :song_entry_index, 0))
+    |> Enum.group_by(&Map.get(&1, :sample_entry_index, 0))
     |> Enum.flat_map(fn {entry_index, events} ->
       base_color = timeline_color(entry_index)
 
