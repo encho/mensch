@@ -15,9 +15,9 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.PerformanceAssembler
   alias Mensch.SampleDb
   alias Mensch.SampleContext
-  alias Mensch.TimelineContext
+  alias MenschWeb.HomeLive.DetailPanelComponent
 
-  @refresh_interval_ms 100
+  @refresh_interval_ms 33
   @chart_colors ["#FF9F1A", "#C96A00", "#2D8C82", "#4E6E8E", "#B3862C", "#8C5A2B"]
   @inactive_note_color "rgba(122, 133, 150, 0.32)"
 
@@ -31,48 +31,55 @@ defmodule MenschWeb.HomeLive do
     sample_context =
       Map.get(active_sample, :sample_context, SampleDb.default_sample_context())
 
+    render_data = PerformanceAssembler.generate_sample(sample_entries, sample_context)
+
     socket =
       socket
       |> assign(:midi_status, Mensch.Midi.Connection.status())
-      |> assign(:render_data, nil)
+      |> assign(:render_data, render_data)
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)
+      |> assign(:playing_duration_ms, nil)
       |> assign(:playhead_pct, nil)
+      |> assign(:playback_ref, nil)
+      |> assign(:pressure_chart, [])
+      |> assign(:slide_chart, [])
+      |> assign(:bend_chart, [])
+      |> assign(:debug_rows, [])
+      |> assign(:note_matrix, [])
+      |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
+      |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
       |> assign(:samples, samples)
       |> assign(:active_sample_index, active_sample_index)
       |> assign(:sample_entries, sample_entries)
       |> assign(:sample_context, sample_context)
-      |> assign(:view_modal_open, false)
-      |> assign(:view_title, nil)
+      |> assign(
+        :sample_timeline_static,
+        sample_timeline_static_model(sample_entries, sample_context)
+      )
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
+      |> assign_detail_content()
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("view_full_sample", _params, socket) do
-    render_data = full_sample_render_data(socket)
-
-    {:noreply,
-     socket
-     |> assign(:render_data, render_data)
-     |> assign(:view_title, "Full Sample")
-     |> assign(:render_scope, :full_sample)
-     |> assign(:selected_note_key, nil)
-     |> assign(:view_modal_open, true)}
-  end
-
   def handle_event("play_full_sample", _params, socket) do
-    render_data = full_sample_render_data(socket)
+    render_data =
+      PerformanceAssembler.generate_sample(
+        socket.assigns.sample_entries,
+        socket.assigns.sample_context
+      )
 
     {:noreply,
      socket
      |> assign(:render_data, render_data)
      |> assign(:render_scope, :full_sample)
      |> assign(:selected_note_key, nil)
+     |> assign_detail_content()
      |> assign(:manual_stop, false)
      |> start_playback(render_data)}
   end
@@ -87,21 +94,23 @@ defmodule MenschWeb.HomeLive do
         case Enum.at(socket.assigns.samples, index) do
           %{sample_entries: sample_entries, sample_context: sample_context} ->
             Player.stop()
+            render_data = PerformanceAssembler.generate_sample(sample_entries, sample_context)
 
             {:noreply,
              socket
              |> assign(:active_sample_index, index)
              |> assign(:sample_entries, sample_entries)
              |> assign(:sample_context, sample_context)
-             |> assign(:render_data, nil)
-             |> assign(:view_modal_open, false)
-             |> assign(:view_title, nil)
+             |> assign(
+               :sample_timeline_static,
+               sample_timeline_static_model(sample_entries, sample_context)
+             )
+             |> assign(:render_data, render_data)
              |> assign(:render_scope, :full_sample)
              |> assign(:player_status, Player.status())
-             |> assign(:play_started_at, nil)
-             |> assign(:playhead_pct, nil)
+             |> clear_playback_state(true)
              |> assign(:selected_note_key, nil)
-             |> assign(:manual_stop, true)}
+             |> assign_detail_content()}
 
           _ ->
             {:noreply, socket}
@@ -110,58 +119,6 @@ defmodule MenschWeb.HomeLive do
       _ ->
         {:noreply, socket}
     end
-  end
-
-  def handle_event("view_entry", %{"index" => index_str}, socket) do
-    case Integer.parse(index_str) do
-      {index, ""} ->
-        case Enum.at(socket.assigns.sample_entries, index) do
-          %{chord_spec: %ChordSpec{} = chord_spec} ->
-            render_data = entry_render_data(socket, index)
-
-            {:noreply,
-             socket
-             |> assign(:render_data, render_data)
-             |> assign(:view_title, chord_label(chord_spec))
-             |> assign(:render_scope, {:entry, index})
-             |> assign(:selected_note_key, nil)
-             |> assign(:view_modal_open, true)}
-
-          _ ->
-            {:noreply, socket}
-        end
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("play_entry", %{"index" => index_str}, socket) do
-    case Integer.parse(index_str) do
-      {index, ""} ->
-        case Enum.at(socket.assigns.sample_entries, index) do
-          %{chord_spec: %ChordSpec{}} ->
-            render_data = entry_render_data(socket, index)
-
-            {:noreply,
-             socket
-             |> assign(:render_data, render_data)
-             |> assign(:render_scope, {:entry, index})
-             |> assign(:selected_note_key, nil)
-             |> assign(:manual_stop, false)
-             |> start_playback(render_data)}
-
-          _ ->
-            {:noreply, socket}
-        end
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("close_view", _params, socket) do
-    {:noreply, socket |> assign(:view_modal_open, false) |> assign(:selected_note_key, nil)}
   end
 
   def handle_event("toggle_note_focus", params, socket) do
@@ -179,14 +136,14 @@ defmodule MenschWeb.HomeLive do
           selected_note_key
         end
 
-      {:noreply, assign(socket, :selected_note_key, next_selected)}
+      {:noreply, socket |> assign(:selected_note_key, next_selected) |> assign_detail_content()}
     else
       _ -> {:noreply, socket}
     end
   end
 
   def handle_event("clear_note_focus", _params, socket) do
-    {:noreply, assign(socket, :selected_note_key, nil)}
+    {:noreply, socket |> assign(:selected_note_key, nil) |> assign_detail_content()}
   end
 
   def handle_event("play", _params, %{assigns: %{render_data: nil}} = socket) do
@@ -204,9 +161,7 @@ defmodule MenschWeb.HomeLive do
     socket =
       socket
       |> assign(:player_status, Player.status())
-      |> assign(:play_started_at, nil)
-      |> assign(:playhead_pct, nil)
-      |> assign(:manual_stop, true)
+      |> clear_playback_state(true)
 
     {:noreply, socket}
   end
@@ -216,123 +171,75 @@ defmodule MenschWeb.HomeLive do
   end
 
   @impl true
-  def handle_info(:refresh_player, socket) do
-    status = Player.status()
+  def handle_info({:refresh_player, refresh_ref}, socket) do
+    if socket.assigns.playback_ref != refresh_ref do
+      {:noreply, socket}
+    else
+      status = Player.status()
 
-    socket =
-      socket
-      |> assign(:player_status, status)
-      |> assign(
-        :playhead_pct,
-        playhead_pct(status, socket.assigns.play_started_at, socket.assigns.render_data)
-      )
+      cond do
+        status == :playing ->
+          socket =
+            socket
+            |> assign(:player_status, status)
+            |> assign(
+              :playhead_pct,
+              playhead_pct(
+                status,
+                socket.assigns.play_started_at,
+                socket.assigns.playing_duration_ms
+              )
+            )
 
-    cond do
-      status == :playing ->
-        Process.send_after(self(), :refresh_player, @refresh_interval_ms)
-        {:noreply, socket}
+          Process.send_after(self(), {:refresh_player, refresh_ref}, @refresh_interval_ms)
+          {:noreply, socket}
 
-      loop_full_sample?(socket) ->
-        {:noreply,
-         socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
+        loop_full_sample?(socket) ->
+          {:noreply,
+           socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
 
-      true ->
-        {:noreply, assign(socket, :manual_stop, false)}
+        true ->
+          {:noreply,
+           socket
+           |> assign(:player_status, status)
+           |> clear_playback_state(false)}
+      end
+    end
+  end
+
+  def handle_info({:playback_done, playback_ref}, socket) do
+    if socket.assigns.playback_ref != playback_ref do
+      {:noreply, socket}
+    else
+      status = Player.status()
+
+      cond do
+        status == :playing ->
+          {:noreply, socket}
+
+        loop_full_sample?(socket) ->
+          {:noreply,
+           socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
+
+        true ->
+          {:noreply,
+           socket
+           |> assign(:player_status, status)
+           |> clear_playback_state(false)}
+      end
     end
   end
 
   @impl true
   def render(assigns) do
     assigns =
-      case assigns.render_data do
-        nil ->
-          assigns
-          |> assign(:pressure_chart, [])
-          |> assign(:slide_chart, [])
-          |> assign(:bend_chart, [])
-          |> assign(:debug_rows, [])
-          |> assign(:note_matrix, [])
-          |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
-          |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
-          |> assign(:detail_chart_playhead_x, nil)
-          |> assign(:detail_matrix_playhead_pct, nil)
-
-        %{music: music, duration_ms: duration_ms} ->
-          detail_total_ticks =
-            max(SampleContext.ms_to_ticks(assigns.sample_context, duration_ms), 1)
-
-          assigns
-          |> assign(
-            :pressure_chart,
-            build_chart(
-              music,
-              :pressure,
-              {0, 127},
-              assigns.render_scope,
-              assigns.selected_note_key,
-              assigns.sample_context,
-              detail_total_ticks
-            )
-          )
-          |> assign(
-            :slide_chart,
-            build_chart(
-              music,
-              :slide,
-              {0, 127},
-              assigns.render_scope,
-              assigns.selected_note_key,
-              assigns.sample_context,
-              detail_total_ticks
-            )
-          )
-          |> assign(
-            :bend_chart,
-            build_chart(
-              music,
-              :bend,
-              value_range(music),
-              assigns.render_scope,
-              assigns.selected_note_key,
-              assigns.sample_context,
-              detail_total_ticks
-            )
-          )
-          |> assign(:debug_rows, debug_rows(music))
-          |> assign(
-            :note_matrix,
-            build_note_matrix(
-              music,
-              assigns.render_scope,
-              assigns.selected_note_key,
-              assigns.sample_context,
-              detail_total_ticks
-            )
-          )
-          |> assign(:chart_grid, chart_grid_model(assigns.sample_context, detail_total_ticks))
-          |> assign(
-            :note_matrix_grid,
-            note_matrix_grid_model(assigns.sample_context, detail_total_ticks)
-          )
-          |> assign(
-            :detail_chart_playhead_x,
-            detail_playhead_x(assigns.playhead_pct, 600)
-          )
-          |> assign(
-            :detail_matrix_playhead_pct,
-            detail_playhead_pct(assigns.playhead_pct)
-          )
-      end
-
-    assigns =
       assign(
         assigns,
         :sample_timeline,
-        sample_timeline_model(
-          assigns.sample_entries,
-          assigns.sample_context,
-          assigns.playhead_pct,
-          assigns.render_scope
+        sample_timeline_with_playhead(
+          assigns.sample_timeline_static,
+          assigns.render_scope,
+          assigns.playhead_pct
         )
       )
 
@@ -431,14 +338,6 @@ defmodule MenschWeb.HomeLive do
             </button>
             <button
               type="button"
-              id="view-full-sample"
-              phx-click="view_full_sample"
-              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-            >
-              View
-            </button>
-            <button
-              type="button"
               id="play-full-sample"
               aria-label="Play full sample"
               phx-click="play_full_sample"
@@ -465,7 +364,7 @@ defmodule MenschWeb.HomeLive do
                   <th class="px-2 py-1.5 font-normal">Machine</th>
                   <th class="px-2 py-1.5 font-normal">Start</th>
                   <th class="px-2 py-1.5 font-normal">Duration</th>
-                  <th class="px-2 py-1.5 font-normal text-right">Actions</th>
+                  <th class="px-2 py-1.5 font-normal text-right">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -496,240 +395,30 @@ defmodule MenschWeb.HomeLive do
                       {duration_label_secondary(entry.timeline_context.duration_ticks)}
                     </div>
                   </td>
-                  <td class="px-2 py-1.5 text-right">
-                    <div class="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        id={"view-entry-#{index}"}
-                        phx-click="view_entry"
-                        phx-value-index={index}
-                        class="flex h-9 items-center border border-zinc-600 px-3 text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-                      >
-                        View
-                      </button>
-                      <button
-                        type="button"
-                        id={"play-entry-#{index}"}
-                        aria-label={"Play #{chord_label(entry.chord_spec)}"}
-                        phx-click="play_entry"
-                        phx-value-index={index}
-                        class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
-                      >
-                        <.icon name="hero-play-solid" class="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        id={"stop-entry-#{index}"}
-                        aria-label={"Stop #{chord_label(entry.chord_spec)}"}
-                        phx-click="stop"
-                        class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
-                      >
-                        <.icon name="hero-stop-solid" class="size-4" />
-                      </button>
-                    </div>
-                  </td>
+                  <td class="px-2 py-1.5 text-right text-zinc-500">Ready</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <.sample_timeline model={@sample_timeline} />
-        </div>
-      </div>
-      <div
-        :if={@view_modal_open and @render_data}
-        id="render-view-modal"
-        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/85 p-4"
-      >
-        <div class="w-full max-w-6xl space-y-4 border border-zinc-700/80 bg-zinc-950 p-4">
-          <div class="flex items-center justify-between border-b border-zinc-700/70 pb-2">
-            <div class="text-sm uppercase tracking-wide text-zinc-200">{@view_title || "View"}</div>
-            <button
-              type="button"
-              id="close-view-modal"
-              phx-click="close_view"
-              class="border border-zinc-600 px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-            >
-              Close
-            </button>
-          </div>
-
-          <div class="font-mono text-[11px] text-zinc-400">
-            {@render_data.bpm} bpm · {elem(@render_data.time_signature, 0)}/{elem(
-              @render_data.time_signature,
-              1
-            )} · {@render_data.granularity_ms}ms ticks · {@render_data.duration_ms}ms · {length(
-              @render_data.music
-            )} frames
-          </div>
-
-          <div id="debug-frames" class="border border-zinc-700/60">
-            <div class="border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
-              All frames
-            </div>
-            <div class="max-h-48 overflow-y-auto">
-              <table class="w-full text-left font-mono text-[11px]">
-                <thead class="sticky top-0 bg-zinc-950">
-                  <tr class="border-b border-zinc-700/60 text-zinc-400">
-                    <th class="px-3 py-1.5 font-normal">ms</th>
-                    <th class="px-3 py-1.5 font-normal">note</th>
-                    <th class="px-3 py-1.5 font-normal">ch</th>
-                    <th class="px-3 py-1.5 font-normal">phase</th>
-                    <th class="px-3 py-1.5 font-normal">on</th>
-                    <th class="px-3 py-1.5 font-normal">off</th>
-                    <th class="px-3 py-1.5 font-normal">pressure</th>
-                    <th class="px-3 py-1.5 font-normal">bend</th>
-                    <th class="px-3 py-1.5 font-normal">slide</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    :for={row <- @debug_rows}
-                    class="border-b border-zinc-800/70 text-zinc-300 last:border-0"
-                  >
-                    <td class="px-3 py-1.5">{row.at_ms}</td>
-                    <td class="px-3 py-1.5 text-zinc-100">{row.note_name}{row.octave}</td>
-                    <td class="px-3 py-1.5">{row.channel}</td>
-                    <td class="px-3 py-1.5">{row.phase}</td>
-                    <td class="px-3 py-1.5">{row.note_on}</td>
-                    <td class="px-3 py-1.5">{row.note_off}</td>
-                    <td class="px-3 py-1.5">{row.pressure}</td>
-                    <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
-                    <td class="px-3 py-1.5">{row.slide}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div id="note-matrix" class="border border-zinc-700/60">
-            <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5">
-              <div class="text-[11px] uppercase tracking-wide text-zinc-400">Note matrix</div>
-              <div class="flex items-center gap-3 font-mono text-[10px] text-zinc-500">
-                <span>Focus: {selected_note_label(@selected_note_key)}</span>
-                <button
-                  :if={not is_nil(@selected_note_key)}
-                  type="button"
-                  phx-click="clear_note_focus"
-                  class="border border-zinc-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-            <div class="relative py-2">
-              <div
-                :for={x <- @note_matrix_grid.subbeat_pcts}
-                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-zinc-700/30"
-                style={"left: #{x}%;"}
-              >
-              </div>
-              <div
-                :for={x <- @note_matrix_grid.beat_pcts}
-                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-zinc-500/40"
-                style={"left: #{x}%;"}
-              >
-              </div>
-              <div
-                :for={x <- @note_matrix_grid.bar_pcts}
-                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-amber-400/35"
-                style={"left: #{x}%;"}
-              >
-              </div>
-              <div
-                :if={not is_nil(@detail_matrix_playhead_pct)}
-                class="pointer-events-none absolute inset-y-0 z-20 w-px bg-amber-300/80"
-                style={"left: #{@detail_matrix_playhead_pct}%;"}
-              >
-              </div>
-              <div
-                :for={{row, index} <- Enum.with_index(@note_matrix)}
-                class={[
-                  "relative z-10 flex h-2.5 items-center border-b border-zinc-700/60 last:border-0",
-                  rem(index, 2) == 0 && "bg-zinc-900/70"
-                ]}
-              >
-                <div
-                  :for={segment <- Map.get(row, :segments, [])}
-                  phx-click="toggle_note_focus"
-                  phx-value-note={to_string(segment.note)}
-                  phx-value-channel={to_string(segment.channel)}
-                  class={[
-                    "absolute inset-y-0 z-20 cursor-pointer transition-opacity duration-150",
-                    segment.active && "opacity-100",
-                    !segment.active && "opacity-70"
-                  ]}
-                  style={segment.style}
-                >
-                </div>
-                <span class={[
-                  "relative z-10 px-1 font-mono text-[5px] uppercase",
-                  (Enum.empty?(Map.get(row, :segments, [])) && "text-zinc-600") ||
-                    (Map.get(row, :has_active_segment, false) && "text-zinc-200") ||
-                    "text-zinc-500"
-                ]}>
-                  {row.label}
-                </span>
-              </div>
-            </div>
-            <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-zinc-500">
-              <span>{local_timeline_start_label()}</span>
-              <span>{local_timeline_end_label(@sample_context, @render_data.duration_ms)}</span>
-            </div>
-          </div>
-
-          <.chart
-            title="Pressure"
-            chart={@pressure_chart}
-            grid={@chart_grid}
-            playhead_x={@detail_chart_playhead_x}
+          <.live_component
+            :if={@render_data}
+            module={DetailPanelComponent}
+            id="detail-panel"
+            render_data={@render_data}
+            selected_note_key={@selected_note_key}
+            selected_note_label={selected_note_label(@selected_note_key)}
+            note_matrix={@note_matrix}
+            note_matrix_grid={@note_matrix_grid}
+            timeline_start_label={local_timeline_start_label()}
+            timeline_end_label={local_timeline_end_label(@sample_context, @render_data.duration_ms)}
+            pressure_chart={@pressure_chart}
+            slide_chart={@slide_chart}
+            bend_chart={@bend_chart}
+            chart_grid={@chart_grid}
+            debug_rows={@debug_rows}
           />
-          <.chart
-            title="Slide (Aftertouch)"
-            chart={@slide_chart}
-            grid={@chart_grid}
-            playhead_x={@detail_chart_playhead_x}
-          />
-          <.chart
-            title="Bend (Vibrato)"
-            chart={@bend_chart}
-            grid={@chart_grid}
-            playhead_x={@detail_chart_playhead_x}
-          />
-
-          <div class="flex justify-center gap-3">
-            <button
-              type="button"
-              id="play-button"
-              aria-label="Play on Osmose"
-              phx-click="play"
-              class={[
-                "flex size-14 items-center justify-center border border-zinc-600 bg-transparent transition-colors duration-150",
-                (playing?(@player_status) && "text-zinc-700 ring-1 ring-zinc-700/60") ||
-                  "text-zinc-300 ring-1 ring-zinc-500/40 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40",
-                "disabled:cursor-not-allowed"
-              ]}
-              disabled={playing?(@player_status)}
-            >
-              <.icon name="hero-play-solid" class="size-6" />
-            </button>
-            <button
-              type="button"
-              id="stop-button"
-              aria-label="Stop"
-              phx-click="stop"
-              class={[
-                "flex size-14 items-center justify-center border border-zinc-600 bg-transparent transition-colors duration-150",
-                (playing?(@player_status) &&
-                   "text-zinc-300 ring-1 ring-zinc-500/40 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40") ||
-                  "text-zinc-700 ring-1 ring-zinc-700/60",
-                "disabled:cursor-not-allowed"
-              ]}
-              disabled={!playing?(@player_status)}
-            >
-              <.icon name="hero-stop-solid" class="size-6" />
-            </button>
-          </div>
         </div>
       </div>
     </Layouts.app>
@@ -848,95 +537,42 @@ defmodule MenschWeb.HomeLive do
     """
   end
 
-  attr :title, :string, required: true
-  attr :chart, :list, required: true
-  attr :grid, :map, required: true
-  attr :playhead_x, :any, default: nil
-
-  defp chart(assigns) do
-    ~H"""
-    <div>
-      <div class="mb-1 text-[11px] uppercase tracking-wide text-zinc-400">{@title}</div>
-      <svg viewBox="0 0 600 120" class="w-full border border-zinc-700/60 bg-zinc-950">
-        <line
-          :for={x <- @grid.subbeat_xs}
-          x1={x}
-          y1="0"
-          x2={x}
-          y2="120"
-          stroke="#5B6472"
-          stroke-opacity="0.32"
-          stroke-width="1"
-        />
-        <line
-          :for={x <- @grid.beat_xs}
-          x1={x}
-          y1="0"
-          x2={x}
-          y2="120"
-          stroke="#7A8596"
-          stroke-opacity="0.38"
-          stroke-width="1"
-        />
-        <line
-          :for={x <- @grid.bar_xs}
-          x1={x}
-          y1="0"
-          x2={x}
-          y2="120"
-          stroke="#FFB55A"
-          stroke-opacity="0.45"
-          stroke-width="1.2"
-        />
-        <polyline
-          :for={series <- @chart}
-          points={series.points}
-          fill="none"
-          stroke={series.color}
-          stroke-width="1.5"
-        />
-        <line
-          :if={not is_nil(@playhead_x)}
-          x1={@playhead_x}
-          x2={@playhead_x}
-          y1="0"
-          y2="120"
-          stroke="#FFC16B"
-          stroke-opacity="0.9"
-          stroke-width="1"
-        />
-      </svg>
-    </div>
-    """
-  end
-
-  defp playing?(player_status), do: player_status == :playing
-
   defp start_playback(socket, render_data) do
     Player.play(render_data)
-    Process.send_after(self(), :refresh_player, @refresh_interval_ms)
-
+    playback_ref = make_ref()
+    Process.send_after(self(), {:refresh_player, playback_ref}, @refresh_interval_ms)
+    playing_duration_ms = Map.get(render_data, :duration_ms)
+    done_after_ms = playing_duration_ms + Map.get(render_data, :granularity_ms, 0)
+    Process.send_after(self(), {:playback_done, playback_ref}, done_after_ms)
     play_started_at = System.monotonic_time(:millisecond)
 
     socket
     |> assign(:player_status, Player.status())
     |> assign(:play_started_at, play_started_at)
-    |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, render_data))
+    |> assign(:playing_duration_ms, playing_duration_ms)
+    |> assign(:playback_ref, playback_ref)
+    |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, playing_duration_ms))
   end
 
-  defp loop_full_sample?(socket) do
-    socket.assigns.loop_full_sample and
-      not socket.assigns.manual_stop and
-      not is_nil(socket.assigns.render_data)
+  defp clear_playback_state(socket, manual_stop) when is_boolean(manual_stop) do
+    socket
+    |> assign(:play_started_at, nil)
+    |> assign(:playing_duration_ms, nil)
+    |> assign(:playhead_pct, nil)
+    |> assign(:playback_ref, nil)
+    |> assign(:manual_stop, manual_stop)
   end
 
-  # How far (0-100) through the performance playback currently is, for
-  # drawing a moving crosshair over the charts/note matrix - `nil`
-  # (hides the crosshair) unless actually mid-playback. Computed and
-  # assigned directly on the socket each `:refresh_player` tick (not
-  # derived inside `render/1`), so its per-tick change is reliably
-  # picked up and pushed to the client.
-  defp playhead_pct(:playing, play_started_at, %{duration_ms: duration_ms})
+  defp playhead_pct(:playing, play_started_at, duration_ms)
+       when is_integer(duration_ms) and duration_ms > 0 and not is_nil(play_started_at) do
+    (System.monotonic_time(:millisecond) - play_started_at)
+    |> max(0)
+    |> min(duration_ms)
+    |> Kernel./(duration_ms)
+    |> Kernel.*(100)
+  end
+
+  defp playhead_pct(:playing, play_started_at, duration_ms)
        when not is_nil(play_started_at) and duration_ms > 0 do
     (System.monotonic_time(:millisecond) - play_started_at)
     |> max(0)
@@ -945,7 +581,13 @@ defmodule MenschWeb.HomeLive do
     |> Kernel.*(100)
   end
 
-  defp playhead_pct(_player_status, _play_started_at, _render_data), do: nil
+  defp playhead_pct(_player_status, _play_started_at, _duration_ms), do: nil
+
+  defp loop_full_sample?(socket) do
+    socket.assigns.loop_full_sample and
+      not socket.assigns.manual_stop and
+      not is_nil(socket.assigns.render_data)
+  end
 
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
@@ -955,8 +597,6 @@ defmodule MenschWeb.HomeLive do
       Enum.map(frame.notes, &Map.put(&1, :at_ms, frame.at_ms))
     end)
   end
-
-  defp format_bend(bend), do: Float.round(bend * 1.0, 5)
 
   defp active_sample_name(samples, active_sample_index)
        when is_list(samples) and is_integer(active_sample_index) do
@@ -1054,57 +694,6 @@ defmodule MenschWeb.HomeLive do
     SampleContext.ticks_to_ms(sample_context, max_end_tick)
   end
 
-  defp full_sample_render_data(socket) do
-    PerformanceAssembler.generate_sample(
-      socket.assigns.sample_entries,
-      socket.assigns.sample_context
-    )
-  end
-
-  defp entry_render_data(socket, entry_index) when is_integer(entry_index) do
-    case Enum.at(socket.assigns.sample_entries, entry_index) do
-      %{timeline_context: %TimelineContext{} = timeline_context} ->
-        sample_context = socket.assigns.sample_context
-        sample_render_data = full_sample_render_data(socket)
-
-        start_tick = SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
-        end_tick = start_tick + timeline_context.duration_ticks
-
-        scoped_music =
-          sample_render_data.music
-          |> Enum.map(fn frame ->
-            notes =
-              Enum.filter(frame.notes, fn note ->
-                Map.get(note, :sample_entry_index) == entry_index
-              end)
-
-            {frame, notes}
-          end)
-          |> Enum.filter(fn {frame, notes} ->
-            frame.at_tick >= start_tick and frame.at_tick <= end_tick and notes != []
-          end)
-          |> Enum.map(fn {frame, notes} ->
-            local_tick = frame.at_tick - start_tick
-
-            %{
-              at_tick: local_tick,
-              at_ms: SampleContext.ticks_to_ms(sample_context, local_tick),
-              notes: notes
-            }
-          end)
-
-        %{
-          sample_render_data
-          | duration_ms:
-              SampleContext.ticks_to_ms(sample_context, timeline_context.duration_ticks),
-            music: scoped_music
-        }
-
-      _ ->
-        nil
-    end
-  end
-
   defp local_timeline_start_label do
     "bar 0 · beat 0 · 0ms"
   end
@@ -1129,12 +718,7 @@ defmodule MenschWeb.HomeLive do
     "#{musical_label} · #{duration_ms}ms"
   end
 
-  defp sample_timeline_model(
-         sample_entries,
-         %SampleContext{} = sample_context,
-         playhead_pct,
-         render_scope
-       ) do
+  defp sample_timeline_static_model(sample_entries, %SampleContext{} = sample_context) do
     svg_width = 1000
     lane_height = 22
     lane_gap = 8
@@ -1195,14 +779,12 @@ defmodule MenschWeb.HomeLive do
         }
       end)
 
-    playhead_x = timeline_playhead_x(playhead_pct, render_scope, entries, total_ticks)
-
     %{
       svg_width: svg_width,
       svg_height: svg_height,
       lanes: lanes,
       entries: entries_with_geometry,
-      playhead_x: playhead_x,
+      source_entries: entries,
       subbeat_xs: timeline_xs(total_ticks, ticks_per_subbeat),
       beat_xs: timeline_xs(total_ticks, ticks_per_beat),
       bar_xs:
@@ -1213,6 +795,20 @@ defmodule MenschWeb.HomeLive do
       beat_count: beat_count,
       total_ticks: total_ticks
     }
+  end
+
+  defp sample_timeline_with_playhead(nil, _render_scope, _playhead_pct), do: nil
+
+  defp sample_timeline_with_playhead(
+         %{
+           source_entries: source_entries,
+           total_ticks: total_ticks
+         } = model,
+         render_scope,
+         playhead_pct
+       ) do
+    playhead_x = timeline_playhead_x(playhead_pct, render_scope, source_entries, total_ticks)
+    Map.put(model, :playhead_x, playhead_x)
   end
 
   defp timeline_playhead_x(nil, _render_scope, _entries, _total_ticks), do: nil
@@ -1311,7 +907,7 @@ defmodule MenschWeb.HomeLive do
          {min_v, max_v},
          render_scope,
          selected_note_key,
-         %SampleContext{} = sample_context,
+         %SampleContext{} = _sample_context,
          total_ticks
        ) do
     colors = note_color_map(music, render_scope, selected_note_key)
@@ -1319,7 +915,7 @@ defmodule MenschWeb.HomeLive do
 
     music
     |> Enum.flat_map(fn frame ->
-      local_tick = SampleContext.ms_to_ticks(sample_context, frame.at_ms)
+      local_tick = frame.at_tick
       x = local_tick / total_ticks * 600
 
       Enum.map(frame.notes, &{{&1.channel, &1.note}, x, Map.fetch!(&1, value_key)})
@@ -1354,7 +950,7 @@ defmodule MenschWeb.HomeLive do
          music,
          render_scope,
          selected_note_key,
-         %SampleContext{} = sample_context,
+         %SampleContext{} = _sample_context,
          total_ticks
        ) do
     colors = note_color_map(music, render_scope, selected_note_key)
@@ -1362,19 +958,16 @@ defmodule MenschWeb.HomeLive do
 
     segments =
       music
-      |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_ms}) end)
-      |> Enum.group_by(fn {note, _at_ms} -> {note.note, note.channel} end)
+      |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_tick}) end)
+      |> Enum.group_by(fn {note, _at_tick} -> {note.note, note.channel} end)
       |> Enum.flat_map(fn {{note_number, channel}, entries} ->
-        {sample, _at_ms} = hd(entries)
+        {sample, _at_tick} = hd(entries)
         start_entry = Enum.find(entries, fn {note, _} -> note.note_on end)
         end_entry = Enum.find(entries, fn {note, _} -> note.note_off end)
 
         if start_entry && end_entry do
-          start_ms = elem(start_entry, 1)
-          end_ms = elem(end_entry, 1)
-
-          start_tick = SampleContext.ms_to_ticks(sample_context, start_ms)
-          end_tick = SampleContext.ms_to_ticks(sample_context, end_ms)
+          start_tick = elem(start_entry, 1)
+          end_tick = elem(end_entry, 1)
           left_pct = start_tick / total_ticks * 100
           width_pct = max((end_tick - start_tick) / total_ticks * 100, 0.5)
 
@@ -1566,21 +1159,87 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp detail_playhead_x(nil, _width), do: nil
+  defp detail_total_ticks(music, duration_ms, %SampleContext{} = sample_context) do
+    tick_by_duration = SampleContext.ms_to_ticks(sample_context, duration_ms)
+    tick_by_frames = music |> List.last() |> then(&if(&1, do: &1.at_tick, else: 0))
 
-  defp detail_playhead_x(playhead_pct, width) when is_number(playhead_pct) do
-    Float.round(playhead_pct / 100 * width, 2)
+    max(max(tick_by_duration, tick_by_frames), 1)
   end
 
-  defp detail_playhead_x(_playhead_pct, _width), do: nil
+  defp assign_detail_content(socket) do
+    case socket.assigns.render_data do
+      nil ->
+        socket
+        |> assign(:pressure_chart, [])
+        |> assign(:slide_chart, [])
+        |> assign(:bend_chart, [])
+        |> assign(:debug_rows, [])
+        |> assign(:note_matrix, [])
+        |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
+        |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
 
-  defp detail_playhead_pct(nil), do: nil
+      %{music: music, duration_ms: duration_ms} ->
+        detail_total_ticks =
+          detail_total_ticks(music, duration_ms, socket.assigns.sample_context)
 
-  defp detail_playhead_pct(playhead_pct) when is_number(playhead_pct) do
-    Float.round(playhead_pct * 1.0, 3)
+        socket
+        |> assign(
+          :pressure_chart,
+          build_chart(
+            music,
+            :pressure,
+            {0, 127},
+            socket.assigns.render_scope,
+            socket.assigns.selected_note_key,
+            socket.assigns.sample_context,
+            detail_total_ticks
+          )
+        )
+        |> assign(
+          :slide_chart,
+          build_chart(
+            music,
+            :slide,
+            {0, 127},
+            socket.assigns.render_scope,
+            socket.assigns.selected_note_key,
+            socket.assigns.sample_context,
+            detail_total_ticks
+          )
+        )
+        |> assign(
+          :bend_chart,
+          build_chart(
+            music,
+            :bend,
+            value_range(music),
+            socket.assigns.render_scope,
+            socket.assigns.selected_note_key,
+            socket.assigns.sample_context,
+            detail_total_ticks
+          )
+        )
+        |> assign(:debug_rows, debug_rows(music))
+        |> assign(
+          :note_matrix,
+          build_note_matrix(
+            music,
+            socket.assigns.render_scope,
+            socket.assigns.selected_note_key,
+            socket.assigns.sample_context,
+            detail_total_ticks
+          )
+        )
+        |> assign(
+          :chart_grid,
+          chart_grid_model(socket.assigns.sample_context, detail_total_ticks)
+        )
+        |> assign(
+          :note_matrix_grid,
+          note_matrix_grid_model(socket.assigns.sample_context, detail_total_ticks)
+        )
+    end
   end
-
-  defp detail_playhead_pct(_playhead_pct), do: nil
 
   # Bend's absolute range is tiny (see `Mensch.NoteShape`'s
   # `@vibrato_depth`), so it gets its own dynamic min/max instead of
