@@ -76,7 +76,7 @@ defmodule Mensch.SampleDb do
               StrummedMpeParams.default()
               | release_mbeats: 0,
                 attack_mbeats: 300,
-                note_stagger_mbeats: 180
+                note_stagger_mbeats: 220
             }
           }
         },
@@ -91,7 +91,7 @@ defmodule Mensch.SampleDb do
               StrummedMpeParams.default()
               | release_mbeats: 0,
                 attack_mbeats: 300,
-                note_stagger_mbeats: 180
+                note_stagger_mbeats: 220
             }
           }
         },
@@ -106,7 +106,7 @@ defmodule Mensch.SampleDb do
               StrummedMpeParams.default()
               | release_mbeats: 0,
                 attack_mbeats: 300,
-                note_stagger_mbeats: 180
+                note_stagger_mbeats: 220
             }
           }
         },
@@ -121,7 +121,7 @@ defmodule Mensch.SampleDb do
               StrummedMpeParams.default()
               | release_mbeats: 0,
                 attack_mbeats: 300,
-                note_stagger_mbeats: 180
+                note_stagger_mbeats: 220
             }
           }
         }
