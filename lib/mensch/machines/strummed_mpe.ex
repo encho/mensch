@@ -14,7 +14,6 @@ defmodule Mensch.Machines.StrummedMpe do
   @behaviour Mensch.Machine
 
   alias Mensch.ChordSpec
-  alias Mensch.Midi.Connection
   alias Mensch.NoteShape
   alias Mensch.Performance
   alias Mensch.SongContext
@@ -46,10 +45,8 @@ defmodule Mensch.Machines.StrummedMpe do
         %ChordSpec{} = chord_spec,
         %SongContext{} = song_context,
         %TimelineContext{} = timeline_context,
-        opts \\ []
+        _opts \\ []
       ) do
-    channels = Keyword.get(opts, :channels, Connection.member_channels())
-
     note_stagger_ticks =
       @note_stagger_ms
       |> then(&SongContext.ms_to_ticks(song_context, &1))
@@ -67,7 +64,6 @@ defmodule Mensch.Machines.StrummedMpe do
     notes =
       build_notes(
         chord_spec,
-        channels,
         song_start_tick,
         note_stagger_ticks,
         chord_end_tick,
@@ -91,7 +87,6 @@ defmodule Mensch.Machines.StrummedMpe do
 
   defp build_notes(
          chord_spec,
-         channels,
          song_start_tick,
          note_stagger_ticks,
          chord_end_tick,
@@ -114,7 +109,7 @@ defmodule Mensch.Machines.StrummedMpe do
         note_name: note_name,
         octave: octave,
         note: note_number,
-        channel: pick_channel(channels, note_index),
+        channel: nil,
         velocity: @velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
@@ -125,13 +120,6 @@ defmodule Mensch.Machines.StrummedMpe do
         milestones: milestones
       }
     end)
-  end
-
-  defp pick_channel([], _note_index), do: 1
-
-  defp pick_channel(channels, note_index) do
-    channel_count = length(channels)
-    Enum.at(channels, rem(note_index, channel_count))
   end
 
   defp build_milestones(note_duration_ticks, %SongContext{} = song_context) do
