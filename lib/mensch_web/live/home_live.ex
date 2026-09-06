@@ -14,9 +14,10 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.Player
   alias Mensch.Render
   alias Mensch.SongContext
+  alias Mensch.TimelineContext
 
   @refresh_interval_ms 100
-  @chart_colors ["#39FF14", "#00E5FF", "#FF4DFF", "#FFD400", "#FF5F1F", "#7DFF7A"]
+  @chart_colors ["#FF9F1A", "#C96A00", "#2D8C82", "#4E6E8E", "#B3862C", "#8C5A2B"]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -76,8 +77,8 @@ defmodule MenschWeb.HomeLive do
     case Integer.parse(index_str) do
       {index, ""} ->
         case Enum.at(socket.assigns.song_entries, index) do
-          %{chord_spec: %ChordSpec{} = chord_spec} ->
-            render_data = Render.generate(chord_spec)
+          %{chord_spec: %ChordSpec{} = chord_spec} = entry ->
+            render_data = entry_render_data(entry, socket.assigns.song_context)
 
             {:noreply,
              socket
@@ -99,8 +100,8 @@ defmodule MenschWeb.HomeLive do
     case Integer.parse(index_str) do
       {index, ""} ->
         case Enum.at(socket.assigns.song_entries, index) do
-          %{chord_spec: %ChordSpec{} = chord_spec} ->
-            render_data = Render.generate(chord_spec)
+          %{chord_spec: %ChordSpec{}} = entry ->
+            render_data = entry_render_data(entry, socket.assigns.song_context)
 
             {:noreply,
              socket
@@ -191,13 +192,7 @@ defmodule MenschWeb.HomeLive do
           |> assign(:detail_matrix_playhead_pct, nil)
 
         %{music: music, duration_ms: duration_ms} ->
-          projection =
-            detail_projection_model(
-              assigns.song_entries,
-              assigns.song_context,
-              assigns.render_scope,
-              duration_ms
-            )
+          detail_total_ticks = max(SongContext.ms_to_ticks(assigns.song_context, duration_ms), 1)
 
           assigns
           |> assign(
@@ -208,7 +203,7 @@ defmodule MenschWeb.HomeLive do
               {0, 127},
               assigns.render_scope,
               assigns.song_context,
-              projection
+              detail_total_ticks
             )
           )
           |> assign(
@@ -219,7 +214,7 @@ defmodule MenschWeb.HomeLive do
               {0, 127},
               assigns.render_scope,
               assigns.song_context,
-              projection
+              detail_total_ticks
             )
           )
           |> assign(
@@ -230,26 +225,31 @@ defmodule MenschWeb.HomeLive do
               value_range(music),
               assigns.render_scope,
               assigns.song_context,
-              projection
+              detail_total_ticks
             )
           )
           |> assign(:debug_rows, debug_rows(music))
           |> assign(
             :note_matrix,
-            build_note_matrix(music, assigns.render_scope, assigns.song_context, projection)
+            build_note_matrix(
+              music,
+              assigns.render_scope,
+              assigns.song_context,
+              detail_total_ticks
+            )
           )
-          |> assign(:chart_grid, chart_grid_model(assigns.song_context, projection.total_ticks))
+          |> assign(:chart_grid, chart_grid_model(assigns.song_context, detail_total_ticks))
           |> assign(
             :note_matrix_grid,
-            note_matrix_grid_model(assigns.song_context, projection.total_ticks)
+            note_matrix_grid_model(assigns.song_context, detail_total_ticks)
           )
           |> assign(
             :detail_chart_playhead_x,
-            detail_playhead_x(assigns.playhead_pct, projection, 600)
+            detail_playhead_x(assigns.playhead_pct, 600)
           )
           |> assign(
             :detail_matrix_playhead_pct,
-            detail_playhead_pct(assigns.playhead_pct, projection)
+            detail_playhead_pct(assigns.playhead_pct)
           )
       end
 
@@ -268,10 +268,10 @@ defmodule MenschWeb.HomeLive do
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
       <div class="mx-auto max-w-6xl space-y-6">
-        <div id="render-section" class="space-y-4 border border-white/15 p-4">
-          <div class="text-[11px] uppercase tracking-wide text-white/40">Render Context</div>
+        <div id="render-section" class="space-y-4 border border-zinc-700/70 bg-zinc-950/85 p-4">
+          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Render Context</div>
 
-          <div class="font-mono text-[11px] text-white/55">
+          <div class="font-mono text-[11px] text-zinc-300">
             SongCtx: {song_context_label(@song_context)}
           </div>
 
@@ -282,10 +282,10 @@ defmodule MenschWeb.HomeLive do
               phx-click="toggle_loop_full_song"
               aria-pressed={@loop_full_song}
               class={[
-                "border px-3 py-1.5 text-[11px] uppercase tracking-wide transition-colors duration-150",
+                "flex h-9 items-center border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
                 (@loop_full_song &&
-                   "border-emerald-400 text-emerald-300 ring-1 ring-emerald-500/70") ||
-                  "border-white/30 text-white/70 hover:border-white hover:text-white"
+                   "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
+                  "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
               ]}
             >
               Loop {if(@loop_full_song, do: "On", else: "Off")}
@@ -294,7 +294,7 @@ defmodule MenschWeb.HomeLive do
               type="button"
               id="view-full-song"
               phx-click="view_full_song"
-              class="border border-white/30 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
             >
               View
             </button>
@@ -303,7 +303,7 @@ defmodule MenschWeb.HomeLive do
               id="play-full-song"
               aria-label="Play full song"
               phx-click="play_full_song"
-              class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-white/75 ring-1 ring-white/20 transition-colors duration-150 hover:border-white/70 hover:text-white hover:ring-white/40"
+              class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
             >
               <.icon name="hero-play-solid" class="size-4" />
             </button>
@@ -312,16 +312,16 @@ defmodule MenschWeb.HomeLive do
               id="stop-full-song"
               aria-label="Stop full song"
               phx-click="stop"
-              class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-white/75 ring-1 ring-white/20 transition-colors duration-150 hover:border-white/70 hover:text-white hover:ring-white/40"
+              class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
             >
               <.icon name="hero-stop-solid" class="size-4" />
             </button>
           </div>
 
-          <div class="overflow-x-auto border border-white/10">
+          <div class="overflow-x-auto border border-zinc-700/60">
             <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
               <thead>
-                <tr class="border-b border-white/10 text-white/40">
+                <tr class="border-b border-zinc-700/70 text-zinc-400">
                   <th class="px-2 py-1.5 font-normal">ChordSpec</th>
                   <th class="px-2 py-1.5 font-normal">Machine</th>
                   <th class="px-2 py-1.5 font-normal">Start</th>
@@ -330,8 +330,8 @@ defmodule MenschWeb.HomeLive do
                 </tr>
               </thead>
               <tbody>
-                <tr :for={{entry, index} <- Enum.with_index(@song_entries)} class="text-white/80">
-                  <td class="px-2 py-1.5 text-white">
+                <tr :for={{entry, index} <- Enum.with_index(@song_entries)} class="text-zinc-200">
+                  <td class="px-2 py-1.5 text-zinc-100">
                     <div class="flex items-center gap-2">
                       <span
                         class="inline-block size-2.5 rounded-full"
@@ -342,18 +342,18 @@ defmodule MenschWeb.HomeLive do
                   </td>
                   <td class="px-2 py-1.5">{machine_label(entry.machine_module)}</td>
                   <td class="px-2 py-1.5 align-top">
-                    <div class="leading-tight text-white">
+                    <div class="leading-tight text-zinc-100">
                       {start_label_primary(@song_context, entry.timeline_context.start_beat)}
                     </div>
-                    <div class="leading-tight text-white/40">
+                    <div class="leading-tight text-zinc-500">
                       {start_label_secondary(@song_context, entry.timeline_context.start_beat)}
                     </div>
                   </td>
                   <td class="px-2 py-1.5 align-top">
-                    <div class="leading-tight text-white">
+                    <div class="leading-tight text-zinc-100">
                       {duration_label_primary(@song_context, entry.timeline_context.duration_ticks)}
                     </div>
-                    <div class="leading-tight text-white/40">
+                    <div class="leading-tight text-zinc-500">
                       {duration_label_secondary(entry.timeline_context.duration_ticks)}
                     </div>
                   </td>
@@ -364,7 +364,7 @@ defmodule MenschWeb.HomeLive do
                         id={"view-entry-#{index}"}
                         phx-click="view_entry"
                         phx-value-index={index}
-                        class="border border-white/30 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+                        class="flex h-9 items-center border border-zinc-600 px-3 text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
                       >
                         View
                       </button>
@@ -374,7 +374,7 @@ defmodule MenschWeb.HomeLive do
                         aria-label={"Play #{chord_label(entry.chord_spec)}"}
                         phx-click="play_entry"
                         phx-value-index={index}
-                        class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-white/75 ring-1 ring-white/20 transition-colors duration-150 hover:border-white/70 hover:text-white hover:ring-white/40"
+                        class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
                       >
                         <.icon name="hero-play-solid" class="size-4" />
                       </button>
@@ -383,7 +383,7 @@ defmodule MenschWeb.HomeLive do
                         id={"stop-entry-#{index}"}
                         aria-label={"Stop #{chord_label(entry.chord_spec)}"}
                         phx-click="stop"
-                        class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-white/75 ring-1 ring-white/20 transition-colors duration-150 hover:border-white/70 hover:text-white hover:ring-white/40"
+                        class="flex size-9 items-center justify-center border border-zinc-600 bg-transparent text-zinc-300 ring-1 ring-zinc-500/40 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40"
                       >
                         <.icon name="hero-stop-solid" class="size-4" />
                       </button>
@@ -400,22 +400,22 @@ defmodule MenschWeb.HomeLive do
       <div
         :if={@view_modal_open and @render_data}
         id="render-view-modal"
-        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4"
+        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/85 p-4"
       >
-        <div class="w-full max-w-6xl space-y-4 border border-white/20 bg-black p-4">
-          <div class="flex items-center justify-between border-b border-white/10 pb-2">
-            <div class="text-sm uppercase tracking-wide text-white/75">{@view_title || "View"}</div>
+        <div class="w-full max-w-6xl space-y-4 border border-zinc-700/80 bg-zinc-950 p-4">
+          <div class="flex items-center justify-between border-b border-zinc-700/70 pb-2">
+            <div class="text-sm uppercase tracking-wide text-zinc-200">{@view_title || "View"}</div>
             <button
               type="button"
               id="close-view-modal"
               phx-click="close_view"
-              class="border border-white/30 px-2 py-1 text-[11px] uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+              class="border border-zinc-600 px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
             >
               Close
             </button>
           </div>
 
-          <div class="font-mono text-[11px] text-white/50">
+          <div class="font-mono text-[11px] text-zinc-400">
             {@render_data.bpm} bpm · {elem(@render_data.time_signature, 0)}/{elem(
               @render_data.time_signature,
               1
@@ -424,14 +424,14 @@ defmodule MenschWeb.HomeLive do
             )} frames
           </div>
 
-          <div id="debug-frames" class="border border-white/10">
-            <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
+          <div id="debug-frames" class="border border-zinc-700/60">
+            <div class="border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
               All frames
             </div>
             <div class="max-h-48 overflow-y-auto">
               <table class="w-full text-left font-mono text-[11px]">
-                <thead class="sticky top-0 bg-black">
-                  <tr class="border-b border-white/10 text-white/40">
+                <thead class="sticky top-0 bg-zinc-950">
+                  <tr class="border-b border-zinc-700/60 text-zinc-400">
                     <th class="px-3 py-1.5 font-normal">ms</th>
                     <th class="px-3 py-1.5 font-normal">note</th>
                     <th class="px-3 py-1.5 font-normal">ch</th>
@@ -446,10 +446,10 @@ defmodule MenschWeb.HomeLive do
                 <tbody>
                   <tr
                     :for={row <- @debug_rows}
-                    class="border-b border-white/5 text-white/70 last:border-0"
+                    class="border-b border-zinc-800/70 text-zinc-300 last:border-0"
                   >
                     <td class="px-3 py-1.5">{row.at_ms}</td>
-                    <td class="px-3 py-1.5 text-white">{row.note_name}{row.octave}</td>
+                    <td class="px-3 py-1.5 text-zinc-100">{row.note_name}{row.octave}</td>
                     <td class="px-3 py-1.5">{row.channel}</td>
                     <td class="px-3 py-1.5">{row.phase}</td>
                     <td class="px-3 py-1.5">{row.note_on}</td>
@@ -463,40 +463,40 @@ defmodule MenschWeb.HomeLive do
             </div>
           </div>
 
-          <div id="note-matrix" class="border border-white/10">
-            <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
+          <div id="note-matrix" class="border border-zinc-700/60">
+            <div class="border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
               Note matrix
             </div>
             <div class="relative py-2">
               <div
                 :for={x <- @note_matrix_grid.subbeat_pcts}
-                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-white/5"
+                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-zinc-700/30"
                 style={"left: #{x}%;"}
               >
               </div>
               <div
                 :for={x <- @note_matrix_grid.beat_pcts}
-                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-white/10"
+                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-zinc-500/40"
                 style={"left: #{x}%;"}
               >
               </div>
               <div
                 :for={x <- @note_matrix_grid.bar_pcts}
-                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-white/25"
+                class="pointer-events-none absolute inset-y-0 z-0 w-px bg-amber-400/35"
                 style={"left: #{x}%;"}
               >
               </div>
               <div
                 :if={not is_nil(@detail_matrix_playhead_pct)}
-                class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/70"
+                class="pointer-events-none absolute inset-y-0 z-20 w-px bg-amber-300/80"
                 style={"left: #{@detail_matrix_playhead_pct}%;"}
               >
               </div>
               <div
                 :for={{row, index} <- Enum.with_index(@note_matrix)}
                 class={[
-                  "relative z-10 flex h-2.5 items-center border-b border-white/20 last:border-0",
-                  rem(index, 2) == 0 && "bg-white/[0.03]"
+                  "relative z-10 flex h-2.5 items-center border-b border-zinc-700/60 last:border-0",
+                  rem(index, 2) == 0 && "bg-zinc-900/70"
                 ]}
               >
                 <div
@@ -507,15 +507,15 @@ defmodule MenschWeb.HomeLive do
                 </div>
                 <span class={[
                   "relative z-10 px-1 font-mono text-[5px] uppercase",
-                  (Enum.empty?(row.styles) && "text-white/30") || "text-white"
+                  (Enum.empty?(row.styles) && "text-zinc-600") || "text-zinc-200"
                 ]}>
                   {row.label}
                 </span>
               </div>
             </div>
-            <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-white/30">
-              <span>0ms</span>
-              <span>{@render_data.duration_ms}ms</span>
+            <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-zinc-500">
+              <span>{local_timeline_start_label()}</span>
+              <span>{local_timeline_end_label(@song_context, @render_data.duration_ms)}</span>
             </div>
           </div>
 
@@ -545,9 +545,9 @@ defmodule MenschWeb.HomeLive do
               aria-label="Play on Osmose"
               phx-click="play"
               class={[
-                "flex size-14 items-center justify-center border border-zinc-500 bg-transparent transition-colors duration-150",
-                (playing?(@player_status) && "text-white/20 ring-1 ring-white/10") ||
-                  "text-white/75 ring-1 ring-white/20 hover:border-white/70 hover:text-white hover:ring-white/40",
+                "flex size-14 items-center justify-center border border-zinc-600 bg-transparent transition-colors duration-150",
+                (playing?(@player_status) && "text-zinc-700 ring-1 ring-zinc-700/60") ||
+                  "text-zinc-300 ring-1 ring-zinc-500/40 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40",
                 "disabled:cursor-not-allowed"
               ]}
               disabled={playing?(@player_status)}
@@ -560,10 +560,10 @@ defmodule MenschWeb.HomeLive do
               aria-label="Stop"
               phx-click="stop"
               class={[
-                "flex size-14 items-center justify-center border border-zinc-500 bg-transparent transition-colors duration-150",
+                "flex size-14 items-center justify-center border border-zinc-600 bg-transparent transition-colors duration-150",
                 (playing?(@player_status) &&
-                   "text-white/75 ring-1 ring-white/20 hover:border-white/70 hover:text-white hover:ring-white/40") ||
-                  "text-white/20 ring-1 ring-white/10",
+                   "text-zinc-300 ring-1 ring-zinc-500/40 hover:border-amber-400 hover:text-amber-200 hover:ring-amber-500/40") ||
+                  "text-zinc-700 ring-1 ring-zinc-700/60",
                 "disabled:cursor-not-allowed"
               ]}
               disabled={!playing?(@player_status)}
@@ -581,8 +581,8 @@ defmodule MenschWeb.HomeLive do
 
   defp song_timeline(assigns) do
     ~H"""
-    <div id="song-timeline" class="space-y-2 border border-white/10 p-3">
-      <div class="flex items-center justify-between font-mono text-[11px] text-white/45">
+    <div id="song-timeline" class="space-y-2 border border-zinc-700/60 bg-zinc-950/70 p-3">
+      <div class="flex items-center justify-between font-mono text-[11px] text-zinc-400">
         <span class="uppercase tracking-wide">Timeline</span>
         <span>
           {@model.row_count} rows · {@model.bar_count} bars · {@model.beat_count} beats · {@model.total_ticks} ticks
@@ -591,7 +591,7 @@ defmodule MenschWeb.HomeLive do
 
       <svg
         viewBox={"0 0 #{@model.svg_width} #{@model.svg_height}"}
-        class="w-full border border-white/10 bg-black/40"
+        class="w-full border border-zinc-700/60 bg-zinc-950/80"
       >
         <line
           :for={x <- @model.subbeat_xs}
@@ -599,8 +599,8 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2={@model.svg_height}
-          stroke="#ffffff"
-          stroke-opacity="0.06"
+          stroke="#5B6472"
+          stroke-opacity="0.3"
           stroke-width="1"
         />
         <line
@@ -609,8 +609,8 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2={@model.svg_height}
-          stroke="#ffffff"
-          stroke-opacity="0.14"
+          stroke="#7A8596"
+          stroke-opacity="0.35"
           stroke-width="1"
         />
         <line
@@ -619,8 +619,8 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2={@model.svg_height}
-          stroke="#ffffff"
-          stroke-opacity="0.32"
+          stroke="#FFB55A"
+          stroke-opacity="0.4"
           stroke-width="1.2"
         />
 
@@ -630,7 +630,7 @@ defmodule MenschWeb.HomeLive do
           y={lane.y}
           width={@model.svg_width}
           height={lane.height}
-          fill="#ffffff"
+          fill="#1A202B"
           fill-opacity={lane.opacity}
         />
 
@@ -649,7 +649,7 @@ defmodule MenschWeb.HomeLive do
           :for={entry <- @model.entries}
           x={entry.x + 6}
           y={entry.text_y}
-          fill="#ffffff"
+          fill="#D1D8E2"
           fill-opacity="0.9"
           font-size="10"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
@@ -661,8 +661,8 @@ defmodule MenschWeb.HomeLive do
           :for={{x, bar_number} <- @model.bar_xs}
           x={x + 2}
           y="13"
-          fill="#ffffff"
-          fill-opacity="0.65"
+          fill="#FFCA87"
+          fill-opacity="0.85"
           font-size="10"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
         >
@@ -675,13 +675,13 @@ defmodule MenschWeb.HomeLive do
           x2={@model.playhead_x}
           y1="0"
           y2={@model.svg_height}
-          stroke="#ffffff"
-          stroke-opacity="0.75"
+          stroke="#FFC16B"
+          stroke-opacity="0.9"
           stroke-width="1.5"
         />
       </svg>
 
-      <div class="flex items-center justify-between font-mono text-[10px] text-white/35">
+      <div class="flex items-center justify-between font-mono text-[10px] text-zinc-500">
         <span>0</span>
         <span>{@model.total_ticks} ticks</span>
       </div>
@@ -697,16 +697,16 @@ defmodule MenschWeb.HomeLive do
   defp chart(assigns) do
     ~H"""
     <div>
-      <div class="mb-1 text-[11px] uppercase tracking-wide text-white/40">{@title}</div>
-      <svg viewBox="0 0 600 120" class="w-full border border-white/10 bg-black">
+      <div class="mb-1 text-[11px] uppercase tracking-wide text-zinc-400">{@title}</div>
+      <svg viewBox="0 0 600 120" class="w-full border border-zinc-700/60 bg-zinc-950">
         <line
           :for={x <- @grid.subbeat_xs}
           x1={x}
           y1="0"
           x2={x}
           y2="120"
-          stroke="#ffffff"
-          stroke-opacity="0.05"
+          stroke="#5B6472"
+          stroke-opacity="0.32"
           stroke-width="1"
         />
         <line
@@ -715,8 +715,8 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2="120"
-          stroke="#ffffff"
-          stroke-opacity="0.12"
+          stroke="#7A8596"
+          stroke-opacity="0.38"
           stroke-width="1"
         />
         <line
@@ -725,8 +725,8 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2="120"
-          stroke="#ffffff"
-          stroke-opacity="0.26"
+          stroke="#FFB55A"
+          stroke-opacity="0.45"
           stroke-width="1.2"
         />
         <polyline
@@ -742,8 +742,8 @@ defmodule MenschWeb.HomeLive do
           x2={@playhead_x}
           y1="0"
           y2="120"
-          stroke="#ffffff"
-          stroke-opacity="0.7"
+          stroke="#FFC16B"
+          stroke-opacity="0.9"
           stroke-width="1"
         />
       </svg>
@@ -856,6 +856,47 @@ defmodule MenschWeb.HomeLive do
 
   defp duration_label_secondary(duration_ticks) do
     "#{duration_ticks} ticks"
+  end
+
+  defp entry_render_data(
+         %{
+           chord_spec: %ChordSpec{} = chord_spec,
+           timeline_context: %TimelineContext{} = timeline_context
+         } = entry,
+         %SongContext{} = song_context
+       ) do
+    local_timeline_context = %TimelineContext{
+      start_beat: BeatPosition.new(0, 0, 0),
+      duration_ticks: timeline_context.duration_ticks
+    }
+
+    machine_module = Map.get(entry, :machine_module, Mensch.Machines.StrummedMpe)
+
+    Render.generate(chord_spec, song_context, local_timeline_context, machine_module)
+  end
+
+  defp local_timeline_start_label do
+    "bar 0 · beat 0 · 0ms"
+  end
+
+  defp local_timeline_end_label(%SongContext{} = song_context, duration_ms) do
+    total_ticks = SongContext.ms_to_ticks(song_context, duration_ms)
+    ticks_per_bar = SongContext.ticks_per_bar(song_context)
+    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+
+    bar = div(total_ticks, ticks_per_bar)
+    bar_remainder = rem(total_ticks, ticks_per_bar)
+    beat = div(bar_remainder, ticks_per_beat)
+    tick_remainder = rem(bar_remainder, ticks_per_beat)
+
+    musical_label =
+      if tick_remainder == 0 do
+        "bar #{bar} · beat #{beat}"
+      else
+        "bar #{bar} · beat #{beat} + #{tick_remainder}t"
+      end
+
+    "#{musical_label} · #{duration_ms}ms"
   end
 
   defp song_timeline_model(
@@ -1040,15 +1081,15 @@ defmodule MenschWeb.HomeLive do
          {min_v, max_v},
          render_scope,
          %SongContext{} = song_context,
-         projection
+         total_ticks
        ) do
     colors = note_color_map(music, render_scope)
+    total_ticks = max(total_ticks, 1)
 
     music
     |> Enum.flat_map(fn frame ->
       local_tick = SongContext.ms_to_ticks(song_context, frame.at_ms)
-      global_tick = project_tick(local_tick, projection)
-      x = global_tick / projection.total_ticks * 600
+      x = local_tick / total_ticks * 600
 
       Enum.map(frame.notes, &{{&1.channel, &1.note}, x, Map.fetch!(&1, value_key)})
     end)
@@ -1071,8 +1112,9 @@ defmodule MenschWeb.HomeLive do
   # and highest sounding note (highest pitch on top), so vertical
   # spacing matches real chromatic distance. A row may contain multiple
   # bars (same pitch reused later by another chord/channel).
-  defp build_note_matrix(music, render_scope, %SongContext{} = song_context, projection) do
+  defp build_note_matrix(music, render_scope, %SongContext{} = song_context, total_ticks) do
     colors = note_color_map(music, render_scope)
+    total_ticks = max(total_ticks, 1)
 
     segments =
       music
@@ -1087,12 +1129,10 @@ defmodule MenschWeb.HomeLive do
           start_ms = elem(start_entry, 1)
           end_ms = elem(end_entry, 1)
 
-          start_tick =
-            song_context |> SongContext.ms_to_ticks(start_ms) |> project_tick(projection)
-
-          end_tick = song_context |> SongContext.ms_to_ticks(end_ms) |> project_tick(projection)
-          left_pct = start_tick / projection.total_ticks * 100
-          width_pct = max((end_tick - start_tick) / projection.total_ticks * 100, 0.5)
+          start_tick = SongContext.ms_to_ticks(song_context, start_ms)
+          end_tick = SongContext.ms_to_ticks(song_context, end_ms)
+          left_pct = start_tick / total_ticks * 100
+          width_pct = max((end_tick - start_tick) / total_ticks * 100, 0.5)
 
           style =
             "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
@@ -1226,76 +1266,21 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp detail_projection_model(
-         song_entries,
-         %SongContext{} = song_context,
-         render_scope,
-         duration_ms
-       ) do
-    entry_windows =
-      Enum.map(song_entries, fn %{timeline_context: timeline_context} ->
-        start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
-        end_tick = start_tick + timeline_context.duration_ticks
-        %{start_tick: start_tick, end_tick: end_tick}
-      end)
+  defp detail_playhead_x(nil, _width), do: nil
 
-    ticks_per_bar = SongContext.ticks_per_bar(song_context)
-
-    total_ticks =
-      case entry_windows do
-        [] -> ticks_per_bar * 2
-        _ -> entry_windows |> Enum.map(& &1.end_tick) |> Enum.max()
-      end
-
-    total_ticks = max(total_ticks, 1)
-    local_total_ticks = max(SongContext.ms_to_ticks(song_context, duration_ms), 1)
-
-    {target_start_tick, target_end_tick} =
-      case render_scope do
-        {:entry, index} when is_integer(index) ->
-          case Enum.at(entry_windows, index) do
-            %{start_tick: start_tick, end_tick: end_tick} -> {start_tick, end_tick}
-            _ -> {0, total_ticks}
-          end
-
-        _ ->
-          {0, total_ticks}
-      end
-
-    %{
-      total_ticks: total_ticks,
-      local_total_ticks: local_total_ticks,
-      target_start_tick: target_start_tick,
-      target_end_tick: target_end_tick
-    }
+  defp detail_playhead_x(playhead_pct, width) when is_number(playhead_pct) do
+    Float.round(playhead_pct / 100 * width, 2)
   end
 
-  defp project_tick(local_tick, projection) do
-    span = max(projection.target_end_tick - projection.target_start_tick, 1)
-    ratio = local_tick / projection.local_total_ticks
-    mapped_tick = projection.target_start_tick + ratio * span
-    mapped_tick |> max(projection.target_start_tick) |> min(projection.target_end_tick)
+  defp detail_playhead_x(_playhead_pct, _width), do: nil
+
+  defp detail_playhead_pct(nil), do: nil
+
+  defp detail_playhead_pct(playhead_pct) when is_number(playhead_pct) do
+    Float.round(playhead_pct * 1.0, 3)
   end
 
-  defp detail_playhead_x(nil, _projection, _width), do: nil
-
-  defp detail_playhead_x(playhead_pct, projection, width) when is_number(playhead_pct) do
-    local_tick = projection.local_total_ticks * (playhead_pct / 100)
-    global_tick = project_tick(local_tick, projection)
-    Float.round(global_tick / projection.total_ticks * width, 2)
-  end
-
-  defp detail_playhead_x(_playhead_pct, _projection, _width), do: nil
-
-  defp detail_playhead_pct(nil, _projection), do: nil
-
-  defp detail_playhead_pct(playhead_pct, projection) when is_number(playhead_pct) do
-    local_tick = projection.local_total_ticks * (playhead_pct / 100)
-    global_tick = project_tick(local_tick, projection)
-    Float.round(global_tick / projection.total_ticks * 100, 3)
-  end
-
-  defp detail_playhead_pct(_playhead_pct, _projection), do: nil
+  defp detail_playhead_pct(_playhead_pct), do: nil
 
   # Bend's absolute range is tiny (see `Mensch.NoteShape`'s
   # `@vibrato_depth`), so it gets its own dynamic min/max instead of

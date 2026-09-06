@@ -143,20 +143,16 @@ defmodule Mensch.Render do
       |> tag_song_entry_index(entry_index)
 
     start_tick = TimelineContext.start_tick(timeline_context, song_context)
-    end_tick = TimelineContext.end_tick(timeline_context, song_context)
-
-    shift_and_clip_performance(local_performance, start_tick, end_tick, song_context)
+    shift_performance(local_performance, start_tick, song_context)
   end
 
-  defp shift_and_clip_performance(
+  defp shift_performance(
          %Performance{} = performance,
          start_tick,
-         end_tick,
          %SongContext{} = song_context
        ) do
-    shifted_frames =
-      performance.music
-      |> Enum.map(fn frame ->
+    shifted_music =
+      Enum.map(performance.music, fn frame ->
         shifted_tick = frame.at_tick + start_tick
 
         %{
@@ -165,19 +161,13 @@ defmodule Mensch.Render do
           notes: frame.notes
         }
       end)
-      |> Enum.filter(&(&1.at_tick <= end_tick))
 
-    forced_off_notes = forced_note_offs(shifted_frames)
-
-    clipped_music =
-      shifted_frames
-      |> insert_forced_off_frame(forced_off_notes, end_tick, song_context)
-      |> Enum.sort_by(& &1.at_tick)
+    last_tick = shifted_music |> List.last() |> then(&if(&1, do: &1.at_tick, else: 0))
 
     %Performance{
       performance
-      | duration_ms: SongContext.ticks_to_ms(song_context, end_tick),
-        music: clipped_music
+      | duration_ms: SongContext.ticks_to_ms(song_context, last_tick),
+        music: shifted_music
     }
   end
 
@@ -193,54 +183,6 @@ defmodule Mensch.Render do
       end)
 
     %Performance{performance | music: tagged_music}
-  end
-
-  defp forced_note_offs(shifted_frames) do
-    shifted_frames
-    |> Enum.flat_map(fn frame ->
-      Enum.map(frame.notes, fn note ->
-        {{note.channel, note.note}, note}
-      end)
-    end)
-    |> Enum.reduce(%{}, fn {{channel, note_number} = note_id, note}, acc ->
-      state = Map.get(acc, note_id, %{last: nil, on?: false, off?: false})
-
-      Map.put(acc, note_id, %{
-        last: note,
-        on?: state.on? or note.note_on,
-        off?: state.off? or note.note_off,
-        channel: channel,
-        note: note_number
-      })
-    end)
-    |> Enum.flat_map(fn {{_channel, _note_number}, state} ->
-      if state.on? and not state.off? do
-        [%{state.last | note_on: false, note_off: true, pressure: 0, bend: 0.0, slide: 0}]
-      else
-        []
-      end
-    end)
-  end
-
-  defp insert_forced_off_frame(frames, [], _end_tick, _song_context), do: frames
-
-  defp insert_forced_off_frame(frames, forced_off_notes, end_tick, %SongContext{} = song_context) do
-    {at_end, other} = Enum.split_with(frames, &(&1.at_tick == end_tick))
-
-    end_frame =
-      case at_end do
-        [existing] ->
-          %{existing | notes: existing.notes ++ forced_off_notes}
-
-        [] ->
-          %{
-            at_tick: end_tick,
-            at_ms: SongContext.ticks_to_ms(song_context, end_tick),
-            notes: forced_off_notes
-          }
-      end
-
-    [end_frame | other]
   end
 
   defp merge_performances([], %SongContext{} = song_context) do

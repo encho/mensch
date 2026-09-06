@@ -55,29 +55,23 @@ defmodule Mensch.Machines.StrummedMpe do
       |> then(&SongContext.ms_to_ticks(song_context, &1))
       |> snap_ticks(@ticks_per_frame)
 
-    note_duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
-    note_duration_ms = SongContext.ticks_to_ms(song_context, note_duration_ticks)
+    chord_duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
 
     song_start_tick =
       timeline_context
       |> TimelineContext.start_tick(song_context)
       |> snap_ticks(@ticks_per_frame)
 
-    milestones = %{
-      attack_end_ms: @attack_ms,
-      decay_end_ms: @attack_ms + @decay_ms,
-      release_start_ms: max(note_duration_ms - @release_ms, 0),
-      total_ms: note_duration_ms,
-      total_ticks: note_duration_ticks
-    }
+    chord_end_tick = song_start_tick + chord_duration_ticks
 
     notes =
       build_notes(
         chord_spec,
         channels,
-        milestones,
         song_start_tick,
-        note_stagger_ticks
+        note_stagger_ticks,
+        chord_end_tick,
+        song_context
       )
 
     duration_ticks =
@@ -98,9 +92,10 @@ defmodule Mensch.Machines.StrummedMpe do
   defp build_notes(
          chord_spec,
          channels,
-         milestones,
          song_start_tick,
-         note_stagger_ticks
+         note_stagger_ticks,
+         chord_end_tick,
+         song_context
        ) do
     chord_notes = ChordSpec.to_midi_notes(chord_spec)
     note_count = max(length(chord_notes), 1)
@@ -109,7 +104,11 @@ defmodule Mensch.Machines.StrummedMpe do
     |> Enum.with_index()
     |> Enum.map(fn {note_number, note_index} ->
       note_delay_ticks = note_index * note_stagger_ticks
+      note_start_tick = song_start_tick + note_delay_ticks
+      note_duration_ticks = max(chord_end_tick - note_start_tick, 0)
       {note_name, octave} = ChordSpec.note_name(note_number)
+
+      milestones = build_milestones(note_duration_ticks, song_context)
 
       %{
         note_name: note_name,
@@ -122,10 +121,22 @@ defmodule Mensch.Machines.StrummedMpe do
         machine_id: id(),
         chord_instance_id: 0,
         event_index: note_index,
-        delay_ticks: song_start_tick + note_delay_ticks,
+        delay_ticks: note_start_tick,
         milestones: milestones
       }
     end)
+  end
+
+  defp build_milestones(note_duration_ticks, %SongContext{} = song_context) do
+    note_duration_ms = SongContext.ticks_to_ms(song_context, note_duration_ticks)
+
+    %{
+      attack_end_ms: @attack_ms,
+      decay_end_ms: @attack_ms + @decay_ms,
+      release_start_ms: max(note_duration_ms - @release_ms, 0),
+      total_ms: note_duration_ms,
+      total_ticks: note_duration_ticks
+    }
   end
 
   defp build_music(notes, duration_ticks, song_context) do
