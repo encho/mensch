@@ -56,6 +56,110 @@ defmodule Mensch.SampleDb do
       ]
     },
     %{
+      id: "sample-1-no-release",
+      name: "Sample 1 · Cm7 F7 Bbmaj7 Gm7 · No Release",
+      sample_context: %SampleContext{
+        bpm: 120,
+        time_signature: {4, 4},
+        mbeats_per_tick: 10,
+        frame_mbeats: 60
+      },
+      sample_entries: [
+        %{
+          chord_spec: %ChordSpec{root: :c, modifier: :min7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
+            duration_ticks: 800
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :f, modifier: :dom7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
+            duration_ticks: 900
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 3, beat: 3, tick: 0},
+            duration_ticks: 900
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :g, modifier: :min7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 5, beat: 3, tick: 0},
+            duration_ticks: 900
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        }
+      ]
+    },
+    %{
+      id: "sample-2-c-major-chords",
+      name: "Sample 2 · C Major ii-V-I-vi Turnaround · No Release",
+      sample_context: %SampleContext{
+        bpm: 80,
+        time_signature: {4, 4},
+        mbeats_per_tick: 10,
+        frame_mbeats: 60
+      },
+      sample_entries: [
+        %{
+          chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
+            duration_ticks: 800
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 2, beat: 0, tick: 0},
+            duration_ticks: 800
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 4, beat: 0, tick: 0},
+            duration_ticks: 800
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :a, modifier: :min7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 6, beat: 0, tick: 0},
+            duration_ticks: 800
+          },
+          machine: %StrummedMpe{
+            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+          }
+        }
+      ]
+    },
+    %{
       id: "sample-2",
       name: "Sample 2 · Cmaj7 Drone",
       sample_context: %SampleContext{
@@ -97,7 +201,7 @@ defmodule Mensch.SampleDb do
           chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
-            duration_ticks: 500
+            duration_ticks: 800
           },
           machine: %RootModulated{params: RootModulatedParams.default()}
         },
@@ -105,7 +209,7 @@ defmodule Mensch.SampleDb do
           chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
-            duration_ticks: 400
+            duration_ticks: 800
           },
           machine: %RootModulated{params: RootModulatedParams.default()}
         }

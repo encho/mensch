@@ -148,10 +148,17 @@ defmodule Mensch.Machines.StrummedMpe do
     %{
       attack_end_ms: SampleContext.ticks_to_ms(sample_context, attack_end_ticks),
       decay_end_ms: SampleContext.ticks_to_ms(sample_context, decay_end_ticks),
-      release_start_ms: SampleContext.ticks_to_ms(sample_context, release_start_ticks),
+      release_start_ms:
+        release_start_ms(sample_context, release_start_ticks, params.release_mbeats),
       total_ms: note_duration_ms,
       total_ticks: note_duration_ticks
     }
+  end
+
+  defp release_start_ms(_sample_context, _release_start_ticks, 0), do: nil
+
+  defp release_start_ms(%SampleContext{} = sample_context, release_start_ticks, _release_mbeats) do
+    SampleContext.ticks_to_ms(sample_context, release_start_ticks)
   end
 
   defp build_music(notes, duration_ticks, sample_context, frame_ticks) do

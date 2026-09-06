@@ -99,13 +99,29 @@ defmodule Mensch.Machines.RootModulated do
       attack_end_ms: SampleContext.ticks_to_ms(sample_context, attack_end_ticks),
       decay_end_ms: SampleContext.ticks_to_ms(sample_context, decay_end_ticks),
       release_start_ms:
-        duration_ticks
-        |> Kernel.-(release_tail_ticks)
-        |> max(0)
-        |> then(&SampleContext.ticks_to_ms(sample_context, &1)),
+        release_start_ms(
+          sample_context,
+          duration_ticks,
+          release_tail_ticks,
+          params.release_mbeats
+        ),
       total_ms: duration_ms,
       total_ticks: duration_ticks
     }
+  end
+
+  defp release_start_ms(_sample_context, _duration_ticks, _release_tail_ticks, 0), do: nil
+
+  defp release_start_ms(
+         %SampleContext{} = sample_context,
+         duration_ticks,
+         release_tail_ticks,
+         _release_mbeats
+       ) do
+    duration_ticks
+    |> Kernel.-(release_tail_ticks)
+    |> max(0)
+    |> then(&SampleContext.ticks_to_ms(sample_context, &1))
   end
 
   defp build_music(note, duration_ticks, sample_context, frame_ticks) do

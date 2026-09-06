@@ -7,7 +7,8 @@ defmodule Mensch.Machines.RootModulatedParams do
   * `velocity`: MIDI note-on velocity (`0..127`).
   * `attack_mbeats`: Envelope attack duration in millibeats.
   * `decay_mbeats`: Envelope decay duration in millibeats.
-  * `release_mbeats`: Envelope release duration in millibeats.
+  * `release_mbeats`: Envelope release duration in millibeats (`0` disables
+    release phase and sustains until note-off).
   """
 
   @type t :: %__MODULE__{
