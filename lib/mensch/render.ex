@@ -11,9 +11,9 @@ defmodule Mensch.Render do
   later, like a bass chord following the first - widening the range of
   notes actually sounding (handy for eyeballing the note matrix).
 
-  The result is a single, self-describing map:
+  The result is a single, self-describing `%Mensch.Performance{}`:
 
-      %{
+      %Mensch.Performance{
         bpm: 120,
         time_signature: {4, 4},
         granularity_ms: 30,
@@ -45,6 +45,7 @@ defmodule Mensch.Render do
 
   alias Mensch.Midi.Connection
   alias Mensch.NoteShape
+  alias Mensch.Performance
 
   @bpm 120
   @time_signature {4, 4}
@@ -117,7 +118,7 @@ defmodule Mensch.Render do
 
     duration_ms = notes |> Enum.map(&(&1.delay_ms + &1.milestones.total_ms)) |> Enum.max()
 
-    %{
+    %Performance{
       bpm: @bpm,
       time_signature: @time_signature,
       granularity_ms: @granularity_ms,
