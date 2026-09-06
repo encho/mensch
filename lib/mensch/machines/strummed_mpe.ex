@@ -16,7 +16,7 @@ defmodule Mensch.Machines.StrummedMpe do
   alias Mensch.SongContext
   alias Mensch.TimelineContext
 
-  @granularity_ms 30
+  @ticks_per_frame 6
   @velocity 100
 
   @attack_ms 100
@@ -38,7 +38,7 @@ defmodule Mensch.Machines.StrummedMpe do
       note_stagger_ms: @note_stagger_ms,
       chord_stagger_ms: @chord_stagger_ms,
       octave_shifts: @octave_shifts,
-      granularity_ms: @granularity_ms
+      ticks_per_frame: @ticks_per_frame
     }
   end
 
@@ -51,37 +51,65 @@ defmodule Mensch.Machines.StrummedMpe do
       ) do
     channels = Connection.member_channels()
 
-    note_duration_ms =
-      song_context
-      |> SongContext.ticks_to_ms(timeline_context.duration_ticks)
-      |> snap(@granularity_ms)
+    note_stagger_ticks =
+      @note_stagger_ms
+      |> then(&SongContext.ms_to_ticks(song_context, &1))
+      |> snap_ticks(@ticks_per_frame)
 
-    song_start_ms =
+    chord_stagger_ticks =
+      @chord_stagger_ms
+      |> then(&SongContext.ms_to_ticks(song_context, &1))
+      |> snap_ticks(@ticks_per_frame)
+
+    note_duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
+    note_duration_ms = SongContext.ticks_to_ms(song_context, note_duration_ticks)
+
+    song_start_tick =
       timeline_context
       |> TimelineContext.start_tick(song_context)
-      |> then(&SongContext.ticks_to_ms(song_context, &1))
-      |> snap(@granularity_ms)
+      |> snap_ticks(@ticks_per_frame)
 
     milestones = %{
       attack_end_ms: @attack_ms,
       decay_end_ms: @attack_ms + @decay_ms,
-      release_start_ms: note_duration_ms - @release_ms,
-      total_ms: note_duration_ms
+      release_start_ms: max(note_duration_ms - @release_ms, 0),
+      total_ms: note_duration_ms,
+      total_ticks: note_duration_ticks
     }
 
-    notes = build_notes(chord_spec, channels, milestones, song_start_ms)
-    duration_ms = notes |> Enum.map(&(&1.delay_ms + &1.milestones.total_ms)) |> Enum.max()
+    notes =
+      build_notes(
+        chord_spec,
+        channels,
+        milestones,
+        song_start_tick,
+        note_stagger_ticks,
+        chord_stagger_ticks
+      )
+
+    duration_ticks =
+      notes |> Enum.map(&(&1.delay_ticks + &1.milestones.total_ticks)) |> Enum.max()
+
+    duration_ms = SongContext.ticks_to_ms(song_context, duration_ticks)
+    granularity_ms = SongContext.ticks_to_ms(song_context, @ticks_per_frame)
 
     %Performance{
       bpm: song_context.bpm,
       time_signature: song_context.time_signature,
-      granularity_ms: @granularity_ms,
+      granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(notes, duration_ms)
+      music: build_music(notes, duration_ticks, song_context)
     }
   end
 
-  defp build_notes(chord_spec, channels, milestones, song_start_ms) do
+  defp build_notes(
+         chord_spec,
+         channels,
+         milestones,
+         song_start_tick,
+         note_stagger_ticks,
+         chord_stagger_ticks
+       ) do
     note_count = chord_note_count(chord_spec)
 
     for {octave_shift, chord_index} <- Enum.with_index(@octave_shifts),
@@ -90,8 +118,8 @@ defmodule Mensch.Machines.StrummedMpe do
           |> shifted_spec(octave_shift)
           |> ChordSpec.to_midi_notes()
           |> Enum.with_index() do
-      chord_delay_ms = chord_index * @chord_stagger_ms
-      note_delay_ms = chord_delay_ms + note_index * @note_stagger_ms
+      chord_delay_ticks = chord_index * chord_stagger_ticks
+      note_delay_ticks = chord_delay_ticks + note_index * note_stagger_ticks
       {note_name, octave} = ChordSpec.note_name(note_number)
 
       %{
@@ -102,7 +130,7 @@ defmodule Mensch.Machines.StrummedMpe do
         velocity: @velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
-        delay_ms: snap(song_start_ms + note_delay_ms, @granularity_ms),
+        delay_ticks: song_start_tick + note_delay_ticks,
         milestones: milestones
       }
     end
@@ -118,16 +146,19 @@ defmodule Mensch.Machines.StrummedMpe do
     %{chord_spec | octave: chord_spec.octave + octave_shift}
   end
 
-  defp build_music(notes, duration_ms) do
-    tick_count = div(duration_ms, @granularity_ms)
+  defp build_music(notes, duration_ticks, song_context) do
+    for at_tick <- 0..duration_ticks//@ticks_per_frame do
+      at_ms = SongContext.ticks_to_ms(song_context, at_tick)
 
-    for tick <- 0..tick_count do
-      at_ms = tick * @granularity_ms
-      %{at_ms: at_ms, notes: Enum.map(notes, &note_frame(&1, at_ms))}
+      %{
+        at_ms: at_ms,
+        at_tick: at_tick,
+        notes: Enum.map(notes, &note_frame(&1, at_tick, song_context))
+      }
     end
   end
 
-  defp note_frame(note, at_ms) when at_ms < note.delay_ms do
+  defp note_frame(note, at_tick, _song_context) when at_tick < note.delay_ticks do
     %{
       note_name: note.note_name,
       octave: note.octave,
@@ -143,8 +174,9 @@ defmodule Mensch.Machines.StrummedMpe do
     }
   end
 
-  defp note_frame(note, at_ms) do
-    local_elapsed_ms = at_ms - note.delay_ms
+  defp note_frame(note, at_tick, song_context) do
+    local_elapsed_ticks = at_tick - note.delay_ticks
+    local_elapsed_ms = SongContext.ticks_to_ms(song_context, local_elapsed_ticks)
 
     %{
       note_name: note.note_name,
@@ -153,8 +185,8 @@ defmodule Mensch.Machines.StrummedMpe do
       channel: note.channel,
       velocity: note.velocity,
       phase: NoteShape.phase_at(note.milestones, local_elapsed_ms),
-      note_on: local_elapsed_ms == 0,
-      note_off: local_elapsed_ms == note.milestones.total_ms,
+      note_on: local_elapsed_ticks == 0,
+      note_off: local_elapsed_ticks == note.milestones.total_ticks,
       pressure:
         NoteShape.pressure(note.milestones, note.phase_offset, local_elapsed_ms)
         |> clamp_7bit(),
@@ -165,6 +197,6 @@ defmodule Mensch.Machines.StrummedMpe do
     }
   end
 
-  defp snap(ms, granularity_ms), do: round(ms / granularity_ms) * granularity_ms
+  defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end
