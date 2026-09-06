@@ -310,6 +310,7 @@ defmodule MenschWeb.HomeLive do
                   <th class="px-2 py-1.5 font-normal">Tempo</th>
                   <th class="px-2 py-1.5 font-normal">Time Sig</th>
                   <th class="px-2 py-1.5 font-normal">Chords</th>
+                  <th class="px-2 py-1.5 font-normal">Duration</th>
                   <th class="px-2 py-1.5 font-normal text-right">Status</th>
                 </tr>
               </thead>
@@ -330,6 +331,12 @@ defmodule MenschWeb.HomeLive do
                     )}
                   </td>
                   <td class="px-2 py-1.5">{length(Map.get(song, :song_entries, []))}</td>
+                  <td class="px-2 py-1.5">
+                    {song_duration_label(
+                      Map.get(song, :song_entries, []),
+                      Map.get(song, :song_context, @song_context)
+                    )}
+                  </td>
                   <td class="px-2 py-1.5 text-right">
                     <button
                       type="button"
@@ -357,6 +364,10 @@ defmodule MenschWeb.HomeLive do
 
           <div class="font-mono text-[11px] text-zinc-300">
             SongCtx: {song_context_label(@song_context)}
+          </div>
+
+          <div class="font-mono text-[11px] text-zinc-400">
+            Song duration: {song_duration_label(@song_entries, @song_context)}
           </div>
 
           <div class="flex items-center justify-end gap-2">
@@ -940,6 +951,32 @@ defmodule MenschWeb.HomeLive do
 
   defp duration_label_secondary(duration_ticks) do
     "#{duration_ticks} ticks"
+  end
+
+  defp song_duration_label(song_entries, %SongContext{} = song_context)
+       when is_list(song_entries) do
+    duration_ms = song_duration_ms(song_entries, song_context)
+    minutes = div(duration_ms, 60_000)
+    seconds = div(rem(duration_ms, 60_000), 1000)
+    millis = rem(duration_ms, 1000)
+
+    "#{minutes}m #{seconds}s #{millis}ms"
+  end
+
+  defp song_duration_ms(song_entries, %SongContext{} = song_context) when is_list(song_entries) do
+    max_end_tick =
+      case song_entries do
+        [] -> 0
+        _ ->
+          song_entries
+          |> Enum.map(fn %{timeline_context: timeline_context} ->
+            start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
+            start_tick + timeline_context.duration_ticks
+          end)
+          |> Enum.max()
+      end
+
+    SongContext.ticks_to_ms(song_context, max_end_tick)
   end
 
   defp full_song_render_data(socket) do
