@@ -34,6 +34,9 @@ defmodule MenschWeb.HomeLive do
       |> assign(:song_context, song_context)
       |> assign(:view_modal_open, false)
       |> assign(:view_title, nil)
+      |> assign(:render_scope, :full_song)
+      |> assign(:loop_full_song, false)
+      |> assign(:manual_stop, false)
 
     {:ok, socket}
   end
@@ -48,6 +51,7 @@ defmodule MenschWeb.HomeLive do
      socket
      |> assign(:render_data, render_data)
      |> assign(:view_title, "Full Song")
+     |> assign(:render_scope, :full_song)
      |> assign(:view_modal_open, true)}
   end
 
@@ -56,7 +60,16 @@ defmodule MenschWeb.HomeLive do
     song_context = socket.assigns.song_context
     render_data = Render.generate_song(entries, song_context)
 
-    {:noreply, start_playback(assign(socket, :render_data, render_data), render_data)}
+    {:noreply,
+     socket
+     |> assign(:render_data, render_data)
+     |> assign(:render_scope, :full_song)
+     |> assign(:manual_stop, false)
+     |> start_playback(render_data)}
+  end
+
+  def handle_event("toggle_loop_full_song", _params, socket) do
+    {:noreply, update(socket, :loop_full_song, &(!&1))}
   end
 
   def handle_event("view_entry", %{"index" => index_str}, socket) do
@@ -70,6 +83,7 @@ defmodule MenschWeb.HomeLive do
              socket
              |> assign(:render_data, render_data)
              |> assign(:view_title, chord_label(chord_spec))
+             |> assign(:render_scope, {:entry, index})
              |> assign(:view_modal_open, true)}
 
           _ ->
@@ -87,7 +101,13 @@ defmodule MenschWeb.HomeLive do
         case Enum.at(socket.assigns.song_entries, index) do
           %{chord_spec: %ChordSpec{} = chord_spec} ->
             render_data = Render.generate(chord_spec)
-            {:noreply, start_playback(assign(socket, :render_data, render_data), render_data)}
+
+            {:noreply,
+             socket
+             |> assign(:render_data, render_data)
+             |> assign(:render_scope, {:entry, index})
+             |> assign(:manual_stop, false)
+             |> start_playback(render_data)}
 
           _ ->
             {:noreply, socket}
@@ -107,7 +127,8 @@ defmodule MenschWeb.HomeLive do
   end
 
   def handle_event("play", _params, socket) do
-    {:noreply, start_playback(socket, socket.assigns.render_data)}
+    {:noreply,
+     socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
   end
 
   def handle_event("stop", _params, socket) do
@@ -118,6 +139,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)
       |> assign(:playhead_pct, nil)
+      |> assign(:manual_stop, true)
 
     {:noreply, socket}
   end
@@ -138,11 +160,18 @@ defmodule MenschWeb.HomeLive do
         playhead_pct(status, socket.assigns.play_started_at, socket.assigns.render_data)
       )
 
-    if status == :playing do
-      Process.send_after(self(), :refresh_player, @refresh_interval_ms)
-    end
+    cond do
+      status == :playing ->
+        Process.send_after(self(), :refresh_player, @refresh_interval_ms)
+        {:noreply, socket}
 
-    {:noreply, socket}
+      loop_full_song?(socket) ->
+        {:noreply,
+         socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
+
+      true ->
+        {:noreply, assign(socket, :manual_stop, false)}
+    end
   end
 
   @impl true
@@ -161,13 +190,31 @@ defmodule MenschWeb.HomeLive do
           assigns
           |> assign(
             :pressure_chart,
-            build_chart(music, duration_ms, :pressure, {0, 127})
+            build_chart(music, duration_ms, :pressure, {0, 127}, assigns.render_scope)
           )
-          |> assign(:slide_chart, build_chart(music, duration_ms, :slide, {0, 127}))
-          |> assign(:bend_chart, build_chart(music, duration_ms, :bend, value_range(music)))
+          |> assign(
+            :slide_chart,
+            build_chart(music, duration_ms, :slide, {0, 127}, assigns.render_scope)
+          )
+          |> assign(
+            :bend_chart,
+            build_chart(music, duration_ms, :bend, value_range(music), assigns.render_scope)
+          )
           |> assign(:debug_rows, debug_rows(music))
-          |> assign(:note_matrix, build_note_matrix(music, duration_ms))
+          |> assign(:note_matrix, build_note_matrix(music, duration_ms, assigns.render_scope))
       end
+
+    assigns =
+      assign(
+        assigns,
+        :song_timeline,
+        song_timeline_model(
+          assigns.song_entries,
+          assigns.song_context,
+          assigns.playhead_pct,
+          assigns.render_scope
+        )
+      )
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
@@ -180,6 +227,20 @@ defmodule MenschWeb.HomeLive do
           </div>
 
           <div class="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              id="toggle-loop-full-song"
+              phx-click="toggle_loop_full_song"
+              aria-pressed={@loop_full_song}
+              class={[
+                "border px-3 py-1.5 text-[11px] uppercase tracking-wide transition-colors duration-150",
+                (@loop_full_song &&
+                   "border-emerald-400 text-emerald-300 ring-1 ring-emerald-500/70") ||
+                  "border-white/30 text-white/70 hover:border-white hover:text-white"
+              ]}
+            >
+              Loop {if(@loop_full_song, do: "On", else: "Off")}
+            </button>
             <button
               type="button"
               id="view-full-song"
@@ -221,7 +282,15 @@ defmodule MenschWeb.HomeLive do
               </thead>
               <tbody>
                 <tr :for={{entry, index} <- Enum.with_index(@song_entries)} class="text-white/80">
-                  <td class="px-2 py-1.5 text-white">{chord_label(entry.chord_spec)}</td>
+                  <td class="px-2 py-1.5 text-white">
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="inline-block size-2.5 rounded-full border"
+                        style={entry_color_dot_style(index)}
+                      ></span>
+                      <span>{chord_label(entry.chord_spec)}</span>
+                    </div>
+                  </td>
                   <td class="px-2 py-1.5">{machine_label(entry.machine_module)}</td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-white">
@@ -275,6 +344,8 @@ defmodule MenschWeb.HomeLive do
               </tbody>
             </table>
           </div>
+
+          <.song_timeline model={@song_timeline} />
         </div>
       </div>
       <div
@@ -361,10 +432,15 @@ defmodule MenschWeb.HomeLive do
                   rem(index, 2) == 0 && "bg-white/[0.03]"
                 ]}
               >
-                <div :if={row.style} class="absolute inset-0" style={row.style}></div>
+                <div
+                  :for={style <- row.styles}
+                  class="absolute inset-y-0"
+                  style={style}
+                >
+                </div>
                 <span class={[
                   "relative z-10 px-1 font-mono text-[5px] uppercase",
-                  (row.style && "text-white") || "text-white/30"
+                  (Enum.empty?(row.styles) && "text-white/30") || "text-white"
                 ]}>
                   {row.label}
                 </span>
@@ -423,6 +499,118 @@ defmodule MenschWeb.HomeLive do
     """
   end
 
+  attr :model, :map, required: true
+
+  defp song_timeline(assigns) do
+    ~H"""
+    <div id="song-timeline" class="space-y-2 border border-white/10 p-3">
+      <div class="flex items-center justify-between font-mono text-[11px] text-white/45">
+        <span class="uppercase tracking-wide">Timeline</span>
+        <span>
+          class="inline-block size-2.5 rounded-full border-0 ring-0 outline-none shadow-none"
+        </span>
+      </div>
+
+      <svg
+        viewBox={"0 0 #{@model.svg_width} #{@model.svg_height}"}
+        class="w-full border border-white/10 bg-black/40"
+      >
+        <line
+          :for={x <- @model.subbeat_xs}
+          x1={x}
+          y1="0"
+          x2={x}
+          y2={@model.svg_height}
+          stroke="#ffffff"
+          stroke-opacity="0.06"
+          stroke-width="1"
+        />
+        <line
+          :for={x <- @model.beat_xs}
+          x1={x}
+          y1="0"
+          x2={x}
+          y2={@model.svg_height}
+          stroke="#ffffff"
+          stroke-opacity="0.14"
+          stroke-width="1"
+        />
+        <line
+          :for={{x, bar_number} <- @model.bar_xs}
+          x1={x}
+          y1="0"
+          x2={x}
+          y2={@model.svg_height}
+          stroke="#ffffff"
+          stroke-opacity="0.32"
+          stroke-width="1.2"
+        />
+
+        <rect
+          :for={lane <- @model.lanes}
+          x="0"
+          y={lane.y}
+          width={@model.svg_width}
+          height={lane.height}
+          fill="#ffffff"
+          fill-opacity={lane.opacity}
+        />
+
+        <rect
+          :for={entry <- @model.entries}
+          x={entry.x}
+          y={entry.y}
+          width={entry.width}
+          height={entry.height}
+          rx="3"
+          fill={entry.fill}
+          fill-opacity="1"
+        />
+
+        <text
+          :for={entry <- @model.entries}
+          x={entry.x + 6}
+          y={entry.text_y}
+          fill="#ffffff"
+          fill-opacity="0.9"
+          font-size="10"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
+        >
+          {entry.label}
+        </text>
+
+        <text
+          :for={{x, bar_number} <- @model.bar_xs}
+          x={x + 2}
+          y="13"
+          fill="#ffffff"
+          fill-opacity="0.65"
+          font-size="10"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
+        >
+          B{bar_number}
+        </text>
+
+        <line
+          :if={not is_nil(@model.playhead_x)}
+          x1={@model.playhead_x}
+          x2={@model.playhead_x}
+          y1="0"
+          y2={@model.svg_height}
+          stroke="#ffffff"
+          stroke-opacity="0.75"
+          stroke-width="1.5"
+        />
+      </svg>
+
+      <div class="flex items-center justify-between font-mono text-[10px] text-white/35">
+        <span>0</span>
+        <span>{@model.total_ticks} ticks</span>
+      </div>
+    </div>
+    """
+  end
+
   attr :title, :string, required: true
   attr :chart, :list, required: true
   attr :playhead_pct, :any, default: nil
@@ -466,6 +654,12 @@ defmodule MenschWeb.HomeLive do
     |> assign(:player_status, Player.status())
     |> assign(:play_started_at, play_started_at)
     |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, render_data))
+  end
+
+  defp loop_full_song?(socket) do
+    socket.assigns.loop_full_song and
+      not socket.assigns.manual_stop and
+      not is_nil(socket.assigns.render_data)
   end
 
   # How far (0-100) through the performance playback currently is, for
@@ -555,11 +749,147 @@ defmodule MenschWeb.HomeLive do
     "#{duration_ticks} ticks"
   end
 
+  defp song_timeline_model(
+         song_entries,
+         %SongContext{} = song_context,
+         playhead_pct,
+         render_scope
+       ) do
+    svg_width = 1000
+    lane_height = 22
+    lane_gap = 8
+    lanes_top = 22
+    lanes_bottom = 12
+
+    ticks_per_bar = SongContext.ticks_per_bar(song_context)
+    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+    ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
+
+    entries =
+      Enum.map(song_entries, fn %{chord_spec: chord_spec, timeline_context: timeline_context} ->
+        start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
+        end_tick = start_tick + timeline_context.duration_ticks
+
+        %{label: short_chord_label(chord_spec), start_tick: start_tick, end_tick: end_tick}
+      end)
+
+    max_end_tick =
+      case entries do
+        [] -> ticks_per_bar * 2
+        _ -> entries |> Enum.map(& &1.end_tick) |> Enum.max()
+      end
+
+    bar_count = max(div(max_end_tick + ticks_per_bar - 1, ticks_per_bar), 2)
+    total_ticks = bar_count * ticks_per_bar
+    beat_count = bar_count * SongContext.beats_per_bar(song_context)
+    total_ticks = max(total_ticks, 1)
+    row_count = max(length(entries), 1)
+    lanes_height = row_count * lane_height + (row_count - 1) * lane_gap
+    svg_height = lanes_top + lanes_height + lanes_bottom
+
+    lanes =
+      for lane_index <- 0..(row_count - 1) do
+        %{
+          y: lanes_top + lane_index * (lane_height + lane_gap),
+          height: lane_height,
+          opacity: if(rem(lane_index, 2) == 0, do: "0.02", else: "0.05")
+        }
+      end
+
+    entries_with_geometry =
+      entries
+      |> Enum.with_index()
+      |> Enum.map(fn {%{label: label, start_tick: start_tick, end_tick: end_tick}, index} ->
+        lane_y = lanes_top + index * (lane_height + lane_gap)
+        x = tick_to_svg_x(start_tick, total_ticks)
+        width = max(tick_to_svg_x(end_tick, total_ticks) - x, 8)
+
+        %{
+          label: label,
+          x: x,
+          y: lane_y + 1,
+          width: width,
+          height: lane_height - 2,
+          text_y: lane_y + 14,
+          fill: timeline_color(index)
+        }
+      end)
+
+    playhead_x = timeline_playhead_x(playhead_pct, render_scope, entries, total_ticks)
+
+    %{
+      svg_width: svg_width,
+      svg_height: svg_height,
+      lanes: lanes,
+      entries: entries_with_geometry,
+      playhead_x: playhead_x,
+      subbeat_xs: timeline_xs(total_ticks, ticks_per_subbeat),
+      beat_xs: timeline_xs(total_ticks, ticks_per_beat),
+      bar_xs:
+        timeline_xs(total_ticks, ticks_per_bar)
+        |> Enum.with_index(1),
+      row_count: row_count,
+      bar_count: bar_count,
+      beat_count: beat_count,
+      total_ticks: total_ticks
+    }
+  end
+
+  defp timeline_playhead_x(nil, _render_scope, _entries, _total_ticks), do: nil
+
+  defp timeline_playhead_x(playhead_pct, :full_song, _entries, total_ticks)
+       when is_number(playhead_pct) do
+    tick_to_svg_x(total_ticks * (playhead_pct / 100), total_ticks)
+  end
+
+  defp timeline_playhead_x(playhead_pct, {:entry, index}, entries, total_ticks)
+       when is_number(playhead_pct) and is_integer(index) do
+    case Enum.at(entries, index) do
+      %{start_tick: start_tick, end_tick: end_tick} ->
+        start_x = tick_to_svg_x(start_tick, total_ticks)
+        end_x = tick_to_svg_x(end_tick, total_ticks)
+        Float.round(start_x + (end_x - start_x) * (playhead_pct / 100), 2)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp timeline_playhead_x(_playhead_pct, _render_scope, _entries, _total_ticks), do: nil
+
+  defp timeline_color(index) do
+    Enum.at(@chart_colors, rem(index, length(@chart_colors)))
+  end
+
+  defp entry_color_dot_style(index) do
+    color = timeline_color(index)
+
+    "background-color: #{color};"
+  end
+
+  defp short_chord_label(%ChordSpec{} = chord_spec) do
+    root = chord_spec.root |> Atom.to_string() |> String.replace("_sharp", "#") |> String.upcase()
+    modifier = chord_spec.modifier |> Atom.to_string()
+    "#{root} #{modifier}"
+  end
+
+  defp timeline_xs(total_ticks, step) do
+    0..total_ticks//step
+    |> Enum.map(&tick_to_svg_x(&1, total_ticks))
+  end
+
+  defp tick_to_svg_x(tick, total_ticks) do
+    tick
+    |> Kernel./(total_ticks)
+    |> Kernel.*(1000)
+    |> Float.round(2)
+  end
+
   # Groups a rendered `music` timeline's frames by note (`{channel,
   # note}`), one polyline per note, for an SVG line chart of `value_key`
   # (`:pressure`, `:bend`, or `:slide`) over time.
-  defp build_chart(music, duration_ms, value_key, {min_v, max_v}) do
-    colors = note_color_map(music)
+  defp build_chart(music, duration_ms, value_key, {min_v, max_v}, render_scope) do
+    colors = note_color_map(music, render_scope)
 
     music
     |> Enum.flat_map(fn frame ->
@@ -581,53 +911,108 @@ defmodule MenschWeb.HomeLive do
   end
 
   # A piano-roll style matrix: one row per semitone between the lowest
-  # and highest sounding note (highest pitch on top), so the vertical
-  # spacing between rows visually matches the actual chromatic distance
-  # between the two chords - not just the notes that happen to sound.
-  # Silent in-between notes get a row (dim label, no bar); sounding
-  # notes get a bar spanning from their own (possibly staggered)
-  # note-on to their note-off.
-  defp build_note_matrix(music, duration_ms) do
-    colors = note_color_map(music)
+  # and highest sounding note (highest pitch on top), so vertical
+  # spacing matches real chromatic distance. A row may contain multiple
+  # bars (same pitch reused later by another chord/channel).
+  defp build_note_matrix(music, duration_ms, render_scope) do
+    colors = note_color_map(music, render_scope)
     duration_ms = max(duration_ms, 1)
 
-    sounding =
+    segments =
       music
       |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_ms}) end)
-      |> Enum.group_by(fn {note, _at_ms} -> note.note end)
-      |> Map.new(fn {note_number, entries} ->
+      |> Enum.group_by(fn {note, _at_ms} -> {note.note, note.channel} end)
+      |> Enum.flat_map(fn {{note_number, channel}, entries} ->
         {sample, _at_ms} = hd(entries)
-        start_ms = entries |> Enum.find(fn {note, _} -> note.note_on end) |> elem(1)
-        end_ms = entries |> Enum.find(fn {note, _} -> note.note_off end) |> elem(1)
-        left_pct = start_ms / duration_ms * 100
-        width_pct = max((end_ms - start_ms) / duration_ms * 100, 0.5)
+        start_entry = Enum.find(entries, fn {note, _} -> note.note_on end)
+        end_entry = Enum.find(entries, fn {note, _} -> note.note_off end)
 
-        style =
-          "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
-            "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
-            "background-color: #{Map.fetch!(colors, {sample.channel, note_number})};"
+        if start_entry && end_entry do
+          start_ms = elem(start_entry, 1)
+          end_ms = elem(end_entry, 1)
+          left_pct = start_ms / duration_ms * 100
+          width_pct = max((end_ms - start_ms) / duration_ms * 100, 0.5)
 
-        {note_number, %{label: "#{sample.note_name}#{sample.octave}", style: style}}
+          style =
+            "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
+              "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
+              "background-color: #{Map.fetch!(colors, {channel, note_number})};"
+
+          [
+            %{
+              note: note_number,
+              label: "#{sample.note_name}#{sample.octave}",
+              style: style
+            }
+          ]
+        else
+          []
+        end
       end)
 
-    {min_note, max_note} = sounding |> Map.keys() |> Enum.min_max()
+    case segments do
+      [] ->
+        []
 
-    for note_number <- max_note..min_note//-1 do
-      case Map.fetch(sounding, note_number) do
-        {:ok, row} ->
-          Map.put(row, :note, note_number)
+      _ ->
+        rows_by_note =
+          segments
+          |> Enum.group_by(& &1.note)
 
-        :error ->
-          {note_name, octave} = Render.note_name(note_number)
-          %{note: note_number, label: "#{note_name}#{octave}", style: nil}
-      end
+        {min_note, max_note} = rows_by_note |> Map.keys() |> Enum.min_max()
+
+        for note_number <- max_note..min_note//-1 do
+          case Map.get(rows_by_note, note_number) do
+            nil ->
+              {note_name, octave} = Render.note_name(note_number)
+              %{note: note_number, label: "#{note_name}#{octave}", styles: []}
+
+            note_segments ->
+              label = note_segments |> hd() |> Map.fetch!(:label)
+              styles = note_segments |> Enum.map(& &1.style)
+              %{note: note_number, label: label, styles: styles}
+          end
+        end
     end
   end
 
   # Assigns each distinct `{channel, note}` a stable color (ordered by
   # channel) shared by both the line charts and the note matrix, so the
   # same note always reads as the same color across visualizations.
-  defp note_color_map(music) do
+  defp note_color_map(music, {:entry, entry_index}) when is_integer(entry_index) do
+    base_color = timeline_color(entry_index)
+    events = music |> distinct_note_events() |> sort_voice_events()
+    total = length(events)
+
+    events
+    |> Enum.with_index()
+    |> Map.new(fn {%{channel: channel, note: note}, index} ->
+      {{channel, note}, color_with_alpha(base_color, voice_alpha(index, total))}
+    end)
+  end
+
+  defp note_color_map(music, :full_song) do
+    music
+    |> distinct_note_events()
+    |> Enum.group_by(&Map.get(&1, :song_entry_index, 0))
+    |> Enum.flat_map(fn {entry_index, events} ->
+      base_color = timeline_color(entry_index)
+
+      events
+      |> sort_voice_events()
+      |> then(fn sorted_events -> {sorted_events, length(sorted_events)} end)
+      |> then(fn {sorted_events, total} ->
+        sorted_events
+        |> Enum.with_index()
+        |> Enum.map(fn {%{channel: channel, note: note}, index} ->
+          {{channel, note}, color_with_alpha(base_color, voice_alpha(index, total))}
+        end)
+      end)
+    end)
+    |> Map.new()
+  end
+
+  defp note_color_map(music, _render_scope) do
     music
     |> Enum.flat_map(& &1.notes)
     |> Enum.uniq_by(&{&1.channel, &1.note})
@@ -637,6 +1022,37 @@ defmodule MenschWeb.HomeLive do
       {{channel, note}, Enum.at(@chart_colors, rem(index, length(@chart_colors)))}
     end)
   end
+
+  defp distinct_note_events(music) do
+    music
+    |> Enum.flat_map(& &1.notes)
+    |> Enum.uniq_by(&{&1.channel, &1.note})
+  end
+
+  defp sort_voice_events(events) do
+    Enum.sort_by(events, fn event ->
+      {Map.get(event, :event_index, 999), event.note, event.channel}
+    end)
+  end
+
+  defp voice_alpha(_index, total) when total <= 1, do: 0.92
+
+  defp voice_alpha(index, total) do
+    # Keep a fixed contrast range regardless of chord size.
+    max_alpha = 0.92
+    min_alpha = 0.32
+    t = index / max(total - 1, 1)
+    Float.round(max_alpha - (max_alpha - min_alpha) * t, 2)
+  end
+
+  defp color_with_alpha("#" <> <<r::binary-size(2), g::binary-size(2), b::binary-size(2)>>, alpha) do
+    {r_i, _} = Integer.parse(r, 16)
+    {g_i, _} = Integer.parse(g, 16)
+    {b_i, _} = Integer.parse(b, 16)
+    "rgba(#{r_i}, #{g_i}, #{b_i}, #{alpha})"
+  end
+
+  defp color_with_alpha(color, _alpha), do: color
 
   defp chart_points(points, duration_ms, min_v, max_v) do
     range = max(max_v - min_v, 0.0001)

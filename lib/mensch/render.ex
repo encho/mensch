@@ -25,17 +25,25 @@ defmodule Mensch.Render do
 
   @default_song_entries [
     %{
-      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
+      chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
       timeline_context: %TimelineContext{
         start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
+        duration_ticks: 768
+      },
+      machine_module: StrummedMpe
+    },
+    %{
+      chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
+      timeline_context: %TimelineContext{
+        start_beat: %BeatPosition{bar: 2, beat: 0, tick: 0},
         duration_ticks: 384
       },
       machine_module: StrummedMpe
     },
     %{
-      chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
+      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
       timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 1, beat: 0, tick: 0},
+        start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
         duration_ticks: 384
       },
       machine_module: StrummedMpe
@@ -58,11 +66,19 @@ defmodule Mensch.Render do
   @spec generate_song([map()], SongContext.t()) :: Performance.t()
   def generate_song(entries, %SongContext{} = song_context) when is_list(entries) do
     entries
-    |> Enum.map(fn %{chord_spec: chord_spec, timeline_context: timeline_context} = entry ->
+    |> Enum.with_index()
+    |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context} = entry,
+                    entry_index} ->
       machine_module = Map.get(entry, :machine_module, StrummedMpe)
 
       entry
-      |> render_entry_performance(chord_spec, timeline_context, machine_module, song_context)
+      |> render_entry_performance(
+        chord_spec,
+        timeline_context,
+        machine_module,
+        song_context,
+        entry_index
+      )
     end)
     |> merge_performances(song_context)
   end
@@ -112,15 +128,20 @@ defmodule Mensch.Render do
          %ChordSpec{} = chord_spec,
          %TimelineContext{} = timeline_context,
          machine_module,
-         %SongContext{} = song_context
+         %SongContext{} = song_context,
+         entry_index
        )
-       when is_atom(machine_module) do
+       when is_atom(machine_module) and is_integer(entry_index) do
     local_timeline_context = %TimelineContext{
       start_beat: BeatPosition.new(0, 0, 0),
       duration_ticks: timeline_context.duration_ticks
     }
 
-    local_performance = machine_module.render(chord_spec, song_context, local_timeline_context)
+    local_performance =
+      chord_spec
+      |> machine_module.render(song_context, local_timeline_context)
+      |> tag_song_entry_index(entry_index)
+
     start_tick = TimelineContext.start_tick(timeline_context, song_context)
     end_tick = TimelineContext.end_tick(timeline_context, song_context)
 
@@ -158,6 +179,20 @@ defmodule Mensch.Render do
       | duration_ms: SongContext.ticks_to_ms(song_context, end_tick),
         music: clipped_music
     }
+  end
+
+  defp tag_song_entry_index(%Performance{} = performance, entry_index) do
+    tagged_music =
+      Enum.map(performance.music, fn frame ->
+        tagged_notes =
+          Enum.map(frame.notes, fn note ->
+            Map.put(note, :song_entry_index, entry_index)
+          end)
+
+        %{frame | notes: tagged_notes}
+      end)
+
+    %Performance{performance | music: tagged_music}
   end
 
   defp forced_note_offs(shifted_frames) do
