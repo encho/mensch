@@ -8,8 +8,11 @@ defmodule Mensch.Machine do
 
   alias Mensch.ChordSpec
   alias Mensch.Performance
+  alias Mensch.SongContext
+  alias Mensch.TimelineContext
 
   @callback id() :: atom()
   @callback controls() :: map()
-  @callback render(ChordSpec.t(), keyword()) :: Performance.t()
+  @callback render(ChordSpec.t(), SongContext.t(), TimelineContext.t(), keyword()) ::
+              Performance.t()
 end

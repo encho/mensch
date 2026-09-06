@@ -40,6 +40,9 @@ defmodule Mensch.Performance do
       }
   """
 
+  alias Mensch.BeatPosition
+  alias Mensch.SongContext
+
   @type note_event :: %{
           at_ms: non_neg_integer(),
           note_name: atom(),
@@ -123,5 +126,34 @@ defmodule Mensch.Performance do
       end)
     end)
     |> Enum.sort_by(fn event -> {event.at_ms, event.channel, event.note, event.type} end)
+  end
+
+  @doc """
+  Returns one entry per frame with both musical position and timestamp.
+
+  This keeps PPQ internal while exposing user-friendly timing:
+
+    * `:position` => `%Mensch.BeatPosition{bar, beat, tick}` (zero-based)
+    * `:timestamp` => `MM:SS.mmm`
+  """
+  @spec frame_time_index(t(), SongContext.t(), BeatPosition.t()) :: [map()]
+  def frame_time_index(
+        %__MODULE__{music: music},
+        %SongContext{} = song_context,
+        %BeatPosition{} = start_beat
+      ) do
+    start_tick = SongContext.position_to_tick(song_context, start_beat)
+
+    Enum.map(music, fn frame ->
+      absolute_tick = start_tick + SongContext.ms_to_ticks(song_context, frame.at_ms)
+      position = SongContext.tick_to_position(song_context, absolute_tick)
+
+      %{
+        at_ms: frame.at_ms,
+        absolute_tick: absolute_tick,
+        position: position,
+        timestamp: SongContext.format_timestamp(frame.at_ms)
+      }
+    end)
   end
 end

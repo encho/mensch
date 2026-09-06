@@ -13,16 +13,15 @@ defmodule Mensch.Machines.StrummedMpe do
   alias Mensch.Midi.Connection
   alias Mensch.NoteShape
   alias Mensch.Performance
+  alias Mensch.SongContext
+  alias Mensch.TimelineContext
 
-  @bpm 120
-  @time_signature {4, 4}
   @granularity_ms 30
   @velocity 100
 
   @attack_ms 100
   @decay_ms 100
   @release_ms 250
-  @duration_ms 2000
 
   # Within-chord strum spacing.
   @note_stagger_ms 60
@@ -44,9 +43,24 @@ defmodule Mensch.Machines.StrummedMpe do
   end
 
   @impl true
-  def render(%ChordSpec{} = chord_spec, _opts \\ []) do
+  def render(
+        %ChordSpec{} = chord_spec,
+        %SongContext{} = song_context,
+        %TimelineContext{} = timeline_context,
+        _opts \\ []
+      ) do
     channels = Connection.member_channels()
-    note_duration_ms = snap(@duration_ms, @granularity_ms)
+
+    note_duration_ms =
+      song_context
+      |> SongContext.ticks_to_ms(timeline_context.duration_ticks)
+      |> snap(@granularity_ms)
+
+    song_start_ms =
+      timeline_context
+      |> TimelineContext.start_tick(song_context)
+      |> then(&SongContext.ticks_to_ms(song_context, &1))
+      |> snap(@granularity_ms)
 
     milestones = %{
       attack_end_ms: @attack_ms,
@@ -55,19 +69,19 @@ defmodule Mensch.Machines.StrummedMpe do
       total_ms: note_duration_ms
     }
 
-    notes = build_notes(chord_spec, channels, milestones)
+    notes = build_notes(chord_spec, channels, milestones, song_start_ms)
     duration_ms = notes |> Enum.map(&(&1.delay_ms + &1.milestones.total_ms)) |> Enum.max()
 
     %Performance{
-      bpm: @bpm,
-      time_signature: @time_signature,
+      bpm: song_context.bpm,
+      time_signature: song_context.time_signature,
       granularity_ms: @granularity_ms,
       duration_ms: duration_ms,
       music: build_music(notes, duration_ms)
     }
   end
 
-  defp build_notes(chord_spec, channels, milestones) do
+  defp build_notes(chord_spec, channels, milestones, song_start_ms) do
     note_count = chord_note_count(chord_spec)
 
     for {octave_shift, chord_index} <- Enum.with_index(@octave_shifts),
@@ -88,7 +102,7 @@ defmodule Mensch.Machines.StrummedMpe do
         velocity: @velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
-        delay_ms: snap(note_delay_ms, @granularity_ms),
+        delay_ms: snap(song_start_ms + note_delay_ms, @granularity_ms),
         milestones: milestones
       }
     end
