@@ -361,14 +361,18 @@ defmodule MenschWeb.HomeLive do
         </div>
 
         <div id="render-section" class="space-y-4 border border-zinc-700/70 bg-zinc-950/85 p-4">
-          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Render Context</div>
+          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Active Sample Playback</div>
+
+          <div class="font-mono text-[11px] text-zinc-200">
+            Selected sample: {active_sample_name(@samples, @active_sample_index)}
+          </div>
 
           <div class="font-mono text-[11px] text-zinc-300">
-            SampleCtx: {sample_context_label(@sample_context)}
+            Timing settings: {sample_context_label(@sample_context)}
           </div>
 
           <div class="font-mono text-[11px] text-zinc-400">
-            Sample duration: {sample_duration_label(@sample_entries, @sample_context)}
+            Total playback length: {sample_duration_label(@sample_entries, @sample_context)}
           </div>
 
           <div class="flex items-center justify-end gap-2">
@@ -894,6 +898,13 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp format_bend(bend), do: Float.round(bend * 1.0, 5)
+
+  defp active_sample_name(samples, active_sample_index)
+       when is_list(samples) and is_integer(active_sample_index) do
+    samples
+    |> Enum.at(active_sample_index, %{})
+    |> Map.get(:name, "Unnamed")
+  end
 
   defp sample_context_label(%SampleContext{} = sample_context) do
     {num, den} = sample_context.time_signature
