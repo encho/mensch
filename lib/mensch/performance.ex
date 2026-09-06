@@ -6,32 +6,45 @@ defmodule Mensch.Performance do
   in a dedicated struct and provides analysis helpers so callers do not
   need to re-implement timeline inspection logic.
 
+  Note provenance is flat: each note event carries `machine_id` and
+  `chord_instance_id` directly.
+
+  Each note event also carries an `event_index`: a simple, stable
+  serial number for that note within its source/chord instance. It is
+  ordering metadata (not a voice-role semantic).
+
   Example dataset:
 
       %Mensch.Performance{
         bpm: 120,
         time_signature: {4, 4},
-        granularity_ms: 30,
-        duration_ms: 2490,
+        granularity_ms: 31,
+        duration_ms: 2500,
         music: [
           %{
             at_ms: 0,
+            at_tick: 0,
             notes: [
               %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
+                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0},
               %{note_name: :e, octave: 4, note: 64, channel: 2, velocity: 100,
+                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 1,
                 phase: :pending, note_on: false, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
             ]
           },
           %{
-            at_ms: 60,
+            at_ms: 31,
+            at_tick: 6,
             notes: [
               %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
+                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
                 phase: :attack, note_on: false, note_off: false,
-                pressure: 76, bend: 0.0, slide: 0},
+                pressure: 39, bend: 0.0, slide: 0},
               %{note_name: :e, octave: 4, note: 64, channel: 2, velocity: 100,
+                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 1,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
             ]
@@ -55,10 +68,13 @@ defmodule Mensch.Performance do
           note_off: boolean(),
           pressure: non_neg_integer(),
           bend: float(),
-          slide: non_neg_integer()
+          slide: non_neg_integer(),
+          machine_id: atom(),
+          chord_instance_id: non_neg_integer(),
+          event_index: non_neg_integer()
         }
 
-  @type frame :: %{at_ms: non_neg_integer(), notes: [note_event()]}
+  @type frame :: %{at_ms: non_neg_integer(), at_tick: non_neg_integer(), notes: [note_event()]}
 
   @type t :: %__MODULE__{
           bpm: pos_integer(),
@@ -102,13 +118,20 @@ defmodule Mensch.Performance do
     end
   end
 
-  @doc "All note on/off events across all frames, sorted by `at_ms`."
+  @doc "All note on/off events across all frames, sorted by `at_ms` and carrying machine/chord provenance + `event_index`."
   @spec io_events(t()) :: [map()]
   def io_events(%__MODULE__{music: music}) do
     music
     |> Enum.flat_map(fn frame ->
       Enum.flat_map(frame.notes, fn note ->
-        base = %{at_ms: frame.at_ms, note: note.note, channel: note.channel}
+        base = %{
+          at_ms: frame.at_ms,
+          note: note.note,
+          channel: note.channel,
+          machine_id: Map.get(note, :machine_id),
+          chord_instance_id: Map.get(note, :chord_instance_id),
+          event_index: Map.get(note, :event_index)
+        }
 
         cond do
           note.note_on and note.note_off ->

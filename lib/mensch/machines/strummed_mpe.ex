@@ -5,6 +5,11 @@ defmodule Mensch.Machines.StrummedMpe do
   Renders a strummed, per-note-envelope MPE performance from a generic
   `Mensch.ChordSpec`, including a second voicing two octaves below,
   staggered in time.
+
+  Frame stepping is PPQ-aligned (`ticks_per_frame`) and converted to
+  milliseconds at output time, so rendered frames stay on the musical
+  grid. Note provenance is flat on each note event via `machine_id` and
+  `chord_instance_id`.
   """
 
   @behaviour Mensch.Machine
@@ -130,6 +135,9 @@ defmodule Mensch.Machines.StrummedMpe do
         velocity: @velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
+        machine_id: id(),
+        chord_instance_id: chord_index,
+        event_index: note_index,
         delay_ticks: song_start_tick + note_delay_ticks,
         milestones: milestones
       }
@@ -165,6 +173,9 @@ defmodule Mensch.Machines.StrummedMpe do
       note: note.note,
       channel: note.channel,
       velocity: note.velocity,
+      machine_id: note.machine_id,
+      chord_instance_id: note.chord_instance_id,
+      event_index: note.event_index,
       phase: :pending,
       note_on: false,
       note_off: false,
@@ -184,6 +195,9 @@ defmodule Mensch.Machines.StrummedMpe do
       note: note.note,
       channel: note.channel,
       velocity: note.velocity,
+      machine_id: note.machine_id,
+      chord_instance_id: note.chord_instance_id,
+      event_index: note.event_index,
       phase: NoteShape.phase_at(note.milestones, local_elapsed_ms),
       note_on: local_elapsed_ticks == 0,
       note_off: local_elapsed_ticks == note.milestones.total_ticks,

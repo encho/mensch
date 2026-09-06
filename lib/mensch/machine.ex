@@ -2,8 +2,13 @@ defmodule Mensch.Machine do
   @moduledoc """
   Behavior for algorithmic chord performers ("machines").
 
-  A machine turns a `Mensch.ChordSpec` (musical intent) into a
-  precomputed `%Mensch.Performance{}` timeline.
+  A machine turns:
+
+    * `Mensch.ChordSpec` (harmonic intent)
+    * `Mensch.SongContext` (global timing, bpm/ppq/signature)
+    * `Mensch.TimelineContext` (where/for how long on the song grid)
+
+  into a precomputed `%Mensch.Performance{}` timeline.
   """
 
   alias Mensch.ChordSpec

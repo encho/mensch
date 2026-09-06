@@ -3,7 +3,9 @@ defmodule Mensch.Render do
   Facade that renders a performance via a concrete `Mensch.Machine`.
 
   This keeps a simple entry point (`generate/0`) for the current UI,
-  while the real rendering algorithm lives in machine modules.
+  while the real rendering algorithm lives in machine modules and
+  consumes explicit `ChordSpec` + `SongContext` + `TimelineContext`.
+  Default contexts are provided for convenience.
   """
 
   alias Mensch.ChordSpec
