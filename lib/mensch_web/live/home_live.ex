@@ -22,6 +22,8 @@ defmodule MenschWeb.HomeLive do
       |> assign(:midi_status, Mensch.Midi.Connection.status())
       |> assign(:render_data, nil)
       |> assign(:player_status, Player.status())
+      |> assign(:play_started_at, nil)
+      |> assign(:playhead_pct, nil)
 
     {:ok, socket}
   end
@@ -38,12 +40,31 @@ defmodule MenschWeb.HomeLive do
   def handle_event("play", _params, socket) do
     Player.play(socket.assigns.render_data)
     Process.send_after(self(), :refresh_player, @refresh_interval_ms)
-    {:noreply, assign(socket, :player_status, Player.status())}
+
+    play_started_at = System.monotonic_time(:millisecond)
+
+    socket =
+      socket
+      |> assign(:player_status, Player.status())
+      |> assign(:play_started_at, play_started_at)
+      |> assign(
+        :playhead_pct,
+        playhead_pct(:playing, play_started_at, socket.assigns.render_data)
+      )
+
+    {:noreply, socket}
   end
 
   def handle_event("stop", _params, socket) do
     Player.stop()
-    {:noreply, assign(socket, :player_status, Player.status())}
+
+    socket =
+      socket
+      |> assign(:player_status, Player.status())
+      |> assign(:play_started_at, nil)
+      |> assign(:playhead_pct, nil)
+
+    {:noreply, socket}
   end
 
   def handle_event("reconnect_midi", _params, socket) do
@@ -53,7 +74,14 @@ defmodule MenschWeb.HomeLive do
   @impl true
   def handle_info(:refresh_player, socket) do
     status = Player.status()
-    socket = assign(socket, :player_status, status)
+
+    socket =
+      socket
+      |> assign(:player_status, status)
+      |> assign(
+        :playhead_pct,
+        playhead_pct(status, socket.assigns.play_started_at, socket.assigns.render_data)
+      )
 
     if status == :playing do
       Process.send_after(self(), :refresh_player, @refresh_interval_ms)
@@ -155,7 +183,13 @@ defmodule MenschWeb.HomeLive do
               <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
                 Note matrix
               </div>
-              <div class="py-2">
+              <div class="relative py-2">
+                <div
+                  :if={@playhead_pct}
+                  class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/70"
+                  style={"left: #{@playhead_pct}%;"}
+                >
+                </div>
                 <div
                   :for={{row, index} <- Enum.with_index(@note_matrix)}
                   class={[
@@ -178,9 +212,13 @@ defmodule MenschWeb.HomeLive do
               </div>
             </div>
 
-            <.chart title="Pressure" chart={@pressure_chart} />
-            <.chart title="Slide (Aftertouch)" chart={@slide_chart} />
-            <.chart title="Bend (Vibrato)" chart={@bend_chart} />
+            <.chart title="Pressure" chart={@pressure_chart} playhead_pct={@playhead_pct} />
+            <.chart
+              title="Slide (Aftertouch)"
+              chart={@slide_chart}
+              playhead_pct={@playhead_pct}
+            />
+            <.chart title="Bend (Vibrato)" chart={@bend_chart} playhead_pct={@playhead_pct} />
 
             <div class="flex gap-3">
               <button
@@ -224,6 +262,7 @@ defmodule MenschWeb.HomeLive do
 
   attr :title, :string, required: true
   attr :chart, :list, required: true
+  attr :playhead_pct, :any, default: nil
 
   defp chart(assigns) do
     ~H"""
@@ -237,12 +276,39 @@ defmodule MenschWeb.HomeLive do
           stroke={series.color}
           stroke-width="1.5"
         />
+        <line
+          :if={@playhead_pct}
+          x1={@playhead_pct / 100 * 600}
+          x2={@playhead_pct / 100 * 600}
+          y1="0"
+          y2="120"
+          stroke="#ffffff"
+          stroke-opacity="0.7"
+          stroke-width="1"
+        />
       </svg>
     </div>
     """
   end
 
   defp playing?(player_status), do: player_status == :playing
+
+  # How far (0-100) through the performance playback currently is, for
+  # drawing a moving crosshair over the charts/note matrix - `nil`
+  # (hides the crosshair) unless actually mid-playback. Computed and
+  # assigned directly on the socket each `:refresh_player` tick (not
+  # derived inside `render/1`), so its per-tick change is reliably
+  # picked up and pushed to the client.
+  defp playhead_pct(:playing, play_started_at, %{duration_ms: duration_ms})
+       when not is_nil(play_started_at) and duration_ms > 0 do
+    (System.monotonic_time(:millisecond) - play_started_at)
+    |> max(0)
+    |> min(duration_ms)
+    |> Kernel./(duration_ms)
+    |> Kernel.*(100)
+  end
+
+  defp playhead_pct(_player_status, _play_started_at, _render_data), do: nil
 
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
