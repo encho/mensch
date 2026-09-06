@@ -21,8 +21,11 @@ defmodule MenschWeb.HomeLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    song_entries = Render.default_song_entries()
-    song_context = Render.default_song_context()
+    songs = Render.default_songs()
+    active_song_index = 0
+    active_song = Enum.at(songs, active_song_index, %{})
+    song_entries = Map.get(active_song, :song_entries, [])
+    song_context = Map.get(active_song, :song_context, Render.default_song_context())
 
     socket =
       socket
@@ -31,6 +34,8 @@ defmodule MenschWeb.HomeLive do
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)
       |> assign(:playhead_pct, nil)
+      |> assign(:songs, songs)
+      |> assign(:active_song_index, active_song_index)
       |> assign(:song_entries, song_entries)
       |> assign(:song_context, song_context)
       |> assign(:view_modal_open, false)
@@ -67,6 +72,36 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("toggle_loop_full_song", _params, socket) do
     {:noreply, update(socket, :loop_full_song, &(!&1))}
+  end
+
+  def handle_event("activate_song", %{"index" => index_str}, socket) do
+    case Integer.parse(index_str) do
+      {index, ""} ->
+        case Enum.at(socket.assigns.songs, index) do
+          %{song_entries: song_entries, song_context: song_context} ->
+            Player.stop()
+
+            {:noreply,
+             socket
+             |> assign(:active_song_index, index)
+             |> assign(:song_entries, song_entries)
+             |> assign(:song_context, song_context)
+             |> assign(:render_data, nil)
+             |> assign(:view_modal_open, false)
+             |> assign(:view_title, nil)
+             |> assign(:render_scope, :full_song)
+             |> assign(:player_status, Player.status())
+             |> assign(:play_started_at, nil)
+             |> assign(:playhead_pct, nil)
+             |> assign(:manual_stop, true)}
+
+          _ ->
+            {:noreply, socket}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("view_entry", %{"index" => index_str}, socket) do
@@ -264,6 +299,59 @@ defmodule MenschWeb.HomeLive do
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
       <div class="mx-auto max-w-6xl space-y-6">
+        <div id="songs-section" class="space-y-3 border border-zinc-700/70 bg-zinc-950/85 p-4">
+          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Songs</div>
+
+          <div class="overflow-x-auto border border-zinc-700/60">
+            <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
+              <thead>
+                <tr class="border-b border-zinc-700/70 text-zinc-400">
+                  <th class="px-2 py-1.5 font-normal">Name</th>
+                  <th class="px-2 py-1.5 font-normal">Tempo</th>
+                  <th class="px-2 py-1.5 font-normal">Time Sig</th>
+                  <th class="px-2 py-1.5 font-normal">Chords</th>
+                  <th class="px-2 py-1.5 font-normal text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  :for={{song, index} <- Enum.with_index(@songs)}
+                  class={[
+                    "text-zinc-200",
+                    @active_song_index == index && "bg-amber-500/10"
+                  ]}
+                >
+                  <td class="px-2 py-1.5 text-zinc-100">{Map.get(song, :name, "Unnamed")}</td>
+                  <td class="px-2 py-1.5">{Map.get(song.song_context, :bpm, 0)} bpm</td>
+                  <td class="px-2 py-1.5">
+                    {elem(song.song_context.time_signature, 0)}/{elem(
+                      song.song_context.time_signature,
+                      1
+                    )}
+                  </td>
+                  <td class="px-2 py-1.5">{length(Map.get(song, :song_entries, []))}</td>
+                  <td class="px-2 py-1.5 text-right">
+                    <button
+                      type="button"
+                      id={"activate-song-#{index}"}
+                      phx-click="activate_song"
+                      phx-value-index={index}
+                      class={[
+                        "h-9 border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
+                        (@active_song_index == index &&
+                           "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
+                          "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
+                      ]}
+                    >
+                      {if @active_song_index == index, do: "Active", else: "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div id="render-section" class="space-y-4 border border-zinc-700/70 bg-zinc-950/85 p-4">
           <div class="text-[11px] uppercase tracking-wide text-zinc-400">Render Context</div>
 

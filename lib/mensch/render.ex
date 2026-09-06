@@ -47,6 +47,33 @@ defmodule Mensch.Render do
     }
   ]
 
+  @default_song_two_context %SongContext{bpm: 80, time_signature: {4, 4}, ppq: 96}
+  @default_song_two_entries [
+    %{
+      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
+      timeline_context: %TimelineContext{
+        start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
+        duration_ticks: 1536
+      },
+      machine_module: StrummedMpe
+    }
+  ]
+
+  @default_songs [
+    %{
+      id: "song-1",
+      name: "Song 1 · Dm7 G7 Cmaj7",
+      song_context: @default_song_context,
+      song_entries: @default_song_entries
+    },
+    %{
+      id: "song-2",
+      name: "Song 2 · Cmaj7 Drone",
+      song_context: @default_song_two_context,
+      song_entries: @default_song_two_entries
+    }
+  ]
+
   @doc "Default multi-entry song render (aggregated timeline)."
   @spec generate_song() :: Performance.t()
   def generate_song do
@@ -78,6 +105,10 @@ defmodule Mensch.Render do
   @doc "Returns the default song entries for UI/debug display."
   @spec default_song_entries() :: [map()]
   def default_song_entries, do: @default_song_entries
+
+  @doc "Returns the default song catalog for UI selection."
+  @spec default_songs() :: [map()]
+  def default_songs, do: @default_songs
 
   @doc "Returns the default song context used by `generate_song/0`."
   @spec default_song_context() :: SongContext.t()
