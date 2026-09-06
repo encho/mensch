@@ -80,13 +80,14 @@ defmodule Mensch.Player do
   def handle_info({:frame, ref, notes}, %{ref: ref} = state) do
     active =
       Enum.reduce(notes, state.active, fn note, active ->
-        send_frame(note)
+        note_id = {note.channel, note.note}
+        currently_active? = MapSet.member?(active, note_id)
 
-        cond do
-          note.note_on -> MapSet.put(active, {note.channel, note.note})
-          note.note_off -> MapSet.delete(active, {note.channel, note.note})
-          true -> active
-        end
+        send_frame(note, currently_active?)
+
+        active
+        |> maybe_add_active(note_id, note.note_on)
+        |> maybe_remove_active(note_id, note.note_off)
       end)
 
     {:noreply, %{state | active: active}}
@@ -101,22 +102,30 @@ defmodule Mensch.Player do
 
   def handle_info({:done, _ref}, state), do: {:noreply, state}
 
-  defp send_frame(note) do
+  defp send_frame(note, currently_active?) do
     if note.note_on do
       Connection.send_message(<<0x90 + note.channel, note.note, note.velocity>>)
     end
 
-    Connection.send_message(<<0xD0 + note.channel, note.pressure>>)
+    if note.note_on or currently_active? do
+      Connection.send_message(<<0xD0 + note.channel, note.pressure>>)
 
-    bend = (8192 + note.bend * 8192) |> round() |> max(0) |> min(16_383)
-    Connection.send_message(<<0xE0 + note.channel, rem(bend, 128), div(bend, 128)>>)
+      bend = (8192 + note.bend * 8192) |> round() |> max(0) |> min(16_383)
+      Connection.send_message(<<0xE0 + note.channel, rem(bend, 128), div(bend, 128)>>)
 
-    Connection.send_message(<<0xB0 + note.channel, 74, note.slide>>)
+      Connection.send_message(<<0xB0 + note.channel, 74, note.slide>>)
+    end
 
     if note.note_off do
       Connection.send_message(<<0x80 + note.channel, note.note, 0>>)
     end
   end
+
+  defp maybe_add_active(active, note_id, true), do: MapSet.put(active, note_id)
+  defp maybe_add_active(active, _note_id, false), do: active
+
+  defp maybe_remove_active(active, note_id, true), do: MapSet.delete(active, note_id)
+  defp maybe_remove_active(active, _note_id, false), do: active
 
   # Silences every currently-sounding note and invalidates any
   # already-scheduled frames from whatever was playing before (they'll

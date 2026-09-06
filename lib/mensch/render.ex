@@ -60,7 +60,9 @@ defmodule Mensch.Render do
     entries
     |> Enum.map(fn %{chord_spec: chord_spec, timeline_context: timeline_context} = entry ->
       machine_module = Map.get(entry, :machine_module, StrummedMpe)
-      machine_module.render(chord_spec, song_context, timeline_context)
+
+      entry
+      |> render_entry_performance(chord_spec, timeline_context, machine_module, song_context)
     end)
     |> merge_performances(song_context)
   end
@@ -104,6 +106,107 @@ defmodule Mensch.Render do
   @doc "The note name and octave for a MIDI note number, e.g. `64` -> `{:e, 4}`."
   @spec note_name(integer()) :: {ChordSpec.root(), integer()}
   def note_name(note_number), do: ChordSpec.note_name(note_number)
+
+  defp render_entry_performance(
+         _entry,
+         %ChordSpec{} = chord_spec,
+         %TimelineContext{} = timeline_context,
+         machine_module,
+         %SongContext{} = song_context
+       )
+       when is_atom(machine_module) do
+    local_timeline_context = %TimelineContext{
+      start_beat: BeatPosition.new(0, 0, 0),
+      duration_ticks: timeline_context.duration_ticks
+    }
+
+    local_performance = machine_module.render(chord_spec, song_context, local_timeline_context)
+    start_tick = TimelineContext.start_tick(timeline_context, song_context)
+    end_tick = TimelineContext.end_tick(timeline_context, song_context)
+
+    shift_and_clip_performance(local_performance, start_tick, end_tick, song_context)
+  end
+
+  defp shift_and_clip_performance(
+         %Performance{} = performance,
+         start_tick,
+         end_tick,
+         %SongContext{} = song_context
+       ) do
+    shifted_frames =
+      performance.music
+      |> Enum.map(fn frame ->
+        shifted_tick = frame.at_tick + start_tick
+
+        %{
+          at_tick: shifted_tick,
+          at_ms: SongContext.ticks_to_ms(song_context, shifted_tick),
+          notes: frame.notes
+        }
+      end)
+      |> Enum.filter(&(&1.at_tick <= end_tick))
+
+    forced_off_notes = forced_note_offs(shifted_frames)
+
+    clipped_music =
+      shifted_frames
+      |> insert_forced_off_frame(forced_off_notes, end_tick, song_context)
+      |> Enum.sort_by(& &1.at_tick)
+
+    %Performance{
+      performance
+      | duration_ms: SongContext.ticks_to_ms(song_context, end_tick),
+        music: clipped_music
+    }
+  end
+
+  defp forced_note_offs(shifted_frames) do
+    shifted_frames
+    |> Enum.flat_map(fn frame ->
+      Enum.map(frame.notes, fn note ->
+        {{note.channel, note.note}, note}
+      end)
+    end)
+    |> Enum.reduce(%{}, fn {{channel, note_number} = note_id, note}, acc ->
+      state = Map.get(acc, note_id, %{last: nil, on?: false, off?: false})
+
+      Map.put(acc, note_id, %{
+        last: note,
+        on?: state.on? or note.note_on,
+        off?: state.off? or note.note_off,
+        channel: channel,
+        note: note_number
+      })
+    end)
+    |> Enum.flat_map(fn {{_channel, _note_number}, state} ->
+      if state.on? and not state.off? do
+        [%{state.last | note_on: false, note_off: true, pressure: 0, bend: 0.0, slide: 0}]
+      else
+        []
+      end
+    end)
+  end
+
+  defp insert_forced_off_frame(frames, [], _end_tick, _song_context), do: frames
+
+  defp insert_forced_off_frame(frames, forced_off_notes, end_tick, %SongContext{} = song_context) do
+    {at_end, other} = Enum.split_with(frames, &(&1.at_tick == end_tick))
+
+    end_frame =
+      case at_end do
+        [existing] ->
+          %{existing | notes: existing.notes ++ forced_off_notes}
+
+        [] ->
+          %{
+            at_tick: end_tick,
+            at_ms: SongContext.ticks_to_ms(song_context, end_tick),
+            notes: forced_off_notes
+          }
+      end
+
+    [end_frame | other]
+  end
 
   defp merge_performances([], %SongContext{} = song_context) do
     %Performance{

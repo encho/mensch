@@ -3,8 +3,7 @@ defmodule Mensch.Machines.StrummedMpe do
   First concrete machine implementation.
 
   Renders a strummed, per-note-envelope MPE performance from a generic
-  `Mensch.ChordSpec`, including a second voicing two octaves below,
-  staggered in time.
+  `Mensch.ChordSpec`.
 
   Frame stepping is PPQ-aligned (`ticks_per_frame`) and converted to
   milliseconds at output time, so rendered frames stay on the musical
@@ -30,9 +29,6 @@ defmodule Mensch.Machines.StrummedMpe do
 
   # Within-chord strum spacing.
   @note_stagger_ms 60
-  # Inter-chord spacing (upper voicing, then lower voicing).
-  @chord_stagger_ms 300
-  @octave_shifts [0, -2]
 
   @impl true
   def id, do: :strummed_mpe
@@ -41,8 +37,6 @@ defmodule Mensch.Machines.StrummedMpe do
   def controls do
     %{
       note_stagger_ms: @note_stagger_ms,
-      chord_stagger_ms: @chord_stagger_ms,
-      octave_shifts: @octave_shifts,
       ticks_per_frame: @ticks_per_frame
     }
   end
@@ -58,11 +52,6 @@ defmodule Mensch.Machines.StrummedMpe do
 
     note_stagger_ticks =
       @note_stagger_ms
-      |> then(&SongContext.ms_to_ticks(song_context, &1))
-      |> snap_ticks(@ticks_per_frame)
-
-    chord_stagger_ticks =
-      @chord_stagger_ms
       |> then(&SongContext.ms_to_ticks(song_context, &1))
       |> snap_ticks(@ticks_per_frame)
 
@@ -88,8 +77,7 @@ defmodule Mensch.Machines.StrummedMpe do
         channels,
         milestones,
         song_start_tick,
-        note_stagger_ticks,
-        chord_stagger_ticks
+        note_stagger_ticks
       )
 
     duration_ticks =
@@ -112,46 +100,32 @@ defmodule Mensch.Machines.StrummedMpe do
          channels,
          milestones,
          song_start_tick,
-         note_stagger_ticks,
-         chord_stagger_ticks
+         note_stagger_ticks
        ) do
-    note_count = chord_note_count(chord_spec)
+    chord_notes = ChordSpec.to_midi_notes(chord_spec)
+    note_count = max(length(chord_notes), 1)
 
-    for {octave_shift, chord_index} <- Enum.with_index(@octave_shifts),
-        {note_number, note_index} <-
-          chord_spec
-          |> shifted_spec(octave_shift)
-          |> ChordSpec.to_midi_notes()
-          |> Enum.with_index() do
-      chord_delay_ticks = chord_index * chord_stagger_ticks
-      note_delay_ticks = chord_delay_ticks + note_index * note_stagger_ticks
+    chord_notes
+    |> Enum.with_index()
+    |> Enum.map(fn {note_number, note_index} ->
+      note_delay_ticks = note_index * note_stagger_ticks
       {note_name, octave} = ChordSpec.note_name(note_number)
 
       %{
         note_name: note_name,
         octave: octave,
         note: note_number,
-        channel: Enum.at(channels, chord_index * note_count + note_index),
+        channel: Enum.at(channels, note_index),
         velocity: @velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
         machine_id: id(),
-        chord_instance_id: chord_index,
+        chord_instance_id: 0,
         event_index: note_index,
         delay_ticks: song_start_tick + note_delay_ticks,
         milestones: milestones
       }
-    end
-  end
-
-  defp chord_note_count(chord_spec) do
-    chord_spec
-    |> ChordSpec.to_midi_notes()
-    |> length()
-  end
-
-  defp shifted_spec(%ChordSpec{} = chord_spec, octave_shift) do
-    %{chord_spec | octave: chord_spec.octave + octave_shift}
+    end)
   end
 
   defp build_music(notes, duration_ticks, song_context) do
