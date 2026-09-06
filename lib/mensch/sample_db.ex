@@ -72,7 +72,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 800
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         },
         %{
@@ -82,7 +87,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 900
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         },
         %{
@@ -92,7 +102,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 900
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         },
         %{
@@ -102,7 +117,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 900
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         }
       ]
@@ -124,7 +144,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 800
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         },
         %{
@@ -134,7 +159,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 800
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         },
         %{
@@ -144,7 +174,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 800
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         },
         %{
@@ -154,7 +189,12 @@ defmodule Mensch.SampleDb do
             duration_ticks: 800
           },
           machine: %StrummedMpe{
-            params: %StrummedMpeParams{StrummedMpeParams.default() | release_mbeats: 0}
+            params: %StrummedMpeParams{
+              StrummedMpeParams.default()
+              | release_mbeats: 0,
+                attack_mbeats: 300,
+                note_stagger_mbeats: 180
+            }
           }
         }
       ]
