@@ -32,24 +32,45 @@ defmodule MenschWeb.HomeLive do
       |> assign(:playhead_pct, nil)
       |> assign(:song_entries, song_entries)
       |> assign(:song_context, song_context)
+      |> assign(:view_modal_open, false)
+      |> assign(:view_title, nil)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("render_full_song", _params, socket) do
+  def handle_event("view_full_song", _params, socket) do
     entries = socket.assigns.song_entries
     song_context = socket.assigns.song_context
+    render_data = Render.generate_song(entries, song_context)
 
-    {:noreply, assign(socket, :render_data, Render.generate_song(entries, song_context))}
+    {:noreply,
+     socket
+     |> assign(:render_data, render_data)
+     |> assign(:view_title, "Full Song")
+     |> assign(:view_modal_open, true)}
   end
 
-  def handle_event("render_chord", %{"index" => index_str}, socket) do
+  def handle_event("play_full_song", _params, socket) do
+    entries = socket.assigns.song_entries
+    song_context = socket.assigns.song_context
+    render_data = Render.generate_song(entries, song_context)
+
+    {:noreply, start_playback(assign(socket, :render_data, render_data), render_data)}
+  end
+
+  def handle_event("view_entry", %{"index" => index_str}, socket) do
     case Integer.parse(index_str) do
       {index, ""} ->
         case Enum.at(socket.assigns.song_entries, index) do
           %{chord_spec: %ChordSpec{} = chord_spec} ->
-            {:noreply, assign(socket, :render_data, Render.generate(chord_spec))}
+            render_data = Render.generate(chord_spec)
+
+            {:noreply,
+             socket
+             |> assign(:render_data, render_data)
+             |> assign(:view_title, chord_label(chord_spec))
+             |> assign(:view_modal_open, true)}
 
           _ ->
             {:noreply, socket}
@@ -60,26 +81,33 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
+  def handle_event("play_entry", %{"index" => index_str}, socket) do
+    case Integer.parse(index_str) do
+      {index, ""} ->
+        case Enum.at(socket.assigns.song_entries, index) do
+          %{chord_spec: %ChordSpec{} = chord_spec} ->
+            render_data = Render.generate(chord_spec)
+            {:noreply, start_playback(assign(socket, :render_data, render_data), render_data)}
+
+          _ ->
+            {:noreply, socket}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_view", _params, socket) do
+    {:noreply, assign(socket, :view_modal_open, false)}
+  end
+
   def handle_event("play", _params, %{assigns: %{render_data: nil}} = socket) do
     {:noreply, socket}
   end
 
   def handle_event("play", _params, socket) do
-    Player.play(socket.assigns.render_data)
-    Process.send_after(self(), :refresh_player, @refresh_interval_ms)
-
-    play_started_at = System.monotonic_time(:millisecond)
-
-    socket =
-      socket
-      |> assign(:player_status, Player.status())
-      |> assign(:play_started_at, play_started_at)
-      |> assign(
-        :playhead_pct,
-        playhead_pct(:playing, play_started_at, socket.assigns.render_data)
-      )
-
-    {:noreply, socket}
+    {:noreply, start_playback(socket, socket.assigns.render_data)}
   end
 
   def handle_event("stop", _params, socket) do
@@ -151,14 +179,32 @@ defmodule MenschWeb.HomeLive do
             SongCtx: {song_context_label(@song_context)}
           </div>
 
-          <div class="flex justify-end">
+          <div class="flex items-center justify-end gap-2">
             <button
               type="button"
-              id="render-full-song-button"
-              phx-click="render_full_song"
+              id="view-full-song"
+              phx-click="view_full_song"
               class="border border-white/30 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
             >
-              Render Full Song
+              View
+            </button>
+            <button
+              type="button"
+              id="play-full-song"
+              aria-label="Play full song"
+              phx-click="play_full_song"
+              class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-green-400 ring-1 ring-green-500/70 transition-colors duration-150 hover:ring-green-400 hover:text-green-300"
+            >
+              <.icon name="hero-play-solid" class="size-4" />
+            </button>
+            <button
+              type="button"
+              id="stop-full-song"
+              aria-label="Stop full song"
+              phx-click="stop"
+              class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-red-400 ring-1 ring-red-500/70 transition-colors duration-150 hover:ring-red-400 hover:text-red-300"
+            >
+              <.icon name="hero-stop-solid" class="size-4" />
             </button>
           </div>
 
@@ -170,7 +216,7 @@ defmodule MenschWeb.HomeLive do
                   <th class="px-2 py-1.5 font-normal">Machine</th>
                   <th class="px-2 py-1.5 font-normal">Start</th>
                   <th class="px-2 py-1.5 font-normal">Duration</th>
-                  <th class="px-2 py-1.5 font-normal text-right">Action</th>
+                  <th class="px-2 py-1.5 font-normal text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -194,144 +240,182 @@ defmodule MenschWeb.HomeLive do
                     </div>
                   </td>
                   <td class="px-2 py-1.5 text-right">
-                    <button
-                      type="button"
-                      id={"render-chord-#{index}"}
-                      phx-click="render_chord"
-                      phx-value-index={index}
-                      class="border border-white/30 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
-                    >
-                      Render Chord
-                    </button>
+                    <div class="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        id={"view-entry-#{index}"}
+                        phx-click="view_entry"
+                        phx-value-index={index}
+                        class="border border-white/30 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        id={"play-entry-#{index}"}
+                        aria-label={"Play #{chord_label(entry.chord_spec)}"}
+                        phx-click="play_entry"
+                        phx-value-index={index}
+                        class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-green-400 ring-1 ring-green-500/70 transition-colors duration-150 hover:ring-green-400 hover:text-green-300"
+                      >
+                        <.icon name="hero-play-solid" class="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        id={"stop-entry-#{index}"}
+                        aria-label={"Stop #{chord_label(entry.chord_spec)}"}
+                        phx-click="stop"
+                        class="flex size-9 items-center justify-center border border-zinc-500 bg-transparent text-red-400 ring-1 ring-red-500/70 transition-colors duration-150 hover:ring-red-400 hover:text-red-300"
+                      >
+                        <.icon name="hero-stop-solid" class="size-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+      <div
+        :if={@view_modal_open and @render_data}
+        id="render-view-modal"
+        class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4"
+      >
+        <div class="w-full max-w-6xl space-y-4 border border-white/20 bg-black p-4">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <div class="text-sm uppercase tracking-wide text-white/75">{@view_title || "View"}</div>
+            <button
+              type="button"
+              id="close-view-modal"
+              phx-click="close_view"
+              class="border border-white/30 px-2 py-1 text-[11px] uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+            >
+              Close
+            </button>
+          </div>
 
-          <div :if={@render_data} class="space-y-4">
-            <div class="font-mono text-[11px] text-white/50">
-              {@render_data.bpm} bpm · {elem(@render_data.time_signature, 0)}/{elem(
-                @render_data.time_signature,
-                1
-              )} · {@render_data.granularity_ms}ms ticks · {@render_data.duration_ms}ms · {length(
-                @render_data.music
-              )} frames
+          <div class="font-mono text-[11px] text-white/50">
+            {@render_data.bpm} bpm · {elem(@render_data.time_signature, 0)}/{elem(
+              @render_data.time_signature,
+              1
+            )} · {@render_data.granularity_ms}ms ticks · {@render_data.duration_ms}ms · {length(
+              @render_data.music
+            )} frames
+          </div>
+
+          <div id="debug-frames" class="border border-white/10">
+            <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
+              All frames
             </div>
-
-            <div id="debug-frames" class="border border-white/10">
-              <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
-                All frames
-              </div>
-              <div class="max-h-48 overflow-y-auto">
-                <table class="w-full text-left font-mono text-[11px]">
-                  <thead class="sticky top-0 bg-black">
-                    <tr class="border-b border-white/10 text-white/40">
-                      <th class="px-3 py-1.5 font-normal">ms</th>
-                      <th class="px-3 py-1.5 font-normal">note</th>
-                      <th class="px-3 py-1.5 font-normal">ch</th>
-                      <th class="px-3 py-1.5 font-normal">phase</th>
-                      <th class="px-3 py-1.5 font-normal">on</th>
-                      <th class="px-3 py-1.5 font-normal">off</th>
-                      <th class="px-3 py-1.5 font-normal">pressure</th>
-                      <th class="px-3 py-1.5 font-normal">bend</th>
-                      <th class="px-3 py-1.5 font-normal">slide</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      :for={row <- @debug_rows}
-                      class="border-b border-white/5 text-white/70 last:border-0"
-                    >
-                      <td class="px-3 py-1.5">{row.at_ms}</td>
-                      <td class="px-3 py-1.5 text-white">{row.note_name}{row.octave}</td>
-                      <td class="px-3 py-1.5">{row.channel}</td>
-                      <td class="px-3 py-1.5">{row.phase}</td>
-                      <td class="px-3 py-1.5">{row.note_on}</td>
-                      <td class="px-3 py-1.5">{row.note_off}</td>
-                      <td class="px-3 py-1.5">{row.pressure}</td>
-                      <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
-                      <td class="px-3 py-1.5">{row.slide}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div class="max-h-48 overflow-y-auto">
+              <table class="w-full text-left font-mono text-[11px]">
+                <thead class="sticky top-0 bg-black">
+                  <tr class="border-b border-white/10 text-white/40">
+                    <th class="px-3 py-1.5 font-normal">ms</th>
+                    <th class="px-3 py-1.5 font-normal">note</th>
+                    <th class="px-3 py-1.5 font-normal">ch</th>
+                    <th class="px-3 py-1.5 font-normal">phase</th>
+                    <th class="px-3 py-1.5 font-normal">on</th>
+                    <th class="px-3 py-1.5 font-normal">off</th>
+                    <th class="px-3 py-1.5 font-normal">pressure</th>
+                    <th class="px-3 py-1.5 font-normal">bend</th>
+                    <th class="px-3 py-1.5 font-normal">slide</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    :for={row <- @debug_rows}
+                    class="border-b border-white/5 text-white/70 last:border-0"
+                  >
+                    <td class="px-3 py-1.5">{row.at_ms}</td>
+                    <td class="px-3 py-1.5 text-white">{row.note_name}{row.octave}</td>
+                    <td class="px-3 py-1.5">{row.channel}</td>
+                    <td class="px-3 py-1.5">{row.phase}</td>
+                    <td class="px-3 py-1.5">{row.note_on}</td>
+                    <td class="px-3 py-1.5">{row.note_off}</td>
+                    <td class="px-3 py-1.5">{row.pressure}</td>
+                    <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
+                    <td class="px-3 py-1.5">{row.slide}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+          </div>
 
-            <div id="note-matrix" class="border border-white/10">
-              <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
-                Note matrix
-              </div>
-              <div class="relative py-2">
-                <div
-                  :if={@playhead_pct}
-                  class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/70"
-                  style={"left: #{@playhead_pct}%;"}
-                >
-                </div>
-                <div
-                  :for={{row, index} <- Enum.with_index(@note_matrix)}
-                  class={[
-                    "relative flex h-2.5 items-center border-b border-white/20 last:border-0",
-                    rem(index, 2) == 0 && "bg-white/[0.03]"
-                  ]}
-                >
-                  <div :if={row.style} class="absolute inset-0" style={row.style}></div>
-                  <span class={[
-                    "relative z-10 px-1 font-mono text-[5px] uppercase",
-                    (row.style && "text-white") || "text-white/30"
-                  ]}>
-                    {row.label}
-                  </span>
-                </div>
-              </div>
-              <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-white/30">
-                <span>0ms</span>
-                <span>{@render_data.duration_ms}ms</span>
-              </div>
+          <div id="note-matrix" class="border border-white/10">
+            <div class="border-b border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/40">
+              Note matrix
             </div>
-
-            <.chart title="Pressure" chart={@pressure_chart} playhead_pct={@playhead_pct} />
-            <.chart
-              title="Slide (Aftertouch)"
-              chart={@slide_chart}
-              playhead_pct={@playhead_pct}
-            />
-            <.chart title="Bend (Vibrato)" chart={@bend_chart} playhead_pct={@playhead_pct} />
-
-            <div class="flex gap-3">
-              <button
-                type="button"
-                id="play-button"
-                aria-label="Play on Osmose"
-                phx-click="play"
-                class={[
-                  "flex flex-1 items-center justify-center border py-3 transition-colors duration-150",
-                  (playing?(@player_status) && "border-white/15 text-white/15") ||
-                    "border-green-500 text-green-500 hover:bg-green-500 hover:text-black",
-                  "disabled:cursor-not-allowed"
-                ]}
-                disabled={playing?(@player_status)}
+            <div class="relative py-2">
+              <div
+                :if={@playhead_pct}
+                class="pointer-events-none absolute inset-y-0 z-20 w-px bg-white/70"
+                style={"left: #{@playhead_pct}%;"}
               >
-                <.icon name="hero-play-solid" class="size-6" />
-              </button>
-              <button
-                type="button"
-                id="stop-button"
-                aria-label="Stop"
-                phx-click="stop"
+              </div>
+              <div
+                :for={{row, index} <- Enum.with_index(@note_matrix)}
                 class={[
-                  "flex flex-1 items-center justify-center border py-3 transition-colors duration-150",
-                  (playing?(@player_status) &&
-                     "border-red-500 text-red-500 hover:bg-red-500 hover:text-black") ||
-                    "border-white/15 text-white/15",
-                  "disabled:cursor-not-allowed"
+                  "relative flex h-2.5 items-center border-b border-white/20 last:border-0",
+                  rem(index, 2) == 0 && "bg-white/[0.03]"
                 ]}
-                disabled={!playing?(@player_status)}
               >
-                <.icon name="hero-stop-solid" class="size-6" />
-              </button>
+                <div :if={row.style} class="absolute inset-0" style={row.style}></div>
+                <span class={[
+                  "relative z-10 px-1 font-mono text-[5px] uppercase",
+                  (row.style && "text-white") || "text-white/30"
+                ]}>
+                  {row.label}
+                </span>
+              </div>
             </div>
+            <div class="flex justify-between px-3 pb-2 pt-1 font-mono text-[10px] text-white/30">
+              <span>0ms</span>
+              <span>{@render_data.duration_ms}ms</span>
+            </div>
+          </div>
+
+          <.chart title="Pressure" chart={@pressure_chart} playhead_pct={@playhead_pct} />
+          <.chart
+            title="Slide (Aftertouch)"
+            chart={@slide_chart}
+            playhead_pct={@playhead_pct}
+          />
+          <.chart title="Bend (Vibrato)" chart={@bend_chart} playhead_pct={@playhead_pct} />
+
+          <div class="flex justify-center gap-3">
+            <button
+              type="button"
+              id="play-button"
+              aria-label="Play on Osmose"
+              phx-click="play"
+              class={[
+                "flex size-14 items-center justify-center border border-zinc-500 bg-transparent transition-colors duration-150",
+                (playing?(@player_status) && "text-white/20 ring-1 ring-white/10") ||
+                  "text-green-400 ring-1 ring-green-500/70 hover:ring-green-400 hover:text-green-300",
+                "disabled:cursor-not-allowed"
+              ]}
+              disabled={playing?(@player_status)}
+            >
+              <.icon name="hero-play-solid" class="size-6" />
+            </button>
+            <button
+              type="button"
+              id="stop-button"
+              aria-label="Stop"
+              phx-click="stop"
+              class={[
+                "flex size-14 items-center justify-center border border-zinc-500 bg-transparent transition-colors duration-150",
+                (playing?(@player_status) &&
+                   "text-red-400 ring-1 ring-red-500/70 hover:ring-red-400 hover:text-red-300") ||
+                  "text-white/20 ring-1 ring-white/10",
+                "disabled:cursor-not-allowed"
+              ]}
+              disabled={!playing?(@player_status)}
+            >
+              <.icon name="hero-stop-solid" class="size-6" />
+            </button>
           </div>
         </div>
       </div>
@@ -371,6 +455,18 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp playing?(player_status), do: player_status == :playing
+
+  defp start_playback(socket, render_data) do
+    Player.play(render_data)
+    Process.send_after(self(), :refresh_player, @refresh_interval_ms)
+
+    play_started_at = System.monotonic_time(:millisecond)
+
+    socket
+    |> assign(:player_status, Player.status())
+    |> assign(:play_started_at, play_started_at)
+    |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, render_data))
+  end
 
   # How far (0-100) through the performance playback currently is, for
   # drawing a moving crosshair over the charts/note matrix - `nil`
