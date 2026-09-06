@@ -9,14 +9,20 @@ defmodule MenschWeb.HomeLive do
 
   use MenschWeb, :live_view
 
+  alias Mensch.BeatPosition
+  alias Mensch.ChordSpec
   alias Mensch.Player
   alias Mensch.Render
+  alias Mensch.SongContext
 
   @refresh_interval_ms 100
   @chart_colors ["#22c55e", "#3b82f6", "#f97316", "#ec4899"]
 
   @impl true
   def mount(_params, _session, socket) do
+    song_entries = Render.default_song_entries()
+    song_context = Render.default_song_context()
+
     socket =
       socket
       |> assign(:midi_status, Mensch.Midi.Connection.status())
@@ -24,13 +30,34 @@ defmodule MenschWeb.HomeLive do
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)
       |> assign(:playhead_pct, nil)
+      |> assign(:song_entries, song_entries)
+      |> assign(:song_context, song_context)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("render", _params, socket) do
-    {:noreply, assign(socket, :render_data, Render.generate())}
+  def handle_event("render_full_song", _params, socket) do
+    entries = socket.assigns.song_entries
+    song_context = socket.assigns.song_context
+
+    {:noreply, assign(socket, :render_data, Render.generate_song(entries, song_context))}
+  end
+
+  def handle_event("render_chord", %{"index" => index_str}, socket) do
+    case Integer.parse(index_str) do
+      {index, ""} ->
+        case Enum.at(socket.assigns.song_entries, index) do
+          %{chord_spec: %ChordSpec{} = chord_spec} ->
+            {:noreply, assign(socket, :render_data, Render.generate(chord_spec))}
+
+          _ ->
+            {:noreply, socket}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("play", _params, %{assigns: %{render_data: nil}} = socket) do
@@ -116,18 +143,70 @@ defmodule MenschWeb.HomeLive do
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
-      <div class="mx-auto max-w-2xl space-y-6">
+      <div class="mx-auto max-w-6xl space-y-6">
         <div id="render-section" class="space-y-4 border border-white/15 p-4">
-          <div class="flex items-center justify-between text-[11px] uppercase tracking-wide text-white/40">
-            <span>C4 maj7</span>
+          <div class="text-[11px] uppercase tracking-wide text-white/40">Render Context</div>
+
+          <div class="font-mono text-[11px] text-white/55">
+            SongCtx: {song_context_label(@song_context)}
+          </div>
+
+          <div class="flex justify-end">
             <button
               type="button"
-              id="render-button"
-              phx-click="render"
-              class="border border-white/30 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+              id="render-full-song-button"
+              phx-click="render_full_song"
+              class="border border-white/30 px-3 py-1.5 text-[11px] uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
             >
-              Render
+              Render Full Song
             </button>
+          </div>
+
+          <div class="overflow-x-auto border border-white/10">
+            <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
+              <thead>
+                <tr class="border-b border-white/10 text-white/40">
+                  <th class="px-2 py-1.5 font-normal">ChordSpec</th>
+                  <th class="px-2 py-1.5 font-normal">Machine</th>
+                  <th class="px-2 py-1.5 font-normal">Start</th>
+                  <th class="px-2 py-1.5 font-normal">Duration</th>
+                  <th class="px-2 py-1.5 font-normal text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr :for={{entry, index} <- Enum.with_index(@song_entries)} class="text-white/80">
+                  <td class="px-2 py-1.5 text-white">{chord_label(entry.chord_spec)}</td>
+                  <td class="px-2 py-1.5">{machine_label(entry.machine_module)}</td>
+                  <td class="px-2 py-1.5 align-top">
+                    <div class="leading-tight text-white">
+                      {start_label_primary(@song_context, entry.timeline_context.start_beat)}
+                    </div>
+                    <div class="leading-tight text-white/40">
+                      {start_label_secondary(@song_context, entry.timeline_context.start_beat)}
+                    </div>
+                  </td>
+                  <td class="px-2 py-1.5 align-top">
+                    <div class="leading-tight text-white">
+                      {duration_label_primary(@song_context, entry.timeline_context.duration_ticks)}
+                    </div>
+                    <div class="leading-tight text-white/40">
+                      {duration_label_secondary(entry.timeline_context.duration_ticks)}
+                    </div>
+                  </td>
+                  <td class="px-2 py-1.5 text-right">
+                    <button
+                      type="button"
+                      id={"render-chord-#{index}"}
+                      phx-click="render_chord"
+                      phx-value-index={index}
+                      class="border border-white/30 px-3 py-1.5 text-white/70 transition-colors duration-150 hover:border-white hover:text-white"
+                    >
+                      Render Chord
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <div :if={@render_data} class="space-y-4">
@@ -320,6 +399,65 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp format_bend(bend), do: Float.round(bend * 1.0, 5)
+
+  defp song_context_label(%SongContext{} = song_context) do
+    {num, den} = song_context.time_signature
+    "#{song_context.bpm} bpm · #{num}/#{den} · ppq #{song_context.ppq}"
+  end
+
+  defp chord_label(%ChordSpec{} = chord_spec) do
+    root = chord_spec.root |> Atom.to_string() |> String.replace("_sharp", "#") |> String.upcase()
+    modifier = chord_spec.modifier |> Atom.to_string()
+    "#{root} #{modifier} · Oct #{chord_spec.octave} · Inv #{chord_spec.inversion}"
+  end
+
+  defp machine_label(machine_module) when is_atom(machine_module) do
+    machine_module
+    |> Module.split()
+    |> List.last()
+    |> Macro.underscore()
+  end
+
+  defp start_label_primary(%SongContext{} = song_context, %BeatPosition{} = start_beat) do
+    tick = SongContext.position_to_tick(song_context, start_beat)
+    ms = SongContext.ticks_to_ms(song_context, tick)
+
+    "bar #{start_beat.bar} · beat #{start_beat.beat} · #{SongContext.format_timestamp(ms)}"
+  end
+
+  defp start_label_secondary(%SongContext{} = song_context, %BeatPosition{} = start_beat) do
+    tick = SongContext.position_to_tick(song_context, start_beat)
+    "tick #{tick}"
+  end
+
+  defp duration_label_primary(%SongContext{} = song_context, duration_ticks) do
+    ticks_per_bar = SongContext.ticks_per_bar(song_context)
+    ticks_per_beat = SongContext.ticks_per_beat(song_context)
+    duration_ms = SongContext.ticks_to_ms(song_context, duration_ticks)
+    duration_s = duration_ms / 1000
+
+    musical =
+      cond do
+        rem(duration_ticks, ticks_per_bar) == 0 ->
+          bars = div(duration_ticks, ticks_per_bar)
+          "#{bars} bar"
+
+        rem(duration_ticks, ticks_per_beat) == 0 ->
+          beats = div(duration_ticks, ticks_per_beat)
+          "#{beats} beats"
+
+        true ->
+          beats = div(duration_ticks, ticks_per_beat)
+          ticks = rem(duration_ticks, ticks_per_beat)
+          "#{beats} beats + #{ticks} ticks"
+      end
+
+    "#{musical} · #{:erlang.float_to_binary(duration_s, decimals: 2)}s"
+  end
+
+  defp duration_label_secondary(duration_ticks) do
+    "#{duration_ticks} ticks"
+  end
 
   # Groups a rendered `music` timeline's frames by note (`{channel,
   # note}`), one polyline per note, for an SVG line chart of `value_key`
