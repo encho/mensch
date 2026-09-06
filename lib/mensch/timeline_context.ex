@@ -3,7 +3,7 @@ defmodule Mensch.TimelineContext do
   Placement of a chord event on a sample timeline.
 
   `start_beat` is human-readable (bar/beat/tick), while duration is
-  stored in PPQ ticks for precise internal math.
+  stored in ticks for precise internal math.
   """
 
   alias Mensch.BeatPosition

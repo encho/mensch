@@ -479,7 +479,7 @@ defmodule MenschWeb.HomeLive do
                       <span>{chord_label(entry.chord_spec)}</span>
                     </div>
                   </td>
-                  <td class="px-2 py-1.5">{machine_label(entry.machine_module)}</td>
+                  <td class="px-2 py-1.5">{machine_label(entry.machine)}</td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
                       {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
@@ -649,19 +649,19 @@ defmodule MenschWeb.HomeLive do
                   rem(index, 2) == 0 && "bg-zinc-900/70"
                 ]}
               >
-                <button
+                <div
                   :for={segment <- Map.get(row, :segments, [])}
-                  type="button"
                   phx-click="toggle_note_focus"
-                  phx-value-note={segment.note}
-                  phx-value-channel={segment.channel}
+                  phx-value-note={to_string(segment.note)}
+                  phx-value-channel={to_string(segment.channel)}
                   class={[
                     "absolute inset-y-0 z-20 cursor-pointer transition-opacity duration-150",
                     segment.active && "opacity-100",
                     !segment.active && "opacity-70"
                   ]}
                   style={segment.style}
-                ></button>
+                >
+                </div>
                 <span class={[
                   "relative z-10 px-1 font-mono text-[5px] uppercase",
                   (Enum.empty?(Map.get(row, :segments, [])) && "text-zinc-600") ||
@@ -967,7 +967,7 @@ defmodule MenschWeb.HomeLive do
 
   defp sample_context_label(%SampleContext{} = sample_context) do
     {num, den} = sample_context.time_signature
-    "#{sample_context.bpm} bpm · #{num}/#{den} · ppq #{sample_context.ppq}"
+    "#{sample_context.bpm} bpm · #{num}/#{den} · frame #{sample_context.frame_mbeats} mbeats"
   end
 
   defp chord_label(%ChordSpec{} = chord_spec) do
@@ -976,11 +976,10 @@ defmodule MenschWeb.HomeLive do
     "#{root} #{modifier} · Oct #{chord_spec.octave} · Inv #{chord_spec.inversion}"
   end
 
-  defp machine_label(machine_module) when is_atom(machine_module) do
-    machine_module
-    |> Module.split()
-    |> List.last()
-    |> Macro.underscore()
+  defp machine_label(machine) do
+    machine
+    |> Mensch.Machine.id()
+    |> Atom.to_string()
   end
 
   defp start_label_primary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do

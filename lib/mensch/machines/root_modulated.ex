@@ -4,56 +4,62 @@ defmodule Mensch.Machines.RootModulated do
   while modulating pressure, bend, and slide over time.
   """
 
-  @behaviour Mensch.Machine
-
   alias Mensch.ChordSpec
+  alias Mensch.Machines.RootModulatedParams
   alias Mensch.NoteShape
   alias Mensch.Performance
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
-  @ticks_per_frame 6
-  @velocity 100
+  @type t :: %__MODULE__{params: RootModulatedParams.t()}
 
-  @attack_ms 90
-  @decay_ms 120
-  @release_ms 280
+  @enforce_keys [:params]
+  defstruct [:params]
 
-  @impl true
   def id, do: :root_modulated
 
-  @impl true
+  def params_module, do: RootModulatedParams
+
+  def default_params, do: RootModulatedParams.default()
+
+  @spec new(RootModulatedParams.t()) :: t()
+  def new(%RootModulatedParams{} = params), do: %__MODULE__{params: params}
+
+  @spec new() :: t()
+  def new, do: %__MODULE__{params: default_params()}
+
   def controls do
-    %{
-      ticks_per_frame: @ticks_per_frame
-    }
+    %{}
   end
 
-  @impl true
   def render(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
-        _opts \\ []
+        opts \\ []
       ) do
-    duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
+    %RootModulatedParams{} = params = machine_params!(opts)
+
+    frame_ticks = SampleContext.frame_ticks(sample_context)
+
+    duration_ticks = snap_ticks(timeline_context.duration_ticks, frame_ticks)
 
     sample_start_tick =
       timeline_context
       |> TimelineContext.start_tick(sample_context)
-      |> snap_ticks(@ticks_per_frame)
+      |> snap_ticks(frame_ticks)
 
     root_note = midi_note_number(chord_spec.root, chord_spec.octave)
     {note_name, octave} = ChordSpec.note_name(root_note)
 
-    milestones = build_milestones(duration_ticks, sample_context)
+    milestones = build_milestones(duration_ticks, sample_context, params)
 
     note = %{
       note_name: note_name,
       octave: octave,
       note: root_note,
       channel: nil,
-      velocity: @velocity,
+      velocity: params.velocity,
       phase_offset: 0.0,
       emphasis: true,
       machine_id: id(),
@@ -64,31 +70,46 @@ defmodule Mensch.Machines.RootModulated do
     }
 
     duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-    granularity_ms = SampleContext.ticks_to_ms(sample_context, @ticks_per_frame)
+    granularity_ms = SampleContext.ticks_to_ms(sample_context, frame_ticks)
 
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(note, duration_ticks, sample_context)
+      music: build_music(note, duration_ticks, sample_context, frame_ticks)
     }
   end
 
-  defp build_milestones(duration_ticks, %SampleContext{} = sample_context) do
+  defp build_milestones(
+         duration_ticks,
+         %SampleContext{} = sample_context,
+         %RootModulatedParams{} = params
+       ) do
+    attack_end_ticks = SampleContext.mbeats_to_ticks(sample_context, params.attack_mbeats)
+
+    decay_end_ticks =
+      attack_end_ticks + SampleContext.mbeats_to_ticks(sample_context, params.decay_mbeats)
+
+    release_tail_ticks = SampleContext.mbeats_to_ticks(sample_context, params.release_mbeats)
+
     duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
 
     %{
-      attack_end_ms: @attack_ms,
-      decay_end_ms: @attack_ms + @decay_ms,
-      release_start_ms: max(duration_ms - @release_ms, 0),
+      attack_end_ms: SampleContext.ticks_to_ms(sample_context, attack_end_ticks),
+      decay_end_ms: SampleContext.ticks_to_ms(sample_context, decay_end_ticks),
+      release_start_ms:
+        duration_ticks
+        |> Kernel.-(release_tail_ticks)
+        |> max(0)
+        |> then(&SampleContext.ticks_to_ms(sample_context, &1)),
       total_ms: duration_ms,
       total_ticks: duration_ticks
     }
   end
 
-  defp build_music(note, duration_ticks, sample_context) do
-    for at_tick <- 0..duration_ticks//@ticks_per_frame do
+  defp build_music(note, duration_ticks, sample_context, frame_ticks) do
+    for at_tick <- 0..duration_ticks//frame_ticks do
       at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
 
       %{
@@ -96,6 +117,20 @@ defmodule Mensch.Machines.RootModulated do
         at_tick: at_tick,
         notes: [note_frame(note, at_tick, sample_context)]
       }
+    end
+  end
+
+  defp machine_params!(opts) do
+    case Keyword.fetch(opts, :machine_params) do
+      {:ok, %RootModulatedParams{} = params} ->
+        params
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "expected #{inspect(RootModulatedParams)} in :machine_params, got #{inspect(other)}"
+
+      :error ->
+        raise ArgumentError, "missing :machine_params for #{inspect(__MODULE__)}"
     end
   end
 
@@ -165,5 +200,23 @@ defmodule Mensch.Machines.RootModulated do
   end
 
   defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
+
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
+end
+
+defimpl Mensch.Machine, for: Mensch.Machines.RootModulated do
+  alias Mensch.Machines.RootModulated
+
+  def id(_machine), do: RootModulated.id()
+
+  def controls(%RootModulated{}), do: %{}
+
+  def render(%RootModulated{params: params}, chord_spec, sample_context, timeline_context, opts) do
+    RootModulated.render(
+      chord_spec,
+      sample_context,
+      timeline_context,
+      Keyword.put(opts, :machine_params, params)
+    )
+  end
 end

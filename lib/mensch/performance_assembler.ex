@@ -10,7 +10,7 @@ defmodule Mensch.PerformanceAssembler do
 
   alias Mensch.ChordSpec
   alias Mensch.BeatPosition
-  alias Mensch.Machines.StrummedMpe
+  alias Mensch.Machine
   alias Mensch.Midi.Connection
   alias Mensch.Performance
   alias Mensch.SampleDb
@@ -30,13 +30,13 @@ defmodule Mensch.PerformanceAssembler do
     |> Enum.with_index()
     |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context} = entry,
                     entry_index} ->
-      machine_module = Map.get(entry, :machine_module, StrummedMpe)
+      machine = Map.fetch!(entry, :machine)
 
       entry
       |> render_entry_performance(
         chord_spec,
         timeline_context,
-        machine_module,
+        machine,
         sample_context,
         entry_index
       )
@@ -53,19 +53,18 @@ defmodule Mensch.PerformanceAssembler do
   @spec default_samples() :: [map()]
   def default_samples, do: SampleDb.default_samples()
 
-  @doc "Renders a chord spec via a specific machine module implementing `Mensch.Machine`."
-  @spec generate(ChordSpec.t(), SampleContext.t(), TimelineContext.t(), module()) ::
+  @doc "Renders a chord spec via a machine instance implementing `Mensch.Machine`."
+  @spec generate(ChordSpec.t(), SampleContext.t(), TimelineContext.t(), struct()) ::
           Performance.t()
   def generate(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
-        machine_module
-      )
-      when is_atom(machine_module) do
+        machine
+      ) do
     machine_opts = machine_timing_opts(sample_context, timeline_context)
 
-    machine_module.render(chord_spec, sample_context, timeline_context, machine_opts)
+    Machine.render(machine, chord_spec, sample_context, timeline_context, machine_opts)
     |> rechannelize_performance()
   end
 
@@ -77,11 +76,11 @@ defmodule Mensch.PerformanceAssembler do
          _entry,
          %ChordSpec{} = chord_spec,
          %TimelineContext{} = timeline_context,
-         machine_module,
+         machine,
          %SampleContext{} = sample_context,
          entry_index
        )
-       when is_atom(machine_module) and is_integer(entry_index) do
+       when is_integer(entry_index) do
     start_tick = TimelineContext.start_tick(timeline_context, sample_context)
 
     local_timeline_context = %TimelineContext{
@@ -96,7 +95,7 @@ defmodule Mensch.PerformanceAssembler do
 
     local_performance =
       chord_spec
-      |> machine_module.render(sample_context, local_timeline_context, machine_opts)
+      |> then(&Machine.render(machine, &1, sample_context, local_timeline_context, machine_opts))
       |> tag_sample_entry_index(entry_index)
 
     shift_performance(local_performance, start_tick, sample_context)
@@ -152,7 +151,8 @@ defmodule Mensch.PerformanceAssembler do
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
-      granularity_ms: SampleContext.ticks_to_ms(sample_context, 6),
+      granularity_ms:
+        SampleContext.ticks_to_ms(sample_context, SampleContext.frame_ticks(sample_context)),
       duration_ms: 0,
       music: []
     }

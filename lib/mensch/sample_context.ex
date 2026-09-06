@@ -2,9 +2,9 @@ defmodule Mensch.SampleContext do
   @moduledoc """
   Global sample timing context.
 
-  PPQ means pulses per quarter note (ticks per beat). This module keeps
-  PPQ internal, while exposing helpers to convert to/from human-friendly
-  beat positions and wall-clock timestamps.
+  Ticks are derived from millibeat resolution (`mbeats_per_tick`).
+  This keeps a tempo-aware public timing model while preserving precise
+  internal tick math for scheduling and conversions.
   """
 
   alias Mensch.BeatPosition
@@ -12,11 +12,12 @@ defmodule Mensch.SampleContext do
   @type t :: %__MODULE__{
           bpm: pos_integer(),
           time_signature: {pos_integer(), pos_integer()},
-          ppq: pos_integer()
+          mbeats_per_tick: pos_integer() | float(),
+          frame_mbeats: pos_integer()
         }
 
-  @enforce_keys [:bpm, :time_signature, :ppq]
-  defstruct [:bpm, :time_signature, :ppq]
+  @enforce_keys [:bpm, :time_signature, :mbeats_per_tick, :frame_mbeats]
+  defstruct [:bpm, :time_signature, :mbeats_per_tick, :frame_mbeats]
 
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
@@ -29,8 +30,11 @@ defmodule Mensch.SampleContext do
       not valid_time_signature?(ctx.time_signature) ->
         {:error, {:invalid_time_signature, ctx.time_signature}}
 
-      not is_integer(ctx.ppq) or ctx.ppq <= 0 ->
-        {:error, {:invalid_ppq, ctx.ppq}}
+      not is_number(ctx.mbeats_per_tick) or ctx.mbeats_per_tick <= 0 ->
+        {:error, {:invalid_mbeats_per_tick, ctx.mbeats_per_tick}}
+
+      not is_integer(ctx.frame_mbeats) or ctx.frame_mbeats <= 0 ->
+        {:error, {:invalid_frame_mbeats, ctx.frame_mbeats}}
 
       true ->
         {:ok, ctx}
@@ -49,9 +53,39 @@ defmodule Mensch.SampleContext do
   @spec beats_per_bar(t()) :: pos_integer()
   def beats_per_bar(%__MODULE__{time_signature: {beats, _denominator}}), do: beats
 
-  @doc "Ticks per beat (`ppq`)."
+  @doc "Millibeats represented by one tick."
+  @spec mbeats_per_tick(t()) :: pos_integer() | float()
+  def mbeats_per_tick(%__MODULE__{mbeats_per_tick: value}), do: value
+
+  @doc "Ticks per beat, derived from `mbeats_per_tick`."
   @spec ticks_per_beat(t()) :: pos_integer()
-  def ticks_per_beat(%__MODULE__{ppq: ppq}), do: ppq
+  def ticks_per_beat(%__MODULE__{} = sample_context) do
+    sample_context
+    |> mbeats_per_tick()
+    |> then(&(1000 / &1))
+    |> round()
+    |> max(1)
+  end
+
+  @doc "Global render frame size in millibeats."
+  @spec frame_mbeats(t()) :: pos_integer()
+  def frame_mbeats(%__MODULE__{frame_mbeats: frame_mbeats}), do: frame_mbeats
+
+  @doc "Converts millibeats to nearest tick."
+  @spec mbeats_to_ticks(t(), non_neg_integer()) :: non_neg_integer()
+  def mbeats_to_ticks(%__MODULE__{} = sample_context, mbeats)
+      when is_integer(mbeats) and mbeats >= 0 do
+    round(mbeats * ticks_per_beat(sample_context) / 1000)
+  end
+
+  @doc "Global render frame size in ticks (at least 1)."
+  @spec frame_ticks(t()) :: pos_integer()
+  def frame_ticks(%__MODULE__{} = sample_context) do
+    sample_context
+    |> frame_mbeats()
+    |> then(&mbeats_to_ticks(sample_context, &1))
+    |> max(1)
+  end
 
   @doc "Ticks per bar."
   @spec ticks_per_bar(t()) :: pos_integer()
@@ -63,7 +97,7 @@ defmodule Mensch.SampleContext do
   @spec ms_per_beat(t()) :: float()
   def ms_per_beat(%__MODULE__{bpm: bpm}), do: 60_000 / bpm
 
-  @doc "Milliseconds per PPQ tick."
+  @doc "Milliseconds per tick."
   @spec ms_per_tick(t()) :: float()
   def ms_per_tick(%__MODULE__{} = sample_context) do
     ms_per_beat(sample_context) / ticks_per_beat(sample_context)

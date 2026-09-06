@@ -154,7 +154,7 @@ defmodule Mensch.Performance do
   @doc """
   Returns one entry per frame with both musical position and timestamp.
 
-  This keeps PPQ internal while exposing user-friendly timing:
+  This keeps internal tick math while exposing user-friendly timing:
 
     * `:position` => `%Mensch.BeatPosition{bar, beat, tick}` (zero-based)
     * `:timestamp` => `MM:SS.mmm`

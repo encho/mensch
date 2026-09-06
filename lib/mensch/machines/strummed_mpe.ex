@@ -5,59 +5,62 @@ defmodule Mensch.Machines.StrummedMpe do
   Renders a strummed, per-note-envelope MPE performance from a generic
   `Mensch.ChordSpec`.
 
-  Frame stepping is PPQ-aligned (`ticks_per_frame`) and converted to
-  milliseconds at output time, so rendered frames stay on the musical
-  grid. Note provenance is flat on each note event via `machine_id` and
+  Frame stepping comes from the global sample context and is resolved to
+  ticks per render, so frame timing stays tempo-aware and musically aligned.
+  Note provenance is flat on each note event via `machine_id` and
   `chord_instance_id`.
   """
 
-  @behaviour Mensch.Machine
-
   alias Mensch.ChordSpec
+  alias Mensch.Machines.StrummedMpeParams
   alias Mensch.NoteShape
   alias Mensch.Performance
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
-  @ticks_per_frame 6
-  @velocity 100
+  @type t :: %__MODULE__{params: StrummedMpeParams.t()}
 
-  @attack_ms 100
-  @decay_ms 100
-  @release_ms 250
+  @enforce_keys [:params]
+  defstruct [:params]
 
-  # Within-chord strum spacing.
-  @note_stagger_ms 60
-
-  @impl true
   def id, do: :strummed_mpe
 
-  @impl true
+  def params_module, do: StrummedMpeParams
+
+  def default_params, do: StrummedMpeParams.default()
+
+  @spec new(StrummedMpeParams.t()) :: t()
+  def new(%StrummedMpeParams{} = params), do: %__MODULE__{params: params}
+
+  @spec new() :: t()
+  def new, do: %__MODULE__{params: default_params()}
+
   def controls do
-    %{
-      note_stagger_ms: @note_stagger_ms,
-      ticks_per_frame: @ticks_per_frame
-    }
+    params = default_params()
+    %{note_stagger_mbeats: params.note_stagger_mbeats}
   end
 
-  @impl true
   def render(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
-        _opts \\ []
+        opts \\ []
       ) do
-    note_stagger_ticks =
-      @note_stagger_ms
-      |> then(&SampleContext.ms_to_ticks(sample_context, &1))
-      |> snap_ticks(@ticks_per_frame)
+    %StrummedMpeParams{} = params = machine_params!(opts)
 
-    chord_duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
+    frame_ticks = SampleContext.frame_ticks(sample_context)
+
+    note_stagger_ticks =
+      params.note_stagger_mbeats
+      |> then(&SampleContext.mbeats_to_ticks(sample_context, &1))
+      |> snap_ticks(frame_ticks)
+
+    chord_duration_ticks = snap_ticks(timeline_context.duration_ticks, frame_ticks)
 
     sample_start_tick =
       timeline_context
       |> TimelineContext.start_tick(sample_context)
-      |> snap_ticks(@ticks_per_frame)
+      |> snap_ticks(frame_ticks)
 
     chord_end_tick = sample_start_tick + chord_duration_ticks
 
@@ -67,21 +70,22 @@ defmodule Mensch.Machines.StrummedMpe do
         sample_start_tick,
         note_stagger_ticks,
         chord_end_tick,
-        sample_context
+        sample_context,
+        params
       )
 
     duration_ticks =
       notes |> Enum.map(&(&1.delay_ticks + &1.milestones.total_ticks)) |> Enum.max()
 
     duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-    granularity_ms = SampleContext.ticks_to_ms(sample_context, @ticks_per_frame)
+    granularity_ms = SampleContext.ticks_to_ms(sample_context, frame_ticks)
 
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(notes, duration_ticks, sample_context)
+      music: build_music(notes, duration_ticks, sample_context, frame_ticks)
     }
   end
 
@@ -90,7 +94,8 @@ defmodule Mensch.Machines.StrummedMpe do
          sample_start_tick,
          note_stagger_ticks,
          chord_end_tick,
-         sample_context
+         sample_context,
+         %StrummedMpeParams{} = params
        ) do
     chord_notes = ChordSpec.to_midi_notes(chord_spec)
     note_count = max(length(chord_notes), 1)
@@ -103,14 +108,14 @@ defmodule Mensch.Machines.StrummedMpe do
       note_duration_ticks = max(chord_end_tick - note_start_tick, 0)
       {note_name, octave} = ChordSpec.note_name(note_number)
 
-      milestones = build_milestones(note_duration_ticks, sample_context)
+      milestones = build_milestones(note_duration_ticks, sample_context, params)
 
       %{
         note_name: note_name,
         octave: octave,
         note: note_number,
         channel: nil,
-        velocity: @velocity,
+        velocity: params.velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
         machine_id: id(),
@@ -122,20 +127,35 @@ defmodule Mensch.Machines.StrummedMpe do
     end)
   end
 
-  defp build_milestones(note_duration_ticks, %SampleContext{} = sample_context) do
+  defp build_milestones(
+         note_duration_ticks,
+         %SampleContext{} = sample_context,
+         %StrummedMpeParams{} = params
+       ) do
+    attack_end_ticks = SampleContext.mbeats_to_ticks(sample_context, params.attack_mbeats)
+
+    decay_end_ticks =
+      attack_end_ticks + SampleContext.mbeats_to_ticks(sample_context, params.decay_mbeats)
+
+    release_start_ticks =
+      max(
+        note_duration_ticks - SampleContext.mbeats_to_ticks(sample_context, params.release_mbeats),
+        0
+      )
+
     note_duration_ms = SampleContext.ticks_to_ms(sample_context, note_duration_ticks)
 
     %{
-      attack_end_ms: @attack_ms,
-      decay_end_ms: @attack_ms + @decay_ms,
-      release_start_ms: max(note_duration_ms - @release_ms, 0),
+      attack_end_ms: SampleContext.ticks_to_ms(sample_context, attack_end_ticks),
+      decay_end_ms: SampleContext.ticks_to_ms(sample_context, decay_end_ticks),
+      release_start_ms: SampleContext.ticks_to_ms(sample_context, release_start_ticks),
       total_ms: note_duration_ms,
       total_ticks: note_duration_ticks
     }
   end
 
-  defp build_music(notes, duration_ticks, sample_context) do
-    for at_tick <- 0..duration_ticks//@ticks_per_frame do
+  defp build_music(notes, duration_ticks, sample_context, frame_ticks) do
+    for at_tick <- 0..duration_ticks//frame_ticks do
       at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
 
       %{
@@ -143,6 +163,20 @@ defmodule Mensch.Machines.StrummedMpe do
         at_tick: at_tick,
         notes: Enum.map(notes, &note_frame(&1, at_tick, sample_context))
       }
+    end
+  end
+
+  defp machine_params!(opts) do
+    case Keyword.fetch(opts, :machine_params) do
+      {:ok, %StrummedMpeParams{} = params} ->
+        params
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "expected #{inspect(StrummedMpeParams)} in :machine_params, got #{inspect(other)}"
+
+      :error ->
+        raise ArgumentError, "missing :machine_params for #{inspect(__MODULE__)}"
     end
   end
 
@@ -192,5 +226,27 @@ defmodule Mensch.Machines.StrummedMpe do
   end
 
   defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
+
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
+end
+
+defimpl Mensch.Machine, for: Mensch.Machines.StrummedMpe do
+  alias Mensch.Machines.StrummedMpe
+
+  def id(_machine), do: StrummedMpe.id()
+
+  def controls(%StrummedMpe{params: params}) do
+    %{
+      note_stagger_mbeats: params.note_stagger_mbeats
+    }
+  end
+
+  def render(%StrummedMpe{params: params}, chord_spec, sample_context, timeline_context, opts) do
+    StrummedMpe.render(
+      chord_spec,
+      sample_context,
+      timeline_context,
+      Keyword.put(opts, :machine_params, params)
+    )
+  end
 end

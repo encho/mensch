@@ -9,46 +9,60 @@ defmodule Mensch.Machines.PulseRoot do
   on the beat tick even when the base frame grid is off-phase.
   """
 
-  @behaviour Mensch.Machine
-
   alias Mensch.ChordSpec
+  alias Mensch.Machines.PulseRootParams
   alias Mensch.Performance
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
-  @ticks_per_frame 6
-  @velocity 100
+  @type t :: %__MODULE__{params: PulseRootParams.t()}
 
-  @base_pressure 30
-  @peak_pressure 95
-  @pulse_width_ms 60
+  @enforce_keys [:params]
+  defstruct [:params]
 
-  @impl true
   def id, do: :pulse_root
 
-  @impl true
+  def params_module, do: PulseRootParams
+
+  def default_params, do: PulseRootParams.default()
+
+  @spec new(PulseRootParams.t()) :: t()
+  def new(%PulseRootParams{} = params), do: %__MODULE__{params: params}
+
+  @spec new() :: t()
+  def new, do: %__MODULE__{params: default_params()}
+
   def controls do
+    params = default_params()
+
     %{
-      ticks_per_frame: @ticks_per_frame,
-      base_pressure: @base_pressure,
-      peak_pressure: @peak_pressure,
-      pulse_width_ms: @pulse_width_ms
+      base_pressure: params.base_pressure,
+      peak_pressure: params.peak_pressure,
+      pulse_width_mbeats: params.pulse_width_mbeats
     }
   end
 
-  @impl true
   def render(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
         opts \\ []
       ) do
-    duration_ticks = snap_ticks(timeline_context.duration_ticks, @ticks_per_frame)
+    %PulseRootParams{} = params = machine_params!(opts)
+
+    frame_ticks = SampleContext.frame_ticks(sample_context)
+
+    pulse_width_ticks =
+      params.pulse_width_mbeats
+      |> then(&SampleContext.mbeats_to_ticks(sample_context, &1))
+      |> max(1)
+
+    duration_ticks = snap_ticks(timeline_context.duration_ticks, frame_ticks)
 
     sample_start_tick =
       timeline_context
       |> TimelineContext.start_tick(sample_context)
-      |> snap_ticks(@ticks_per_frame)
+      |> snap_ticks(frame_ticks)
 
     entry_start_tick_abs = Keyword.get(opts, :entry_start_tick_abs, sample_start_tick)
 
@@ -63,30 +77,33 @@ defmodule Mensch.Machines.PulseRoot do
       octave: octave,
       note: root_note,
       channel: nil,
-      velocity: @velocity,
+      velocity: params.velocity,
       machine_id: id(),
       chord_instance_id: 0,
       event_index: 0,
       delay_ticks: sample_start_tick,
       total_ticks: duration_ticks,
       entry_start_tick_abs: entry_start_tick_abs,
-      ticks_per_beat: ticks_per_beat
+      ticks_per_beat: ticks_per_beat,
+      pulse_width_ticks: pulse_width_ticks,
+      base_pressure: params.base_pressure,
+      peak_pressure: params.peak_pressure
     }
 
     duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-    granularity_ms = SampleContext.ticks_to_ms(sample_context, @ticks_per_frame)
+    granularity_ms = SampleContext.ticks_to_ms(sample_context, frame_ticks)
 
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(note, duration_ticks, sample_context)
+      music: build_music(note, duration_ticks, sample_context, frame_ticks)
     }
   end
 
-  defp build_music(note, duration_ticks, sample_context) do
-    for at_tick <- timeline_ticks(note, duration_ticks) do
+  defp build_music(note, duration_ticks, sample_context, frame_ticks) do
+    for at_tick <- timeline_ticks(note, duration_ticks, frame_ticks) do
       at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
 
       %{
@@ -116,10 +133,18 @@ defmodule Mensch.Machines.PulseRoot do
     }
   end
 
-  defp note_frame(note, at_tick, sample_context) do
+  defp note_frame(note, at_tick, _sample_context) do
     local_elapsed_ticks = at_tick - note.delay_ticks
     absolute_tick = note.entry_start_tick_abs + at_tick
-    pressure = beat_pulse_pressure(absolute_tick, note.ticks_per_beat, sample_context)
+
+    pressure =
+      beat_pulse_pressure(
+        absolute_tick,
+        note.ticks_per_beat,
+        note.pulse_width_ticks,
+        note.base_pressure,
+        note.peak_pressure
+      )
 
     %{
       note_name: note.note_name,
@@ -139,29 +164,41 @@ defmodule Mensch.Machines.PulseRoot do
     }
   end
 
-  defp beat_pulse_pressure(absolute_tick, ticks_per_beat, sample_context)
-       when ticks_per_beat > 0 do
+  defp beat_pulse_pressure(
+         absolute_tick,
+         ticks_per_beat,
+         pulse_width_ticks,
+         base_pressure,
+         peak_pressure
+       )
+       when ticks_per_beat > 0 and pulse_width_ticks > 0 do
     phase_ticks = rem(absolute_tick, ticks_per_beat)
-    phase_ms = SampleContext.ticks_to_ms(sample_context, phase_ticks)
 
     cond do
       phase_ticks == 0 ->
-        @peak_pressure
+        peak_pressure
 
-      phase_ms < @pulse_width_ms ->
-        progress = phase_ms / @pulse_width_ms
-        interpolate(@peak_pressure, @base_pressure, progress)
+      phase_ticks < pulse_width_ticks ->
+        progress = phase_ticks / pulse_width_ticks
+        interpolate(peak_pressure, base_pressure, progress)
 
       true ->
-        @base_pressure
+        base_pressure
     end
     |> clamp_7bit()
   end
 
-  defp beat_pulse_pressure(_absolute_tick, _ticks_per_beat, _sample_context), do: @base_pressure
+  defp beat_pulse_pressure(
+         _absolute_tick,
+         _ticks_per_beat,
+         _pulse_width_ticks,
+         base_pressure,
+         _peak_pressure
+       ),
+       do: base_pressure
 
-  defp timeline_ticks(note, duration_ticks) do
-    base_ticks = Enum.to_list(0..duration_ticks//@ticks_per_frame)
+  defp timeline_ticks(note, duration_ticks, frame_ticks) do
+    base_ticks = Enum.to_list(0..duration_ticks//frame_ticks)
     beat_ticks = beat_ticks_within(note.entry_start_tick_abs, note.ticks_per_beat, duration_ticks)
 
     (base_ticks ++ beat_ticks)
@@ -179,6 +216,20 @@ defmodule Mensch.Machines.PulseRoot do
 
     first_beat_local_tick..duration_ticks//ticks_per_beat
     |> Enum.to_list()
+  end
+
+  defp machine_params!(opts) do
+    case Keyword.fetch(opts, :machine_params) do
+      {:ok, %PulseRootParams{} = params} ->
+        params
+
+      {:ok, other} ->
+        raise ArgumentError,
+              "expected #{inspect(PulseRootParams)} in :machine_params, got #{inspect(other)}"
+
+      :error ->
+        raise ArgumentError, "missing :machine_params for #{inspect(__MODULE__)}"
+    end
   end
 
   defp interpolate(from, to, progress) do
@@ -206,5 +257,29 @@ defmodule Mensch.Machines.PulseRoot do
   end
 
   defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
+
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
+end
+
+defimpl Mensch.Machine, for: Mensch.Machines.PulseRoot do
+  alias Mensch.Machines.PulseRoot
+
+  def id(_machine), do: PulseRoot.id()
+
+  def controls(%PulseRoot{params: params}) do
+    %{
+      base_pressure: params.base_pressure,
+      peak_pressure: params.peak_pressure,
+      pulse_width_mbeats: params.pulse_width_mbeats
+    }
+  end
+
+  def render(%PulseRoot{params: params}, chord_spec, sample_context, timeline_context, opts) do
+    PulseRoot.render(
+      chord_spec,
+      sample_context,
+      timeline_context,
+      Keyword.put(opts, :machine_params, params)
+    )
+  end
 end

@@ -1,23 +1,23 @@
-defmodule Mensch.Machine do
+defprotocol Mensch.Machine do
   @moduledoc """
-  Behavior for algorithmic chord performers ("machines").
+  Polymorphic machine interface over machine structs.
 
-  A machine turns:
-
-    * `Mensch.ChordSpec` (harmonic intent)
-    * `Mensch.SampleContext` (global timing, bpm/ppq/signature)
-    * `Mensch.TimelineContext` (where/for how long on the sample grid)
-
-  into a precomputed `%Mensch.Performance{}` timeline.
+  Each machine instance carries its typed params in its struct. Rendering is
+  dispatched through this protocol.
   """
 
-  alias Mensch.ChordSpec
-  alias Mensch.Performance
-  alias Mensch.SampleContext
-  alias Mensch.TimelineContext
+  @spec id(t()) :: atom()
+  def id(machine)
 
-  @callback id() :: atom()
-  @callback controls() :: map()
-  @callback render(ChordSpec.t(), SampleContext.t(), TimelineContext.t(), keyword()) ::
-              Performance.t()
+  @spec controls(t()) :: map()
+  def controls(machine)
+
+  @spec render(
+          t(),
+          Mensch.ChordSpec.t(),
+          Mensch.SampleContext.t(),
+          Mensch.TimelineContext.t(),
+          keyword()
+        ) :: Mensch.Performance.t()
+  def render(machine, chord_spec, sample_context, timeline_context, opts)
 end
