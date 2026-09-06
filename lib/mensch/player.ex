@@ -81,9 +81,8 @@ defmodule Mensch.Player do
     active =
       Enum.reduce(notes, state.active, fn note, active ->
         note_id = {note.channel, note.note}
-        currently_active? = MapSet.member?(active, note_id)
 
-        send_frame(note, currently_active?)
+        send_frame(note)
 
         active
         |> maybe_add_active(note_id, note.note_on)
@@ -102,12 +101,15 @@ defmodule Mensch.Player do
 
   def handle_info({:done, _ref}, state), do: {:noreply, state}
 
-  defp send_frame(note, currently_active?) do
+  defp send_frame(note) do
     if note.note_on do
       Connection.send_message(<<0x90 + note.channel, note.note, note.velocity>>)
     end
 
-    if note.note_on or currently_active? do
+    # Drive channel expression from machine phase data directly. This
+    # keeps sustained overlap notes emitting pressure/bend/slide even if
+    # active bookkeeping gets out of sync.
+    if note.phase != :pending and not note.note_off do
       Connection.send_message(<<0xD0 + note.channel, note.pressure>>)
 
       bend = (8192 + note.bend * 8192) |> round() |> max(0) |> min(16_383)

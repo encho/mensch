@@ -44,9 +44,7 @@ defmodule MenschWeb.HomeLive do
 
   @impl true
   def handle_event("view_full_song", _params, socket) do
-    entries = socket.assigns.song_entries
-    song_context = socket.assigns.song_context
-    render_data = Render.generate_song(entries, song_context)
+    render_data = full_song_render_data(socket)
 
     {:noreply,
      socket
@@ -57,9 +55,7 @@ defmodule MenschWeb.HomeLive do
   end
 
   def handle_event("play_full_song", _params, socket) do
-    entries = socket.assigns.song_entries
-    song_context = socket.assigns.song_context
-    render_data = Render.generate_song(entries, song_context)
+    render_data = full_song_render_data(socket)
 
     {:noreply,
      socket
@@ -77,8 +73,8 @@ defmodule MenschWeb.HomeLive do
     case Integer.parse(index_str) do
       {index, ""} ->
         case Enum.at(socket.assigns.song_entries, index) do
-          %{chord_spec: %ChordSpec{} = chord_spec} = entry ->
-            render_data = entry_render_data(entry, socket.assigns.song_context)
+          %{chord_spec: %ChordSpec{} = chord_spec} ->
+            render_data = entry_render_data(socket, index)
 
             {:noreply,
              socket
@@ -100,8 +96,8 @@ defmodule MenschWeb.HomeLive do
     case Integer.parse(index_str) do
       {index, ""} ->
         case Enum.at(socket.assigns.song_entries, index) do
-          %{chord_spec: %ChordSpec{}} = entry ->
-            render_data = entry_render_data(entry, socket.assigns.song_context)
+          %{chord_spec: %ChordSpec{}} ->
+            render_data = entry_render_data(socket, index)
 
             {:noreply,
              socket
@@ -858,21 +854,51 @@ defmodule MenschWeb.HomeLive do
     "#{duration_ticks} ticks"
   end
 
-  defp entry_render_data(
-         %{
-           chord_spec: %ChordSpec{} = chord_spec,
-           timeline_context: %TimelineContext{} = timeline_context
-         } = entry,
-         %SongContext{} = song_context
-       ) do
-    local_timeline_context = %TimelineContext{
-      start_beat: BeatPosition.new(0, 0, 0),
-      duration_ticks: timeline_context.duration_ticks
-    }
+  defp full_song_render_data(socket) do
+    Render.generate_song(socket.assigns.song_entries, socket.assigns.song_context)
+  end
 
-    machine_module = Map.get(entry, :machine_module, Mensch.Machines.StrummedMpe)
+  defp entry_render_data(socket, entry_index) when is_integer(entry_index) do
+    case Enum.at(socket.assigns.song_entries, entry_index) do
+      %{timeline_context: %TimelineContext{} = timeline_context} ->
+        song_context = socket.assigns.song_context
+        song_render_data = full_song_render_data(socket)
 
-    Render.generate(chord_spec, song_context, local_timeline_context, machine_module)
+        start_tick = SongContext.position_to_tick(song_context, timeline_context.start_beat)
+        end_tick = start_tick + timeline_context.duration_ticks
+
+        scoped_music =
+          song_render_data.music
+          |> Enum.map(fn frame ->
+            notes =
+              Enum.filter(frame.notes, fn note ->
+                Map.get(note, :song_entry_index) == entry_index
+              end)
+
+            {frame, notes}
+          end)
+          |> Enum.filter(fn {frame, notes} ->
+            frame.at_tick >= start_tick and frame.at_tick <= end_tick and notes != []
+          end)
+          |> Enum.map(fn {frame, notes} ->
+            local_tick = frame.at_tick - start_tick
+
+            %{
+              at_tick: local_tick,
+              at_ms: SongContext.ticks_to_ms(song_context, local_tick),
+              notes: notes
+            }
+          end)
+
+        %{
+          song_render_data
+          | duration_ms: SongContext.ticks_to_ms(song_context, timeline_context.duration_ticks),
+            music: scoped_music
+        }
+
+      _ ->
+        nil
+    end
   end
 
   defp local_timeline_start_label do

@@ -46,9 +46,9 @@ defmodule Mensch.Machines.StrummedMpe do
         %ChordSpec{} = chord_spec,
         %SongContext{} = song_context,
         %TimelineContext{} = timeline_context,
-        _opts \\ []
+        opts \\ []
       ) do
-    channels = Connection.member_channels()
+    channels = Keyword.get(opts, :channels, Connection.member_channels())
 
     note_stagger_ticks =
       @note_stagger_ms
@@ -114,7 +114,7 @@ defmodule Mensch.Machines.StrummedMpe do
         note_name: note_name,
         octave: octave,
         note: note_number,
-        channel: Enum.at(channels, note_index),
+        channel: pick_channel(channels, note_index),
         velocity: @velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
@@ -125,6 +125,13 @@ defmodule Mensch.Machines.StrummedMpe do
         milestones: milestones
       }
     end)
+  end
+
+  defp pick_channel([], _note_index), do: 1
+
+  defp pick_channel(channels, note_index) do
+    channel_count = length(channels)
+    Enum.at(channels, rem(note_index, channel_count))
   end
 
   defp build_milestones(note_duration_ticks, %SongContext{} = song_context) do

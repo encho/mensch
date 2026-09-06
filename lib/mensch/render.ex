@@ -11,6 +11,7 @@ defmodule Mensch.Render do
 
   alias Mensch.ChordSpec
   alias Mensch.Machines.StrummedMpe
+  alias Mensch.Midi.Connection
   alias Mensch.Performance
   alias Mensch.SongContext
   alias Mensch.TimelineContext
@@ -35,8 +36,8 @@ defmodule Mensch.Render do
     %{
       chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
       timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 2, beat: 0, tick: 0},
-        duration_ticks: 384
+        start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
+        duration_ticks: 480
       },
       machine_module: StrummedMpe
     },
@@ -65,11 +66,16 @@ defmodule Mensch.Render do
   @doc "Renders and aggregates a full song timeline from entry maps."
   @spec generate_song([map()], SongContext.t()) :: Performance.t()
   def generate_song(entries, %SongContext{} = song_context) when is_list(entries) do
+    channels_by_entry_index = allocate_entry_channels(entries, song_context)
+
     entries
     |> Enum.with_index()
     |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context} = entry,
                     entry_index} ->
       machine_module = Map.get(entry, :machine_module, StrummedMpe)
+
+      machine_channels =
+        Map.get(channels_by_entry_index, entry_index, Connection.member_channels())
 
       entry
       |> render_entry_performance(
@@ -77,10 +83,12 @@ defmodule Mensch.Render do
         timeline_context,
         machine_module,
         song_context,
-        entry_index
+        entry_index,
+        machine_channels
       )
     end)
     |> merge_performances(song_context)
+    |> rechannelize_performance()
   end
 
   @doc "Returns the default song entries for UI/debug display."
@@ -129,7 +137,8 @@ defmodule Mensch.Render do
          %TimelineContext{} = timeline_context,
          machine_module,
          %SongContext{} = song_context,
-         entry_index
+         entry_index,
+         machine_channels
        )
        when is_atom(machine_module) and is_integer(entry_index) do
     local_timeline_context = %TimelineContext{
@@ -139,7 +148,7 @@ defmodule Mensch.Render do
 
     local_performance =
       chord_spec
-      |> machine_module.render(song_context, local_timeline_context)
+      |> machine_module.render(song_context, local_timeline_context, channels: machine_channels)
       |> tag_song_entry_index(entry_index)
 
     start_tick = TimelineContext.start_tick(timeline_context, song_context)
@@ -216,5 +225,138 @@ defmodule Mensch.Render do
       duration_ms: performances |> Enum.map(& &1.duration_ms) |> Enum.max(),
       music: merged_music
     }
+  end
+
+  defp rechannelize_performance(%Performance{} = performance) do
+    channels = Connection.member_channels()
+
+    {music, _state} =
+      Enum.map_reduce(
+        performance.music,
+        %{channel_by_note: %{}, active_by_channel: %{}, channels: channels},
+        fn frame, state ->
+          {notes, next_state} = rechannelize_notes(frame.notes, state)
+          {%{frame | notes: notes}, next_state}
+        end
+      )
+
+    %Performance{performance | music: music}
+  end
+
+  defp rechannelize_notes(notes, state) do
+    Enum.map_reduce(notes, state, fn note, acc ->
+      note_id = logical_note_id(note)
+
+      {channel, acc} =
+        cond do
+          note.note_on and not Map.has_key?(acc.channel_by_note, note_id) ->
+            allocate_note_channel(acc, note_id, note.channel)
+
+          Map.has_key?(acc.channel_by_note, note_id) ->
+            {Map.fetch!(acc.channel_by_note, note_id), acc}
+
+          true ->
+            {note.channel, acc}
+        end
+
+      remapped_note = %{note | channel: channel}
+
+      acc =
+        if note.note_off and Map.get(acc.channel_by_note, note_id) == channel do
+          release_note_channel(acc, note_id, channel)
+        else
+          acc
+        end
+
+      {remapped_note, acc}
+    end)
+  end
+
+  defp allocate_note_channel(state, note_id, original_channel) do
+    channel =
+      Enum.find(state.channels, fn candidate ->
+        not Map.has_key?(state.active_by_channel, candidate)
+      end) ||
+        fallback_channel(state.channels, original_channel)
+
+    next_state =
+      state
+      |> put_in([:channel_by_note, note_id], channel)
+      |> put_in([:active_by_channel, channel], note_id)
+
+    {channel, next_state}
+  end
+
+  defp release_note_channel(state, note_id, channel) do
+    state
+    |> update_in([:channel_by_note], &Map.delete(&1, note_id))
+    |> update_in([:active_by_channel], &Map.delete(&1, channel))
+  end
+
+  defp fallback_channel([], original_channel), do: original_channel
+
+  defp fallback_channel(channels, original_channel) do
+    if original_channel in channels do
+      original_channel
+    else
+      hd(channels)
+    end
+  end
+
+  defp logical_note_id(note) do
+    {
+      Map.get(note, :song_entry_index, -1),
+      Map.get(note, :machine_id, :unknown),
+      Map.get(note, :chord_instance_id, 0),
+      Map.get(note, :event_index, 0),
+      note.note
+    }
+  end
+
+  defp allocate_entry_channels(entries, %SongContext{} = song_context) do
+    channel_pool = Connection.member_channels()
+
+    entries
+    |> Enum.with_index()
+    |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context}, index} ->
+      start_tick = TimelineContext.start_tick(timeline_context, song_context)
+      end_tick = TimelineContext.end_tick(timeline_context, song_context)
+      note_count = chord_spec |> ChordSpec.to_midi_notes() |> length() |> max(1)
+
+      %{index: index, start_tick: start_tick, end_tick: end_tick, note_count: note_count}
+    end)
+    |> Enum.sort_by(fn entry -> {entry.start_tick, entry.index} end)
+    |> Enum.reduce(%{active: [], assigned: %{}}, fn entry, state ->
+      active = Enum.reject(state.active, fn item -> item.end_tick < entry.start_tick end)
+
+      used_channels =
+        active
+        |> Enum.flat_map(& &1.channels)
+        |> MapSet.new()
+
+      free_channels = Enum.reject(channel_pool, &MapSet.member?(used_channels, &1))
+      channels = take_channels(channel_pool, free_channels, entry.note_count)
+
+      %{
+        active: [%{end_tick: entry.end_tick, channels: channels} | active],
+        assigned: Map.put(state.assigned, entry.index, channels)
+      }
+    end)
+    |> Map.fetch!(:assigned)
+  end
+
+  defp take_channels(channel_pool, free_channels, note_count) do
+    if length(free_channels) >= note_count do
+      Enum.take(free_channels, note_count)
+    else
+      spill_count = note_count - length(free_channels)
+
+      reused_channels =
+        channel_pool
+        |> Enum.reject(&(&1 in free_channels))
+        |> Enum.take(spill_count)
+
+      free_channels ++ reused_channels
+    end
   end
 end
