@@ -8,7 +8,7 @@ defmodule Mensch.NoteShape do
   vibrato/breathing `phase` offset (radians), and whether it's the
   chord's `emphasis` (aftertouch) note.
 
-  Used by `Mensch.Render` to sample a note's whole life ahead of time,
+  Used by `Mensch.PerformanceAssembler` to sample a note's whole life ahead of time,
   building a precomputed performance dataset.
   """
 

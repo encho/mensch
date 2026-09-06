@@ -1,6 +1,6 @@
 defmodule Mensch.Player do
   @moduledoc """
-  Plays a precomputed performance (see `Mensch.Render.generate_sample/0`) in
+  Plays a precomputed performance (see `Mensch.PerformanceAssembler.generate_sample/0`) in
   real time by dispatching each frame's MIDI messages to
   `Mensch.Midi.Connection` at the right scheduled offset.
 
@@ -28,7 +28,7 @@ defmodule Mensch.Player do
 
   @doc """
   Starts playing `data` (a `%Mensch.Performance{}` from
-  `Mensch.Render.generate_sample/0`) in real time,
+  `Mensch.PerformanceAssembler.generate_sample/0`) in real time,
   from right now. Stops (silencing) any performance already in
   progress first.
   """

@@ -1,121 +1,29 @@
-defmodule Mensch.Render do
+defmodule Mensch.PerformanceAssembler do
   @moduledoc """
-  Facade that renders a performance via a concrete `Mensch.Machine`.
+  Assembles playable `%Mensch.Performance{}` timelines from sample data.
 
-  Use `generate_sample/0` or `generate_sample/2` to render and aggregate a
-  full multi-entry sample timeline.
+  This module does not own seed/sample data. It consumes sample definitions
+  provided by `Mensch.SampleDb`, renders each entry through its configured
+  machine, aligns entries on the global timeline, merges frames, and performs
+  a final MPE channel allocation pass.
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.Machines.RootModulated
+  alias Mensch.BeatPosition
   alias Mensch.Machines.StrummedMpe
   alias Mensch.Midi.Connection
   alias Mensch.Performance
+  alias Mensch.SampleDb
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
-  alias Mensch.BeatPosition
 
-  @default_sample_context %SampleContext{bpm: 120, time_signature: {4, 4}, ppq: 96}
-  @default_timeline_context %TimelineContext{
-    start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-    duration_ticks: 384
-  }
-
-  @default_sample_entries [
-    %{
-      chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-        duration_ticks: 768
-      },
-      machine_module: StrummedMpe
-    },
-    %{
-      chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
-        duration_ticks: 480
-      },
-      machine_module: StrummedMpe
-    },
-    %{
-      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
-        duration_ticks: 384
-      },
-      machine_module: StrummedMpe
-    }
-  ]
-
-  @default_sample_two_context %SampleContext{bpm: 80, time_signature: {4, 4}, ppq: 96}
-  @default_sample_two_entries [
-    %{
-      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-        duration_ticks: 1536
-      },
-      machine_module: StrummedMpe
-    }
-  ]
-
-  @default_sample_three_context @default_sample_context
-  @default_sample_three_entries [
-    %{
-      chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-        duration_ticks: 768
-      },
-      machine_module: RootModulated
-    },
-    %{
-      chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
-        duration_ticks: 480
-      },
-      machine_module: RootModulated
-    },
-    %{
-      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
-      timeline_context: %TimelineContext{
-        start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
-        duration_ticks: 384
-      },
-      machine_module: RootModulated
-    }
-  ]
-
-  @default_samples [
-    %{
-      id: "sample-1",
-      name: "Sample 1 · Dm7 G7 Cmaj7",
-      sample_context: @default_sample_context,
-      sample_entries: @default_sample_entries
-    },
-    %{
-      id: "sample-2",
-      name: "Sample 2 · Cmaj7 Drone",
-      sample_context: @default_sample_two_context,
-      sample_entries: @default_sample_two_entries
-    },
-    %{
-      id: "sample-3",
-      name: "Sample 3 · Dm7 G7 Cmaj7 Root",
-      sample_context: @default_sample_three_context,
-      sample_entries: @default_sample_three_entries
-    }
-  ]
-
-  @doc "Default multi-entry sample render (aggregated timeline)."
+  @doc "Assembles the default sample-1 entry set from `Mensch.SampleDb`."
   @spec generate_sample() :: Performance.t()
   def generate_sample do
-    generate_sample(@default_sample_entries, @default_sample_context)
+    generate_sample(SampleDb.default_sample_entries(), SampleDb.default_sample_context())
   end
 
-  @doc "Renders and aggregates a full sample timeline from entry maps."
+  @doc "Assembles and aggregates a full sample timeline from entry maps."
   @spec generate_sample([map()], SampleContext.t()) :: Performance.t()
   def generate_sample(entries, %SampleContext{} = sample_context) when is_list(entries) do
     entries
@@ -137,22 +45,26 @@ defmodule Mensch.Render do
     |> rechannelize_performance()
   end
 
-  @doc "Returns the default sample entries for UI/debug display."
+  @doc "Returns sample-1 entries from `Mensch.SampleDb`."
   @spec default_sample_entries() :: [map()]
-  def default_sample_entries, do: @default_sample_entries
+  def default_sample_entries, do: SampleDb.default_sample_entries()
 
-  @doc "Returns the default sample catalog for UI selection."
+  @doc "Returns the full sample catalog from `Mensch.SampleDb`."
   @spec default_samples() :: [map()]
-  def default_samples, do: @default_samples
+  def default_samples, do: SampleDb.default_samples()
 
-  @doc "Returns the default sample context used by `generate_sample/0`."
+  @doc "Returns sample-1 context from `Mensch.SampleDb`."
   @spec default_sample_context() :: SampleContext.t()
-  def default_sample_context, do: @default_sample_context
+  def default_sample_context, do: SampleDb.default_sample_context()
 
-  @doc "Renders the given chord spec using default sample/timeline contexts."
+  @doc "Renders one chord using sample-1 default context and timeline from `Mensch.SampleDb`."
   @spec generate(ChordSpec.t()) :: Performance.t()
   def generate(%ChordSpec{} = chord_spec) do
-    StrummedMpe.render(chord_spec, @default_sample_context, @default_timeline_context)
+    StrummedMpe.render(
+      chord_spec,
+      SampleDb.default_sample_context(),
+      SampleDb.default_timeline_context()
+    )
     |> rechannelize_performance()
   end
 

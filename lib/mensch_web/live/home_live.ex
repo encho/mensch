@@ -1,7 +1,7 @@
 defmodule MenschWeb.HomeLive do
   @moduledoc """
   Minimal UI: RENDER precomputes the full MPE performance for a
-  hardcoded C4 maj7 chord (see `Mensch.Render`), showing its pressure/
+  hardcoded C4 maj7 chord (see `Mensch.PerformanceAssembler`), showing its pressure/
   slide/bend curves as line charts. PLAY then dispatches that
   precomputed data in real time to the connected MIDI output (e.g. an
   Osmose); STOP silences it immediately.
@@ -12,7 +12,8 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
   alias Mensch.Player
-  alias Mensch.Render
+  alias Mensch.PerformanceAssembler
+  alias Mensch.SampleDb
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -21,11 +22,13 @@ defmodule MenschWeb.HomeLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    samples = Render.default_samples()
+    samples = SampleDb.default_samples()
     active_sample_index = 0
     active_sample = Enum.at(samples, active_sample_index, %{})
     sample_entries = Map.get(active_sample, :sample_entries, [])
-    sample_context = Map.get(active_sample, :sample_context, Render.default_sample_context())
+
+    sample_context =
+      Map.get(active_sample, :sample_context, SampleDb.default_sample_context())
 
     socket =
       socket
@@ -997,7 +1000,10 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp full_sample_render_data(socket) do
-    Render.generate_sample(socket.assigns.sample_entries, socket.assigns.sample_context)
+    PerformanceAssembler.generate_sample(
+      socket.assigns.sample_entries,
+      socket.assigns.sample_context
+    )
   end
 
   defp entry_render_data(socket, entry_index) when is_integer(entry_index) do
@@ -1334,7 +1340,7 @@ defmodule MenschWeb.HomeLive do
         for note_number <- max_note..min_note//-1 do
           case Map.get(rows_by_note, note_number) do
             nil ->
-              {note_name, octave} = Render.note_name(note_number)
+              {note_name, octave} = PerformanceAssembler.note_name(note_number)
               %{note: note_number, label: "#{note_name}#{octave}", styles: []}
 
             note_segments ->
