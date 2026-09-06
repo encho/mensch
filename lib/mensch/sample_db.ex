@@ -9,15 +9,11 @@ defmodule Mensch.SampleDb do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.Machines.PulseRoot
   alias Mensch.Machines.RootModulated
   alias Mensch.Machines.StrummedMpe
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
-
-  @default_timeline_context %TimelineContext{
-    start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-    duration_ticks: 384
-  }
 
   @samples [
     %{
@@ -96,6 +92,37 @@ defmodule Mensch.SampleDb do
           machine_module: RootModulated
         }
       ]
+    },
+    %{
+      id: "sample-4",
+      name: "Sample 4 · Dm7 G7 Cmaj7 Pulse Root",
+      sample_context: %SampleContext{bpm: 120, time_signature: {4, 4}, ppq: 96},
+      sample_entries: [
+        %{
+          chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
+            duration_ticks: 768
+          },
+          machine_module: PulseRoot
+        },
+        %{
+          chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 1, beat: 3, tick: 40},
+            duration_ticks: 480
+          },
+          machine_module: PulseRoot
+        },
+        %{
+          chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
+            duration_ticks: 384
+          },
+          machine_module: PulseRoot
+        }
+      ]
     }
   ]
 
@@ -106,10 +133,6 @@ defmodule Mensch.SampleDb do
     |> Enum.at(0, %{})
     |> Map.fetch!(:sample_context)
   end
-
-  @doc "Returns default single-entry timeline context for ad hoc chord rendering."
-  @spec default_timeline_context() :: TimelineContext.t()
-  def default_timeline_context, do: @default_timeline_context
 
   @doc "Returns sample-1 entries."
   @spec default_sample_entries() :: [map()]

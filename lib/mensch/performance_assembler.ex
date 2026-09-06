@@ -53,32 +53,6 @@ defmodule Mensch.PerformanceAssembler do
   @spec default_samples() :: [map()]
   def default_samples, do: SampleDb.default_samples()
 
-  @doc "Returns sample-1 context from `Mensch.SampleDb`."
-  @spec default_sample_context() :: SampleContext.t()
-  def default_sample_context, do: SampleDb.default_sample_context()
-
-  @doc "Renders one chord using sample-1 default context and timeline from `Mensch.SampleDb`."
-  @spec generate(ChordSpec.t()) :: Performance.t()
-  def generate(%ChordSpec{} = chord_spec) do
-    StrummedMpe.render(
-      chord_spec,
-      SampleDb.default_sample_context(),
-      SampleDb.default_timeline_context()
-    )
-    |> rechannelize_performance()
-  end
-
-  @doc "Renders a chord spec with an explicit sample/timeline context via the default machine."
-  @spec generate(ChordSpec.t(), SampleContext.t(), TimelineContext.t()) :: Performance.t()
-  def generate(
-        %ChordSpec{} = chord_spec,
-        %SampleContext{} = sample_context,
-        %TimelineContext{} = timeline_context
-      ) do
-    StrummedMpe.render(chord_spec, sample_context, timeline_context)
-    |> rechannelize_performance()
-  end
-
   @doc "Renders a chord spec via a specific machine module implementing `Mensch.Machine`."
   @spec generate(ChordSpec.t(), SampleContext.t(), TimelineContext.t(), module()) ::
           Performance.t()
@@ -89,7 +63,9 @@ defmodule Mensch.PerformanceAssembler do
         machine_module
       )
       when is_atom(machine_module) do
-    machine_module.render(chord_spec, sample_context, timeline_context)
+    machine_opts = machine_timing_opts(sample_context, timeline_context)
+
+    machine_module.render(chord_spec, sample_context, timeline_context, machine_opts)
     |> rechannelize_performance()
   end
 
@@ -106,18 +82,31 @@ defmodule Mensch.PerformanceAssembler do
          entry_index
        )
        when is_atom(machine_module) and is_integer(entry_index) do
+    start_tick = TimelineContext.start_tick(timeline_context, sample_context)
+
     local_timeline_context = %TimelineContext{
       start_beat: BeatPosition.new(0, 0, 0),
       duration_ticks: timeline_context.duration_ticks
     }
 
+    machine_opts = [
+      entry_start_tick_abs: start_tick,
+      ticks_per_beat: SampleContext.ticks_per_beat(sample_context)
+    ]
+
     local_performance =
       chord_spec
-      |> machine_module.render(sample_context, local_timeline_context)
+      |> machine_module.render(sample_context, local_timeline_context, machine_opts)
       |> tag_sample_entry_index(entry_index)
 
-    start_tick = TimelineContext.start_tick(timeline_context, sample_context)
     shift_performance(local_performance, start_tick, sample_context)
+  end
+
+  defp machine_timing_opts(sample_context, timeline_context) do
+    [
+      entry_start_tick_abs: TimelineContext.start_tick(timeline_context, sample_context),
+      ticks_per_beat: SampleContext.ticks_per_beat(sample_context)
+    ]
   end
 
   defp shift_performance(
