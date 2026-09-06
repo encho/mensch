@@ -19,6 +19,7 @@ defmodule MenschWeb.HomeLive do
 
   @refresh_interval_ms 100
   @chart_colors ["#FF9F1A", "#C96A00", "#2D8C82", "#4E6E8E", "#B3862C", "#8C5A2B"]
+  @inactive_note_color "rgba(122, 133, 150, 0.32)"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -45,6 +46,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:view_title, nil)
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
+      |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
 
     {:ok, socket}
@@ -59,6 +61,7 @@ defmodule MenschWeb.HomeLive do
      |> assign(:render_data, render_data)
      |> assign(:view_title, "Full Sample")
      |> assign(:render_scope, :full_sample)
+     |> assign(:selected_note_key, nil)
      |> assign(:view_modal_open, true)}
   end
 
@@ -69,6 +72,7 @@ defmodule MenschWeb.HomeLive do
      socket
      |> assign(:render_data, render_data)
      |> assign(:render_scope, :full_sample)
+     |> assign(:selected_note_key, nil)
      |> assign(:manual_stop, false)
      |> start_playback(render_data)}
   end
@@ -96,6 +100,7 @@ defmodule MenschWeb.HomeLive do
              |> assign(:player_status, Player.status())
              |> assign(:play_started_at, nil)
              |> assign(:playhead_pct, nil)
+             |> assign(:selected_note_key, nil)
              |> assign(:manual_stop, true)}
 
           _ ->
@@ -119,6 +124,7 @@ defmodule MenschWeb.HomeLive do
              |> assign(:render_data, render_data)
              |> assign(:view_title, chord_label(chord_spec))
              |> assign(:render_scope, {:entry, index})
+             |> assign(:selected_note_key, nil)
              |> assign(:view_modal_open, true)}
 
           _ ->
@@ -141,6 +147,7 @@ defmodule MenschWeb.HomeLive do
              socket
              |> assign(:render_data, render_data)
              |> assign(:render_scope, {:entry, index})
+             |> assign(:selected_note_key, nil)
              |> assign(:manual_stop, false)
              |> start_playback(render_data)}
 
@@ -154,7 +161,32 @@ defmodule MenschWeb.HomeLive do
   end
 
   def handle_event("close_view", _params, socket) do
-    {:noreply, assign(socket, :view_modal_open, false)}
+    {:noreply, socket |> assign(:view_modal_open, false) |> assign(:selected_note_key, nil)}
+  end
+
+  def handle_event("toggle_note_focus", params, socket) do
+    note_str = Map.get(params, "note", "")
+    channel_str = Map.get(params, "channel", "")
+
+    with {note, ""} <- Integer.parse(to_string(note_str)),
+         {channel, ""} <- Integer.parse(to_string(channel_str)) do
+      selected_note_key = {channel, note}
+
+      next_selected =
+        if socket.assigns.selected_note_key == selected_note_key do
+          nil
+        else
+          selected_note_key
+        end
+
+      {:noreply, assign(socket, :selected_note_key, next_selected)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("clear_note_focus", _params, socket) do
+    {:noreply, assign(socket, :selected_note_key, nil)}
   end
 
   def handle_event("play", _params, %{assigns: %{render_data: nil}} = socket) do
@@ -237,6 +269,7 @@ defmodule MenschWeb.HomeLive do
               :pressure,
               {0, 127},
               assigns.render_scope,
+              assigns.selected_note_key,
               assigns.sample_context,
               detail_total_ticks
             )
@@ -248,6 +281,7 @@ defmodule MenschWeb.HomeLive do
               :slide,
               {0, 127},
               assigns.render_scope,
+              assigns.selected_note_key,
               assigns.sample_context,
               detail_total_ticks
             )
@@ -259,6 +293,7 @@ defmodule MenschWeb.HomeLive do
               :bend,
               value_range(music),
               assigns.render_scope,
+              assigns.selected_note_key,
               assigns.sample_context,
               detail_total_ticks
             )
@@ -269,6 +304,7 @@ defmodule MenschWeb.HomeLive do
             build_note_matrix(
               music,
               assigns.render_scope,
+              assigns.selected_note_key,
               assigns.sample_context,
               detail_total_ticks
             )
@@ -567,8 +603,19 @@ defmodule MenschWeb.HomeLive do
           </div>
 
           <div id="note-matrix" class="border border-zinc-700/60">
-            <div class="border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
-              Note matrix
+            <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5">
+              <div class="text-[11px] uppercase tracking-wide text-zinc-400">Note matrix</div>
+              <div class="flex items-center gap-3 font-mono text-[10px] text-zinc-500">
+                <span>Focus: {selected_note_label(@selected_note_key)}</span>
+                <button
+                  :if={not is_nil(@selected_note_key)}
+                  type="button"
+                  phx-click="clear_note_focus"
+                  class="border border-zinc-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
             <div class="relative py-2">
               <div
@@ -602,15 +649,24 @@ defmodule MenschWeb.HomeLive do
                   rem(index, 2) == 0 && "bg-zinc-900/70"
                 ]}
               >
-                <div
-                  :for={style <- row.styles}
-                  class="absolute inset-y-0"
-                  style={style}
-                >
-                </div>
+                <button
+                  :for={segment <- Map.get(row, :segments, [])}
+                  type="button"
+                  phx-click="toggle_note_focus"
+                  phx-value-note={segment.note}
+                  phx-value-channel={segment.channel}
+                  class={[
+                    "absolute inset-y-0 z-20 cursor-pointer transition-opacity duration-150",
+                    segment.active && "opacity-100",
+                    !segment.active && "opacity-70"
+                  ]}
+                  style={segment.style}
+                ></button>
                 <span class={[
                   "relative z-10 px-1 font-mono text-[5px] uppercase",
-                  (Enum.empty?(row.styles) && "text-zinc-600") || "text-zinc-200"
+                  (Enum.empty?(Map.get(row, :segments, [])) && "text-zinc-600") ||
+                    (Map.get(row, :has_active_segment, false) && "text-zinc-200") ||
+                    "text-zinc-500"
                 ]}>
                   {row.label}
                 </span>
@@ -1255,10 +1311,11 @@ defmodule MenschWeb.HomeLive do
          value_key,
          {min_v, max_v},
          render_scope,
+         selected_note_key,
          %SampleContext{} = sample_context,
          total_ticks
        ) do
-    colors = note_color_map(music, render_scope)
+    colors = note_color_map(music, render_scope, selected_note_key)
     total_ticks = max(total_ticks, 1)
 
     music
@@ -1280,15 +1337,28 @@ defmodule MenschWeb.HomeLive do
         points: chart_points(points, min_v, max_v)
       }
     end)
-    |> Enum.sort_by(& &1.channel)
+    |> Enum.sort_by(&chart_series_sort_key(&1, selected_note_key))
+  end
+
+  defp chart_series_sort_key(series, selected_note_key) do
+    is_selected =
+      not is_nil(selected_note_key) and {series.channel, series.note} == selected_note_key
+
+    {is_selected, series.channel, series.note}
   end
 
   # A piano-roll style matrix: one row per semitone between the lowest
   # and highest sounding note (highest pitch on top), so vertical
   # spacing matches real chromatic distance. A row may contain multiple
   # bars (same pitch reused later by another chord/channel).
-  defp build_note_matrix(music, render_scope, %SampleContext{} = sample_context, total_ticks) do
-    colors = note_color_map(music, render_scope)
+  defp build_note_matrix(
+         music,
+         render_scope,
+         selected_note_key,
+         %SampleContext{} = sample_context,
+         total_ticks
+       ) do
+    colors = note_color_map(music, render_scope, selected_note_key)
     total_ticks = max(total_ticks, 1)
 
     segments =
@@ -1316,8 +1386,10 @@ defmodule MenschWeb.HomeLive do
 
           [
             %{
+              channel: channel,
               note: note_number,
               label: "#{sample.note_name}#{sample.octave}",
+              active: note_selected?({channel, note_number}, selected_note_key),
               style: style
             }
           ]
@@ -1341,12 +1413,34 @@ defmodule MenschWeb.HomeLive do
           case Map.get(rows_by_note, note_number) do
             nil ->
               {note_name, octave} = PerformanceAssembler.note_name(note_number)
-              %{note: note_number, label: "#{note_name}#{octave}", styles: []}
+
+              %{
+                note: note_number,
+                label: "#{note_name}#{octave}",
+                segments: [],
+                has_active_segment: false
+              }
 
             note_segments ->
               label = note_segments |> hd() |> Map.fetch!(:label)
-              styles = note_segments |> Enum.map(& &1.style)
-              %{note: note_number, label: label, styles: styles}
+
+              segments =
+                note_segments
+                |> Enum.map(fn segment ->
+                  %{
+                    style: segment.style,
+                    channel: segment.channel,
+                    note: segment.note,
+                    active: segment.active
+                  }
+                end)
+
+              %{
+                note: note_number,
+                label: label,
+                segments: segments,
+                has_active_segment: Enum.any?(segments, & &1.active)
+              }
           end
         end
     end
@@ -1355,7 +1449,15 @@ defmodule MenschWeb.HomeLive do
   # Assigns each distinct `{channel, note}` a stable color (ordered by
   # channel) shared by both the line charts and the note matrix, so the
   # same note always reads as the same color across visualizations.
-  defp note_color_map(music, {:entry, entry_index}) when is_integer(entry_index) do
+  defp note_color_map(music, render_scope, selected_note_key) do
+    music
+    |> base_note_color_map(render_scope)
+    |> Map.new(fn {note_key, color} ->
+      {note_key, focus_color(note_key, color, selected_note_key)}
+    end)
+  end
+
+  defp base_note_color_map(music, {:entry, entry_index}) when is_integer(entry_index) do
     base_color = timeline_color(entry_index)
     events = music |> distinct_note_events() |> sort_voice_events()
     total = length(events)
@@ -1367,7 +1469,7 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp note_color_map(music, :full_sample) do
+  defp base_note_color_map(music, :full_sample) do
     music
     |> distinct_note_events()
     |> Enum.group_by(&Map.get(&1, :sample_entry_index, 0))
@@ -1388,7 +1490,7 @@ defmodule MenschWeb.HomeLive do
     |> Map.new()
   end
 
-  defp note_color_map(music, _render_scope) do
+  defp base_note_color_map(music, _render_scope) do
     music
     |> Enum.flat_map(& &1.notes)
     |> Enum.uniq_by(&{&1.channel, &1.note})
@@ -1397,6 +1499,30 @@ defmodule MenschWeb.HomeLive do
     |> Map.new(fn {%{channel: channel, note: note}, index} ->
       {{channel, note}, Enum.at(@chart_colors, rem(index, length(@chart_colors)))}
     end)
+  end
+
+  defp note_selected?(_note_key, nil), do: true
+  defp note_selected?(note_key, selected_note_key), do: note_key == selected_note_key
+
+  defp focus_color(_note_key, color, nil), do: color
+
+  defp focus_color(note_key, color, selected_note_key) when note_key == selected_note_key,
+    do: color
+
+  defp focus_color(_note_key, _color, _selected_note_key), do: @inactive_note_color
+
+  defp selected_note_label(nil), do: "all"
+
+  defp selected_note_label({channel, note_number}) do
+    {note_name, octave} = PerformanceAssembler.note_name(note_number)
+
+    pretty_note_name =
+      note_name
+      |> Atom.to_string()
+      |> String.replace("_sharp", "#")
+      |> String.upcase()
+
+    "#{pretty_note_name}#{octave} · ch #{channel}"
   end
 
   defp distinct_note_events(music) do
