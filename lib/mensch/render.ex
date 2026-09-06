@@ -7,6 +7,7 @@ defmodule Mensch.Render do
   """
 
   alias Mensch.ChordSpec
+  alias Mensch.Machines.RootModulated
   alias Mensch.Machines.StrummedMpe
   alias Mensch.Midi.Connection
   alias Mensch.Performance
@@ -59,6 +60,34 @@ defmodule Mensch.Render do
     }
   ]
 
+  @default_sample_three_context @default_sample_context
+  @default_sample_three_entries [
+    %{
+      chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
+      timeline_context: %TimelineContext{
+        start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
+        duration_ticks: 768
+      },
+      machine_module: RootModulated
+    },
+    %{
+      chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
+      timeline_context: %TimelineContext{
+        start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
+        duration_ticks: 480
+      },
+      machine_module: RootModulated
+    },
+    %{
+      chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
+      timeline_context: %TimelineContext{
+        start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
+        duration_ticks: 384
+      },
+      machine_module: RootModulated
+    }
+  ]
+
   @default_samples [
     %{
       id: "sample-1",
@@ -71,6 +100,12 @@ defmodule Mensch.Render do
       name: "Sample 2 · Cmaj7 Drone",
       sample_context: @default_sample_two_context,
       sample_entries: @default_sample_two_entries
+    },
+    %{
+      id: "sample-3",
+      name: "Sample 3 · Dm7 G7 Cmaj7 Root",
+      sample_context: @default_sample_three_context,
+      sample_entries: @default_sample_three_entries
     }
   ]
 
