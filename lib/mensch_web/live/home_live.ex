@@ -322,6 +322,27 @@ defmodule MenschWeb.HomeLive do
           </div>
 
           <div class="flex items-center justify-end gap-2">
+            <.link
+              id="download-mpe-midi"
+              href={~p"/exports/sample/#{@active_sample_index}/mpe.mid"}
+              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+            >
+              Download MPE MIDI
+            </.link>
+            <.link
+              id="download-bitwig-mpe-midi"
+              href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
+              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+            >
+              Download Bitwig MPE MIDI
+            </.link>
+            <.link
+              id="download-mpe-report"
+              href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
+              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+            >
+              Export Event Report
+            </.link>
             <button
               type="button"
               id="toggle-loop-full-sample"

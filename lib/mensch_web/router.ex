@@ -18,6 +18,9 @@ defmodule MenschWeb.Router do
     pipe_through :browser
 
     live "/", HomeLive
+    get "/exports/sample/:index/mpe.mid", ExportController, :mpe_midi
+    get "/exports/sample/:index/bitwig-mpe.mid", ExportController, :bitwig_mpe_midi
+    get "/exports/sample/:index/mpe-events.txt", ExportController, :mpe_report
   end
 
   # Other scopes may use custom stacks.
