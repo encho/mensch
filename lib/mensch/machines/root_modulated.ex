@@ -6,9 +6,9 @@ defmodule Mensch.Machines.RootModulated do
 
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
+  alias Mensch.Machine.RenderedEntry
   alias Mensch.Machines.RootModulatedParams
   alias Mensch.NoteShape
-  alias Mensch.Performance
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -73,15 +73,9 @@ defmodule Mensch.Machines.RootModulated do
       adsr: adsr
     }
 
-    duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
-    granularity_ms = SampleContext.mbeats_to_ms(sample_context, frame_mbeats)
-
-    %Performance{
-      bpm: sample_context.bpm,
-      time_signature: sample_context.time_signature,
-      granularity_ms: granularity_ms,
-      duration_ms: duration_ms,
-      music: build_music(note, duration_mbeats, sample_context, frame_mbeats)
+    %RenderedEntry{
+      duration_mbeats: duration_mbeats,
+      music: build_music(note, duration_mbeats, frame_mbeats, sample_context)
     }
   end
 
@@ -97,12 +91,9 @@ defmodule Mensch.Machines.RootModulated do
     })
   end
 
-  defp build_music(note, duration_mbeats, sample_context, frame_mbeats) do
+  defp build_music(note, duration_mbeats, frame_mbeats, sample_context) do
     for at_mbeat <- 0..duration_mbeats//frame_mbeats do
-      at_ms = SampleContext.mbeats_to_ms(sample_context, at_mbeat)
-
       %{
-        at_ms: at_ms,
         at_mbeat: at_mbeat,
         notes: [note_frame(note, at_mbeat, sample_context)]
       }

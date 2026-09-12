@@ -11,6 +11,7 @@ defmodule Mensch.PerformanceAssembler do
   alias Mensch.ChordSpec
   alias Mensch.BeatPosition
   alias Mensch.Machine
+  alias Mensch.Machine.RenderedEntry
   alias Mensch.Midi.Connection
   alias Mensch.Performance
   alias Mensch.SampleDb
@@ -35,7 +36,7 @@ defmodule Mensch.PerformanceAssembler do
       machine = Map.fetch!(entry, :machine)
 
       entry
-      |> render_entry_performance(
+      |> render_entry(
         chord_spec,
         timeline_context,
         machine,
@@ -43,7 +44,7 @@ defmodule Mensch.PerformanceAssembler do
         entry_index
       )
     end)
-    |> merge_performances(sample_context)
+    |> build_global_performance(sample_context)
     |> rechannelize_performance()
   end
 
@@ -65,9 +66,19 @@ defmodule Mensch.PerformanceAssembler do
         machine
       ) do
     sample_context = SampleContext.validate!(sample_context)
-    machine_opts = machine_timing_opts(sample_context, timeline_context)
+    start_mbeat = TimelineContext.start_mbeat(timeline_context, sample_context)
 
-    Machine.render(machine, chord_spec, sample_context, timeline_context, machine_opts)
+    local_timeline_context = %TimelineContext{
+      start_beat: BeatPosition.new(0, 0, 0),
+      duration_mbeats: timeline_context.duration_mbeats
+    }
+
+    machine_opts = [entry_start_mbeat_abs: start_mbeat]
+
+    chord_spec
+    |> then(&Machine.render(machine, &1, sample_context, local_timeline_context, machine_opts))
+    |> shift_entry(start_mbeat)
+    |> to_global_performance(sample_context)
     |> rechannelize_performance()
   end
 
@@ -75,7 +86,7 @@ defmodule Mensch.PerformanceAssembler do
   @spec note_name(integer()) :: {ChordSpec.root(), integer()}
   def note_name(note_number), do: ChordSpec.note_name(note_number)
 
-  defp render_entry_performance(
+  defp render_entry(
          _entry,
          %ChordSpec{} = chord_spec,
          %TimelineContext{} = timeline_context,
@@ -95,51 +106,27 @@ defmodule Mensch.PerformanceAssembler do
       entry_start_mbeat_abs: start_mbeat
     ]
 
-    local_performance =
+    local_entry =
       chord_spec
       |> then(&Machine.render(machine, &1, sample_context, local_timeline_context, machine_opts))
       |> tag_sample_entry_index(entry_index)
 
-    shift_performance(local_performance, start_mbeat, sample_context)
+    shift_entry(local_entry, start_mbeat)
   end
 
-  defp machine_timing_opts(sample_context, timeline_context) do
-    start_mbeat = TimelineContext.start_mbeat(timeline_context, sample_context)
-
-    [
-      entry_start_mbeat_abs: start_mbeat
-    ]
-  end
-
-  defp shift_performance(
-         %Performance{} = performance,
-         start_mbeat,
-         %SampleContext{} = sample_context
-       ) do
+  defp shift_entry(%RenderedEntry{} = rendered_entry, start_mbeat) do
     shifted_music =
-      Enum.map(performance.music, fn frame ->
+      Enum.map(rendered_entry.music, fn frame ->
         local_mbeat = Map.get(frame, :at_mbeat, 0)
-        shifted_mbeat = local_mbeat + start_mbeat
-
-        %{
-          at_mbeat: shifted_mbeat,
-          at_ms: SampleContext.mbeats_to_ms(sample_context, shifted_mbeat),
-          notes: frame.notes
-        }
+        %{frame | at_mbeat: local_mbeat + start_mbeat}
       end)
 
-    last_mbeat = shifted_music |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
-
-    %Performance{
-      performance
-      | duration_ms: SampleContext.mbeats_to_ms(sample_context, last_mbeat),
-        music: shifted_music
-    }
+    %RenderedEntry{rendered_entry | music: shifted_music}
   end
 
-  defp tag_sample_entry_index(%Performance{} = performance, entry_index) do
+  defp tag_sample_entry_index(%RenderedEntry{} = rendered_entry, entry_index) do
     tagged_music =
-      Enum.map(performance.music, fn frame ->
+      Enum.map(rendered_entry.music, fn frame ->
         tagged_notes =
           Enum.map(frame.notes, fn note ->
             Map.put(note, :sample_entry_index, entry_index)
@@ -148,23 +135,13 @@ defmodule Mensch.PerformanceAssembler do
         %{frame | notes: tagged_notes}
       end)
 
-    %Performance{performance | music: tagged_music}
+    %RenderedEntry{rendered_entry | music: tagged_music}
   end
 
-  defp merge_performances([], %SampleContext{} = sample_context) do
-    %Performance{
-      bpm: sample_context.bpm,
-      time_signature: sample_context.time_signature,
-      granularity_ms:
-        SampleContext.mbeats_to_ms(sample_context, SampleContext.frame_units(sample_context)),
-      duration_ms: 0,
-      music: []
-    }
-  end
-
-  defp merge_performances(performances, %SampleContext{} = sample_context) do
+  defp build_global_performance(rendered_entries, %SampleContext{} = sample_context)
+       when is_list(rendered_entries) do
     merged_music =
-      performances
+      rendered_entries
       |> Enum.flat_map(& &1.music)
       |> Enum.group_by(&Map.get(&1, :at_mbeat, 0))
       |> Enum.map(fn {at_mbeat, frames} ->
@@ -176,12 +153,19 @@ defmodule Mensch.PerformanceAssembler do
       end)
       |> Enum.sort_by(& &1.at_mbeat)
 
+    to_global_performance(%RenderedEntry{duration_mbeats: 0, music: merged_music}, sample_context)
+  end
+
+  defp to_global_performance(%RenderedEntry{} = rendered_entry, %SampleContext{} = sample_context) do
+    last_mbeat = rendered_entry.music |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
+
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
-      granularity_ms: performances |> Enum.map(& &1.granularity_ms) |> Enum.min(),
-      duration_ms: performances |> Enum.map(& &1.duration_ms) |> Enum.max(),
-      music: merged_music
+      granularity_ms:
+        SampleContext.mbeats_to_ms(sample_context, SampleContext.frame_units(sample_context)),
+      duration_ms: SampleContext.mbeats_to_ms(sample_context, last_mbeat),
+      music: rendered_entry.music
     }
   end
 

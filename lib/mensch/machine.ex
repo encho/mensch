@@ -18,6 +18,6 @@ defprotocol Mensch.Machine do
           Mensch.SampleContext.t(),
           Mensch.TimelineContext.t(),
           keyword()
-        ) :: Mensch.Performance.t()
+        ) :: Mensch.Machine.RenderedEntry.t()
   def render(machine, chord_spec, sample_context, timeline_context, opts)
 end
