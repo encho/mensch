@@ -32,24 +32,24 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %StrummedMpe{params: StrummedMpeParams.default()}
         },
         %{
           chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
-            duration_ticks: 500
+            start_beat: %BeatPosition{bar: 1, beat: 3, mbeat: 0},
+            duration_mbeats: 5000
           },
           machine: %StrummedMpe{params: StrummedMpeParams.default()}
         },
         %{
           chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
-            duration_ticks: 400
+            start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
+            duration_mbeats: 4000
           },
           machine: %StrummedMpe{params: StrummedMpeParams.default()}
         }
@@ -68,8 +68,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :c, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -83,8 +83,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :f, modifier: :dom7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
-            duration_ticks: 900
+            start_beat: %BeatPosition{bar: 1, beat: 3, mbeat: 0},
+            duration_mbeats: 9000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -98,8 +98,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 3, beat: 3, tick: 0},
-            duration_ticks: 900
+            start_beat: %BeatPosition{bar: 3, beat: 3, mbeat: 0},
+            duration_mbeats: 9000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -113,8 +113,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :g, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 5, beat: 3, tick: 0},
-            duration_ticks: 900
+            start_beat: %BeatPosition{bar: 5, beat: 3, mbeat: 0},
+            duration_mbeats: 9000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -140,8 +140,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -155,8 +155,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 2, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 2, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -170,8 +170,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 4, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 4, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -185,8 +185,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :a, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 6, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 6, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %StrummedMpe{
             params: %StrummedMpeParams{
@@ -212,8 +212,8 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-            duration_ticks: 1600
+            start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+            duration_mbeats: 16000
           },
           machine: %StrummedMpe{params: StrummedMpeParams.default()}
         }
@@ -232,24 +232,24 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %RootModulated{params: RootModulatedParams.default()}
         },
         %{
           chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 1, beat: 3, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 1, beat: 3, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %RootModulated{params: RootModulatedParams.default()}
         },
         %{
           chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %RootModulated{params: RootModulatedParams.default()}
         }
@@ -268,24 +268,24 @@ defmodule Mensch.SampleDb do
         %{
           chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 0, beat: 0, tick: 0},
-            duration_ticks: 800
+            start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: %PulseRoot{params: PulseRootParams.default()}
         },
         %{
           chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 1, beat: 3, tick: 42},
-            duration_ticks: 500
+            start_beat: %BeatPosition{bar: 1, beat: 3, mbeat: 420},
+            duration_mbeats: 5000
           },
           machine: %PulseRoot{params: PulseRootParams.default()}
         },
         %{
           chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 3, beat: 0, tick: 0},
-            duration_ticks: 400
+            start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
+            duration_mbeats: 4000
           },
           machine: %PulseRoot{params: PulseRootParams.default()}
         }

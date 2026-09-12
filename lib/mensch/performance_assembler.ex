@@ -85,7 +85,7 @@ defmodule Mensch.PerformanceAssembler do
 
     local_timeline_context = %TimelineContext{
       start_beat: BeatPosition.new(0, 0, 0),
-      duration_ticks: timeline_context.duration_ticks
+      duration_mbeats: timeline_context.duration_mbeats
     }
 
     machine_opts = [

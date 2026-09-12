@@ -43,7 +43,10 @@ defmodule Mensch.Machines.RootModulated do
 
     frame_ticks = SampleContext.frame_ticks(sample_context)
 
-    duration_ticks = snap_ticks(timeline_context.duration_ticks, frame_ticks)
+    duration_ticks =
+      timeline_context
+      |> TimelineContext.duration_ticks(sample_context)
+      |> snap_ticks(frame_ticks)
 
     sample_start_tick =
       timeline_context

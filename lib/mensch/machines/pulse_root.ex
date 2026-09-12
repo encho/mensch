@@ -57,7 +57,10 @@ defmodule Mensch.Machines.PulseRoot do
       |> then(&SampleContext.mbeats_to_ticks(sample_context, &1))
       |> max(1)
 
-    duration_ticks = snap_ticks(timeline_context.duration_ticks, frame_ticks)
+    duration_ticks =
+      timeline_context
+      |> TimelineContext.duration_ticks(sample_context)
+      |> snap_ticks(frame_ticks)
 
     sample_start_tick =
       timeline_context

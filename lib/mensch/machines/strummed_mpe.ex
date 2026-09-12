@@ -56,7 +56,10 @@ defmodule Mensch.Machines.StrummedMpe do
       |> then(&SampleContext.mbeats_to_ticks(sample_context, &1))
       |> snap_ticks(frame_ticks)
 
-    chord_duration_ticks = snap_ticks(timeline_context.duration_ticks, frame_ticks)
+    chord_duration_ticks =
+      timeline_context
+      |> TimelineContext.duration_ticks(sample_context)
+      |> snap_ticks(frame_ticks)
 
     sample_start_tick =
       timeline_context

@@ -15,6 +15,7 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.PerformanceAssembler
   alias Mensch.SampleDb
   alias Mensch.SampleContext
+  alias Mensch.TimelineContext
   alias MenschWeb.HomeLive.DetailPanelComponent
 
   @refresh_interval_ms 33
@@ -410,10 +411,10 @@ defmodule MenschWeb.HomeLive do
                   </td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
-                      {duration_label_primary(@sample_context, entry.timeline_context.duration_ticks)}
+                      {duration_label_primary(@sample_context, entry.timeline_context)}
                     </div>
                     <div class="leading-tight text-zinc-500">
-                      {duration_label_secondary(entry.timeline_context.duration_ticks)}
+                      {duration_label_secondary(@sample_context, entry.timeline_context)}
                     </div>
                   </td>
                   <td class="px-2 py-1.5 text-right text-zinc-500">Ready</td>
@@ -655,7 +656,11 @@ defmodule MenschWeb.HomeLive do
     "tick #{tick}"
   end
 
-  defp duration_label_primary(%SampleContext{} = sample_context, duration_ticks) do
+  defp duration_label_primary(
+         %SampleContext{} = sample_context,
+         %TimelineContext{} = timeline_context
+       ) do
+    duration_ticks = TimelineContext.duration_ticks(timeline_context, sample_context)
     ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
     ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
     duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
@@ -680,7 +685,11 @@ defmodule MenschWeb.HomeLive do
     "#{musical} · #{:erlang.float_to_binary(duration_s, decimals: 2)}s"
   end
 
-  defp duration_label_secondary(duration_ticks) do
+  defp duration_label_secondary(
+         %SampleContext{} = sample_context,
+         %TimelineContext{} = timeline_context
+       ) do
+    duration_ticks = TimelineContext.duration_ticks(timeline_context, sample_context)
     "#{duration_ticks} ticks"
   end
 
@@ -707,7 +716,7 @@ defmodule MenschWeb.HomeLive do
             start_tick =
               SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
 
-            start_tick + timeline_context.duration_ticks
+            start_tick + TimelineContext.duration_ticks(timeline_context, sample_context)
           end)
           |> Enum.max()
       end
@@ -753,7 +762,7 @@ defmodule MenschWeb.HomeLive do
     entries =
       Enum.map(sample_entries, fn %{chord_spec: chord_spec, timeline_context: timeline_context} ->
         start_tick = SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
-        end_tick = start_tick + timeline_context.duration_ticks
+        end_tick = start_tick + TimelineContext.duration_ticks(timeline_context, sample_context)
 
         %{label: short_chord_label(chord_spec), start_tick: start_tick, end_tick: end_tick}
       end)

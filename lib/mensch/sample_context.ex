@@ -115,15 +115,15 @@ defmodule Mensch.SampleContext do
     round(ms / ms_per_tick(sample_context))
   end
 
-  @doc "Converts a beat position (`bar`/`beat`/`tick`) to absolute tick."
+  @doc "Converts a beat position (`bar`/`beat`/`mbeat`) to absolute tick."
   @spec position_to_tick(t(), BeatPosition.t()) :: non_neg_integer()
   def position_to_tick(%__MODULE__{} = sample_context, %BeatPosition{} = beat_position) do
     beat_position.bar * ticks_per_bar(sample_context) +
       beat_position.beat * ticks_per_beat(sample_context) +
-      beat_position.tick
+      mbeats_to_ticks(sample_context, beat_position.mbeat)
   end
 
-  @doc "Converts an absolute tick to zero-based `bar`/`beat`/`tick`."
+  @doc "Converts an absolute tick to zero-based `bar`/`beat`/`mbeat`."
   @spec tick_to_position(t(), non_neg_integer()) :: BeatPosition.t()
   def tick_to_position(%__MODULE__{} = sample_context, absolute_tick)
       when is_integer(absolute_tick) and absolute_tick >= 0 do
@@ -133,9 +133,10 @@ defmodule Mensch.SampleContext do
     bar = div(absolute_tick, ticks_per_bar)
     in_bar = rem(absolute_tick, ticks_per_bar)
     beat = div(in_bar, ticks_per_beat)
-    tick = rem(in_bar, ticks_per_beat)
+    tick_in_beat = rem(in_bar, ticks_per_beat)
+    mbeat = round(tick_in_beat * 1000 / ticks_per_beat)
 
-    BeatPosition.new(bar, beat, tick)
+    BeatPosition.new(bar, beat, min(mbeat, 999))
   end
 
   @doc "Converts milliseconds to `MM:SS.mmm` format."
