@@ -15,6 +15,7 @@ defmodule Mensch.Machines.SimpleChord do
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
   alias Mensch.Machine.MachineFrameSequence
+  alias Mensch.Machine.NotePlanItem
   alias Mensch.Machines.SimpleChordParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
@@ -90,10 +91,16 @@ defmodule Mensch.Machines.SimpleChord do
 
     note_length_mode = normalize_note_length_mode(params.note_length_mode)
 
-    notes =
-      build_notes(
+    note_plan =
+      build_note_plan(
         midi_notes,
         sample_start_mbeat,
+        effective_stagger_mbeats
+      )
+
+    notes =
+      assign_envelopes(
+        note_plan,
         effective_stagger_mbeats,
         chord_duration_mbeats,
         note_length_mode,
@@ -107,50 +114,90 @@ defmodule Mensch.Machines.SimpleChord do
         _ -> notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
       end
 
-    %MachineFrameSequence{frames: build_frames(notes, duration_mbeats, frame_mbeats)}
+    note_frame_streams =
+      Enum.map(notes, fn note ->
+        render_note_frame_stream(note, duration_mbeats, frame_mbeats)
+      end)
+
+    %MachineFrameSequence{
+      frames: stitch_note_frame_streams(note_frame_streams, duration_mbeats, frame_mbeats)
+    }
   end
 
-  defp build_notes(
+  # Builds the playback sequence on a quantized grid. `event_index` is sequence position,
+  # while `degree_index` tracks harmonic source index and may diverge in future patterns.
+  #
+  # Example (plain triad order):
+  # sequence notes: [C4, E4, G4]
+  # event_index:    [0, 1, 2]
+  # degree_index:   [0, 1, 2]
+  #
+  # Example (future octave walk):
+  # sequence notes: [C4, E4, G4, C5, G4, E4]
+  # event_index:    [0, 1, 2, 3, 4, 5]
+  # degree_index:   [0, 1, 2, 0, 2, 1]
+  #
+  # With sample_start_mbeat=240 and stagger_mbeats=10, delay_mbeats are:
+  # [240, 250, 260, ...]
+  defp build_note_plan(
          midi_notes,
          sample_start_mbeat,
+         stagger_mbeats
+       ) do
+    midi_notes
+    |> Enum.with_index()
+    |> Enum.map(fn {note_number, sequence_index} ->
+      {note_name, octave} = ChordSpec.note_name(note_number)
+      note_delay_mbeats = sequence_index * stagger_mbeats
+
+      NotePlanItem.new(%{
+        # Human-readable pitch class for UI/debug usage.
+        note_name: note_name,
+        # Octave register paired with note_name for display/debug context.
+        octave: octave,
+        # MIDI note number used for playback/export.
+        note: note_number,
+        # Filled later by channel allocation in assembly.
+        channel: nil,
+        # Note-on velocity emitted for this machine.
+        velocity: @velocity,
+        # Source machine identifier for downstream grouping.
+        machine_id: id(),
+        # Chord-instance identity within a generated sample/performance.
+        chord_instance_id: 0,
+        # Position in the realized playback sequence.
+        event_index: sequence_index,
+        # Position in the harmonic source (may diverge in richer sequencers).
+        degree_index: sequence_index,
+        # Absolute quantized start time in mbeat units.
+        delay_mbeats: sample_start_mbeat + note_delay_mbeats
+      })
+    end)
+  end
+
+  defp assign_envelopes(
+         note_plan,
          stagger_mbeats,
          chord_duration_mbeats,
          note_length_mode,
          sample_context,
          %SimpleChordParams{} = params
        ) do
-    note_count = length(midi_notes)
+    note_count = length(note_plan)
 
-    midi_notes
-    |> Enum.with_index()
-    |> Enum.map(fn {note_number, note_index} ->
-      {note_name, octave} = ChordSpec.note_name(note_number)
-      note_delay_mbeats = note_index * stagger_mbeats
-      note_start_mbeat = sample_start_mbeat + note_delay_mbeats
-
+    Enum.map(note_plan, fn %NotePlanItem{} = planned_note ->
       note_duration_mbeats =
         note_duration_mbeats(
           chord_duration_mbeats,
           stagger_mbeats,
-          note_index,
+          planned_note.event_index,
           note_count,
           note_length_mode
         )
 
       adsr = build_adsr(note_duration_mbeats, sample_context, params)
 
-      %{
-        note_name: note_name,
-        octave: octave,
-        note: note_number,
-        channel: nil,
-        velocity: @velocity,
-        machine_id: id(),
-        chord_instance_id: 0,
-        event_index: note_index,
-        delay_mbeats: note_start_mbeat,
-        adsr: adsr
-      }
+      NotePlanItem.with_adsr(planned_note, adsr)
     end)
   end
 
@@ -171,13 +218,34 @@ defmodule Mensch.Machines.SimpleChord do
     })
   end
 
-  defp build_frames(notes, duration_mbeats, frame_mbeats) do
+  defp render_note_frame_stream(note, duration_mbeats, frame_mbeats) do
     for at_mbeat <- 0..duration_mbeats//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
-        notes: Enum.map(notes, &note_frame(&1, at_mbeat))
+        note: note_frame(note, at_mbeat)
       }
     end
+  end
+
+  defp stitch_note_frame_streams(note_frame_streams, duration_mbeats, frame_mbeats) do
+    notes_by_mbeat =
+      note_frame_streams
+      |> List.flatten()
+      |> Enum.group_by(& &1.at_mbeat, & &1.note)
+
+    dense_frame_mbeats(duration_mbeats, frame_mbeats)
+    |> Enum.map(fn at_mbeat ->
+      frame_notes =
+        notes_by_mbeat
+        |> Map.get(at_mbeat, [])
+        |> Enum.sort_by(&{&1.event_index, &1.note})
+
+      %{at_mbeat: at_mbeat, notes: frame_notes}
+    end)
+  end
+
+  defp dense_frame_mbeats(duration_mbeats, frame_mbeats) do
+    Enum.to_list(0..duration_mbeats//frame_mbeats)
   end
 
   defp note_frame(note, at_mbeat) when at_mbeat < note.delay_mbeats do
@@ -190,6 +258,7 @@ defmodule Mensch.Machines.SimpleChord do
       machine_id: note.machine_id,
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
+      degree_index: note.degree_index,
       phase: :pending,
       note_on: false,
       note_off: false,
@@ -210,6 +279,7 @@ defmodule Mensch.Machines.SimpleChord do
       machine_id: note.machine_id,
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
+      degree_index: note.degree_index,
       phase: :ended,
       note_on: false,
       note_off: false,
@@ -232,6 +302,7 @@ defmodule Mensch.Machines.SimpleChord do
       machine_id: note.machine_id,
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
+      degree_index: note.degree_index,
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
