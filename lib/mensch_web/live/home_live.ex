@@ -991,13 +991,9 @@ defmodule MenschWeb.HomeLive do
       |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_mbeat}) end)
       |> Enum.group_by(fn {note, _at_mbeat} -> {note.note, note.channel} end)
       |> Enum.flat_map(fn {{note_number, channel}, entries} ->
-        {sample, _at_mbeat} = hd(entries)
-        start_entry = Enum.find(entries, fn {note, _} -> note.note_on end)
-        end_entry = Enum.find(entries, fn {note, _} -> note.note_off end)
-
-        if start_entry && end_entry do
-          start_mbeat = elem(start_entry, 1)
-          end_mbeat = elem(end_entry, 1)
+        entries
+        |> lifecycle_segments(total_mbeats)
+        |> Enum.map(fn %{start_mbeat: start_mbeat, end_mbeat: end_mbeat, label: label} ->
           left_pct = start_mbeat / total_mbeats * 100
           width_pct = max((end_mbeat - start_mbeat) / total_mbeats * 100, 0.5)
 
@@ -1006,18 +1002,14 @@ defmodule MenschWeb.HomeLive do
               "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
               "background-color: #{Map.fetch!(colors, {channel, note_number})};"
 
-          [
-            %{
-              channel: channel,
-              note: note_number,
-              label: "#{sample.note_name}#{sample.octave}",
-              active: note_selected?({channel, note_number}, selected_note_key),
-              style: style
-            }
-          ]
-        else
-          []
-        end
+          %{
+            channel: channel,
+            note: note_number,
+            label: label,
+            active: note_selected?({channel, note_number}, selected_note_key),
+            style: style
+          }
+        end)
       end)
 
     case segments do
@@ -1066,6 +1058,42 @@ defmodule MenschWeb.HomeLive do
           end
         end
     end
+  end
+
+  defp lifecycle_segments(entries, total_mbeats) do
+    {segments, open_segment} =
+      entries
+      |> Enum.sort_by(fn {_note, at_mbeat} -> at_mbeat end)
+      |> Enum.reduce({[], nil}, fn {note, at_mbeat}, {acc, open} ->
+        label = "#{note.note_name}#{note.octave}"
+
+        cond do
+          note.note_on and is_nil(open) ->
+            {acc, %{start_mbeat: at_mbeat, label: label}}
+
+          note.note_on and not is_nil(open) ->
+            closed = Map.put(open, :end_mbeat, at_mbeat)
+            {[closed | acc], %{start_mbeat: at_mbeat, label: label}}
+
+          note.note_off and not is_nil(open) ->
+            closed = Map.put(open, :end_mbeat, at_mbeat)
+            {[closed | acc], nil}
+
+          true ->
+            {acc, open}
+        end
+      end)
+
+    segments =
+      if is_nil(open_segment) do
+        segments
+      else
+        [Map.put(open_segment, :end_mbeat, total_mbeats) | segments]
+      end
+
+    segments
+    |> Enum.reverse()
+    |> Enum.filter(fn segment -> segment.end_mbeat >= segment.start_mbeat end)
   end
 
   # Assigns each distinct `{channel, note}` a stable color (ordered by

@@ -1,0 +1,71 @@
+defmodule Mensch.Machines.SimpleChordParams do
+  @moduledoc """
+  Typed parameters for `Mensch.Machines.SimpleChord`.
+
+  Parameter reference:
+
+  * `stagger_mbeats`: Delay between successive chord tones in millibeats.
+  * `attack_mbeats`: Envelope attack duration in millibeats.
+  * `decay_mbeats`: Envelope decay duration in millibeats.
+  * `release_mbeats`: Envelope release duration in millibeats (`0` disables
+    release phase and sustains until note-off).
+  * `attack_curve`: Attack interpolation (`:linear`, `:exp`, `:log`, `:s_curve`).
+  * `decay_curve`: Decay interpolation (`:linear`, `:exp`, `:log`, `:s_curve`).
+  * `release_curve`: Release interpolation (`:linear`, `:exp`, `:log`, `:s_curve`).
+  * `peak_level`: Peak envelope level (`0.0..1.0`).
+  * `sustain_level`: Sustain envelope level (`0.0..1.0`).
+  """
+
+  @type curve :: :linear | :exp | :log | :s_curve
+
+  @type t :: %__MODULE__{
+          stagger_mbeats: non_neg_integer(),
+          attack_mbeats: non_neg_integer(),
+          decay_mbeats: non_neg_integer(),
+          release_mbeats: non_neg_integer(),
+          attack_curve: curve(),
+          decay_curve: curve(),
+          release_curve: curve(),
+          peak_level: float(),
+          sustain_level: float()
+        }
+
+  @enforce_keys [
+    :stagger_mbeats,
+    :attack_mbeats,
+    :decay_mbeats,
+    :release_mbeats,
+    :attack_curve,
+    :decay_curve,
+    :release_curve,
+    :peak_level,
+    :sustain_level
+  ]
+  defstruct [
+    :stagger_mbeats,
+    :attack_mbeats,
+    :decay_mbeats,
+    :release_mbeats,
+    :attack_curve,
+    :decay_curve,
+    :release_curve,
+    :peak_level,
+    :sustain_level
+  ]
+
+  @doc "Default parameters for the simple chord machine."
+  @spec default() :: t()
+  def default do
+    %__MODULE__{
+      stagger_mbeats: 120,
+      attack_mbeats: 80,
+      decay_mbeats: 150,
+      release_mbeats: 220,
+      attack_curve: :linear,
+      decay_curve: :linear,
+      release_curve: :linear,
+      peak_level: 1.0,
+      sustain_level: 0.72
+    }
+  end
+end

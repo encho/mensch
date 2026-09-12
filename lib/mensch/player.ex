@@ -109,7 +109,7 @@ defmodule Mensch.Player do
     # Drive channel expression from machine phase data directly. This
     # keeps sustained overlap notes emitting pressure/bend/slide even if
     # active bookkeeping gets out of sync.
-    if note.phase != :pending and not note.note_off do
+    if note.phase not in [:pending, :ended] and not note.note_off do
       Connection.send_message(<<0xD0 + note.channel, note.pressure>>)
 
       bend = (8192 + note.bend * 8192) |> round() |> max(0) |> min(16_383)

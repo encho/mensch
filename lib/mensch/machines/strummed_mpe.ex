@@ -188,6 +188,26 @@ defmodule Mensch.Machines.StrummedMpe do
     }
   end
 
+  defp note_frame(note, at_mbeat, _sample_context)
+       when at_mbeat > note.delay_mbeats + note.adsr.total_mbeats do
+    %{
+      note_name: note.note_name,
+      octave: note.octave,
+      note: note.note,
+      channel: note.channel,
+      velocity: note.velocity,
+      machine_id: note.machine_id,
+      chord_instance_id: note.chord_instance_id,
+      event_index: note.event_index,
+      phase: :ended,
+      note_on: false,
+      note_off: false,
+      pressure: 0,
+      bend: 0.0,
+      slide: 0
+    }
+  end
+
   defp note_frame(note, at_mbeat, sample_context) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     local_elapsed_ms = SampleContext.mbeats_to_ms(sample_context, local_elapsed_mbeats)

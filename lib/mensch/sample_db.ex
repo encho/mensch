@@ -14,10 +14,12 @@ defmodule Mensch.SampleDb do
   alias Mensch.SampleDb.Sample2CMajorChords
   alias Mensch.SampleDb.Sample3
   alias Mensch.SampleDb.Sample4
+  alias Mensch.SampleDb.Sample5SimpleChord
 
   @default_frame_mbeats 50
 
   @samples [
+    Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample1.sample(@default_frame_mbeats),
     Sample1NoRelease.sample(@default_frame_mbeats),
     Sample2CMajorChords.sample(@default_frame_mbeats),

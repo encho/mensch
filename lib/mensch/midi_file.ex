@@ -149,7 +149,8 @@ defmodule Mensch.MidiFile do
             bytes: <<0x90 + ch, midi_note, velocity>>
           })
           |> maybe_add(
-            Map.get(note, :phase) != :pending and not Map.get(note, :note_off, false),
+            Map.get(note, :phase) not in [:pending, :ended] and
+              not Map.get(note, :note_off, false),
             %{
               tick: mbeat,
               at_ms: at_ms,
@@ -160,7 +161,8 @@ defmodule Mensch.MidiFile do
             }
           )
           |> maybe_add(
-            Map.get(note, :phase) != :pending and not Map.get(note, :note_off, false),
+            Map.get(note, :phase) not in [:pending, :ended] and
+              not Map.get(note, :note_off, false),
             %{
               tick: mbeat,
               at_ms: at_ms,
@@ -171,7 +173,8 @@ defmodule Mensch.MidiFile do
             }
           )
           |> maybe_add(
-            Map.get(note, :phase) != :pending and not Map.get(note, :note_off, false),
+            Map.get(note, :phase) not in [:pending, :ended] and
+              not Map.get(note, :note_off, false),
             %{
               tick: mbeat,
               at_ms: at_ms,
