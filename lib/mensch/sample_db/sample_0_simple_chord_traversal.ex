@@ -31,6 +31,7 @@ defmodule Mensch.SampleDb.Sample0SimpleChordTraversal do
 
     %{
       id: "sample-0-simple-chord-traversal",
+      folder: "New Architecture",
       name: "ArpMachine · Traversal Ping Pong",
       sample_context:
         SampleContext.new!(%{bpm: 104, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),

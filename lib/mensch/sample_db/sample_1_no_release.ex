@@ -19,6 +19,7 @@ defmodule Mensch.SampleDb.Sample1NoRelease do
 
     %{
       id: "sample-1-no-release",
+      folder: "Legacy",
       name: "StrummedMpe · Cm7 F7 Bbmaj7 Gm7 · No Release",
       sample_context:
         SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),

@@ -51,6 +51,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
       |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
       |> assign(:samples, samples)
+      |> assign(:sample_folders, build_sample_folders(samples))
       |> assign(:active_sample_index, active_sample_index)
       |> assign(:sample_entries, sample_entries)
       |> assign(:sample_context, sample_context)
@@ -279,45 +280,52 @@ defmodule MenschWeb.HomeLive do
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  :for={{sample, index} <- Enum.with_index(@samples)}
-                  class={[
-                    "text-zinc-200",
-                    @active_sample_index == index && "bg-amber-500/10"
-                  ]}
-                >
-                  <td class="px-2 py-1.5 text-zinc-100">{Map.get(sample, :name, "Unnamed")}</td>
-                  <td class="px-2 py-1.5">{Map.get(sample.sample_context, :bpm, 0)} bpm</td>
-                  <td class="px-2 py-1.5">
-                    {elem(sample.sample_context.time_signature, 0)}/{elem(
-                      sample.sample_context.time_signature,
-                      1
-                    )}
-                  </td>
-                  <td class="px-2 py-1.5">{length(Map.get(sample, :sample_entries, []))}</td>
-                  <td class="px-2 py-1.5">
-                    {sample_duration_label(
-                      Map.get(sample, :sample_entries, []),
-                      Map.get(sample, :sample_context, @sample_context)
-                    )}
-                  </td>
-                  <td class="px-2 py-1.5 text-right">
-                    <button
-                      type="button"
-                      id={"activate-sample-#{index}"}
-                      phx-click="activate_sample"
-                      phx-value-index={index}
-                      class={[
-                        "h-9 border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
-                        (@active_sample_index == index &&
-                           "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
-                          "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
-                      ]}
-                    >
-                      {if @active_sample_index == index, do: "Active", else: "Activate"}
-                    </button>
-                  </td>
-                </tr>
+                <%= for folder <- @sample_folders do %>
+                  <tr class="border-y border-zinc-700/60 bg-zinc-900/60 text-zinc-300">
+                    <td colspan="6" class="px-2 py-1.5 uppercase tracking-wide">
+                      {folder.name}
+                    </td>
+                  </tr>
+                  <tr
+                    :for={{sample, index} <- folder.samples}
+                    class={[
+                      "text-zinc-200",
+                      @active_sample_index == index && "bg-amber-500/10"
+                    ]}
+                  >
+                    <td class="px-2 py-1.5 text-zinc-100">{Map.get(sample, :name, "Unnamed")}</td>
+                    <td class="px-2 py-1.5">{Map.get(sample.sample_context, :bpm, 0)} bpm</td>
+                    <td class="px-2 py-1.5">
+                      {elem(sample.sample_context.time_signature, 0)}/{elem(
+                        sample.sample_context.time_signature,
+                        1
+                      )}
+                    </td>
+                    <td class="px-2 py-1.5">{length(Map.get(sample, :sample_entries, []))}</td>
+                    <td class="px-2 py-1.5">
+                      {sample_duration_label(
+                        Map.get(sample, :sample_entries, []),
+                        Map.get(sample, :sample_context, @sample_context)
+                      )}
+                    </td>
+                    <td class="px-2 py-1.5 text-right">
+                      <button
+                        type="button"
+                        id={"activate-sample-#{index}"}
+                        phx-click="activate_sample"
+                        phx-value-index={index}
+                        class={[
+                          "h-9 border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
+                          (@active_sample_index == index &&
+                             "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
+                            "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
+                        ]}
+                      >
+                        {if @active_sample_index == index, do: "Active", else: "Activate"}
+                      </button>
+                    </td>
+                  </tr>
+                <% end %>
               </tbody>
             </table>
           </div>
@@ -686,6 +694,30 @@ defmodule MenschWeb.HomeLive do
     machine
     |> Mensch.Machine.id()
     |> Atom.to_string()
+  end
+
+  defp build_sample_folders(samples) when is_list(samples) do
+    indexed_samples = Enum.with_index(samples)
+
+    grouped_by_folder =
+      Enum.group_by(indexed_samples, fn {sample, _index} ->
+        Map.get(sample, :folder, "Unfiled")
+      end)
+
+    preferred_order = ["New Architecture", "Legacy"]
+
+    folder_names =
+      preferred_order ++
+        (grouped_by_folder
+         |> Map.keys()
+         |> Enum.reject(&(&1 in preferred_order))
+         |> Enum.sort())
+
+    folder_names
+    |> Enum.map(fn folder_name ->
+      %{name: folder_name, samples: Map.get(grouped_by_folder, folder_name, [])}
+    end)
+    |> Enum.reject(fn folder -> folder.samples == [] end)
   end
 
   defp sample_voicing_strategies_label(sample_entries) when is_list(sample_entries) do

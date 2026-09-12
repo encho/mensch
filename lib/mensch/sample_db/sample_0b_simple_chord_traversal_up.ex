@@ -31,6 +31,7 @@ defmodule Mensch.SampleDb.Sample0bSimpleChordTraversalUp do
 
     %{
       id: "sample-0b-simple-chord-traversal-up",
+      folder: "New Architecture",
       name: "ArpMachine · Traversal Up",
       sample_context:
         SampleContext.new!(%{bpm: 104, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
