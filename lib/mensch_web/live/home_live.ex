@@ -60,6 +60,7 @@ defmodule MenschWeb.HomeLive do
       )
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
+      |> assign(:show_detail_panel, false)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
       |> assign_detail_content()
@@ -87,6 +88,10 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("toggle_loop_full_sample", _params, socket) do
     {:noreply, update(socket, :loop_full_sample, &(!&1))}
+  end
+
+  def handle_event("toggle_detail_panel", _params, socket) do
+    {:noreply, update(socket, :show_detail_panel, &(!&1))}
   end
 
   def handle_event("activate_sample", %{"index" => index_str}, socket) do
@@ -342,6 +347,20 @@ defmodule MenschWeb.HomeLive do
           </div>
 
           <div class="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              id="toggle-detail-panel"
+              phx-click="toggle_detail_panel"
+              aria-pressed={@show_detail_panel}
+              class={[
+                "flex h-9 items-center border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
+                (@show_detail_panel &&
+                   "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
+                  "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
+              ]}
+            >
+              {if @show_detail_panel, do: "Hide Detail Charts", else: "Show Detail Charts"}
+            </button>
             <.link
               id="download-mpe-midi"
               href={~p"/exports/sample/#{@active_sample_index}/mpe.mid"}
@@ -454,7 +473,7 @@ defmodule MenschWeb.HomeLive do
 
           <.sample_timeline model={@sample_timeline} />
           <.live_component
-            :if={@render_data}
+            :if={@render_data && @show_detail_panel}
             module={DetailPanelComponent}
             id="detail-panel"
             render_data={@render_data}
