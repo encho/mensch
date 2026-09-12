@@ -5,6 +5,8 @@ defmodule Mensch.Machines.SimpleChordParams do
   Parameter reference:
 
   * `stagger_mbeats`: Delay between successive chord tones in millibeats.
+  * `note_length_mode`: `:equal` for equal note lengths, or `:align_end` so
+    all notes end at the chord end.
   * `attack_mbeats`: Envelope attack duration in millibeats.
   * `decay_mbeats`: Envelope decay duration in millibeats.
   * `release_mbeats`: Envelope release duration in millibeats (`0` disables
@@ -17,9 +19,11 @@ defmodule Mensch.Machines.SimpleChordParams do
   """
 
   @type curve :: :linear | :exp | :log | :s_curve
+  @type note_length_mode :: :equal | :align_end
 
   @type t :: %__MODULE__{
           stagger_mbeats: non_neg_integer(),
+          note_length_mode: note_length_mode(),
           attack_mbeats: non_neg_integer(),
           decay_mbeats: non_neg_integer(),
           release_mbeats: non_neg_integer(),
@@ -32,6 +36,7 @@ defmodule Mensch.Machines.SimpleChordParams do
 
   @enforce_keys [
     :stagger_mbeats,
+    :note_length_mode,
     :attack_mbeats,
     :decay_mbeats,
     :release_mbeats,
@@ -43,6 +48,7 @@ defmodule Mensch.Machines.SimpleChordParams do
   ]
   defstruct [
     :stagger_mbeats,
+    :note_length_mode,
     :attack_mbeats,
     :decay_mbeats,
     :release_mbeats,
@@ -58,6 +64,7 @@ defmodule Mensch.Machines.SimpleChordParams do
   def default do
     %__MODULE__{
       stagger_mbeats: 120,
+      note_length_mode: :equal,
       attack_mbeats: 80,
       decay_mbeats: 150,
       release_mbeats: 220,

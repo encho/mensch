@@ -56,4 +56,38 @@ defmodule Mensch.NoteLifecycleTest do
                not note.note_on
            end)
   end
+
+  test "simple chord align_end mode makes all notes end together" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0}
+
+    params =
+      %SimpleChordParams{
+        SimpleChordParams.default()
+        | stagger_mbeats: 1000,
+          release_mbeats: 0,
+          note_length_mode: :align_end
+      }
+
+    machine = %SimpleChord{params: params}
+    performance = Machine.render(machine, chord_spec, sample_context, timeline_context, [])
+
+    note_offs_by_index =
+      performance.music
+      |> Enum.flat_map(fn frame ->
+        frame.notes
+        |> Enum.filter(& &1.note_off)
+        |> Enum.map(fn note -> {note.event_index, frame.at_mbeat} end)
+      end)
+      |> Map.new()
+
+    assert map_size(note_offs_by_index) == 4
+    assert Enum.uniq(Map.values(note_offs_by_index)) == [4000]
+  end
 end

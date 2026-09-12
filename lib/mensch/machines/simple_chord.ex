@@ -1,7 +1,12 @@
 defmodule Mensch.Machines.SimpleChord do
   @moduledoc """
   Simple machine that plays full chords with a configurable note stagger and
-  internally computed equal per-note durations.
+  internally computed per-note durations.
+
+  `note_length_mode` controls duration behavior:
+
+  * `:equal` gives every note the same length.
+  * `:align_end` makes all notes end at the chord end.
 
   Unlike the expressive machines, this one keeps bend and slide at zero and
   derives pressure directly from ADSR level.
@@ -38,6 +43,7 @@ defmodule Mensch.Machines.SimpleChord do
 
     %{
       stagger_mbeats: params.stagger_mbeats,
+      note_length_mode: params.note_length_mode,
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
       release_mbeats: params.release_mbeats,
@@ -80,15 +86,15 @@ defmodule Mensch.Machines.SimpleChord do
     effective_stagger_mbeats =
       effective_stagger_mbeats(stagger_mbeats, chord_duration_mbeats, note_count, frame_mbeats)
 
-    note_duration_mbeats =
-      equal_note_duration_mbeats(chord_duration_mbeats, effective_stagger_mbeats, note_count)
+    note_length_mode = normalize_note_length_mode(params.note_length_mode)
 
     notes =
       build_notes(
         midi_notes,
         sample_start_mbeat,
         effective_stagger_mbeats,
-        note_duration_mbeats,
+        chord_duration_mbeats,
+        note_length_mode,
         sample_context,
         params
       )
@@ -115,16 +121,29 @@ defmodule Mensch.Machines.SimpleChord do
          midi_notes,
          sample_start_mbeat,
          stagger_mbeats,
-         note_duration_mbeats,
+         chord_duration_mbeats,
+         note_length_mode,
          sample_context,
          %SimpleChordParams{} = params
        ) do
+    note_count = length(midi_notes)
+
     midi_notes
     |> Enum.with_index()
     |> Enum.map(fn {note_number, note_index} ->
       {note_name, octave} = ChordSpec.note_name(note_number)
       note_delay_mbeats = note_index * stagger_mbeats
       note_start_mbeat = sample_start_mbeat + note_delay_mbeats
+
+      note_duration_mbeats =
+        note_duration_mbeats(
+          chord_duration_mbeats,
+          stagger_mbeats,
+          note_index,
+          note_count,
+          note_length_mode
+        )
+
       adsr = build_adsr(note_duration_mbeats, sample_context, params)
 
       %{
@@ -276,6 +295,36 @@ defmodule Mensch.Machines.SimpleChord do
     duration_mbeats - (note_count - 1) * stagger_mbeats
   end
 
+  defp note_duration_mbeats(_duration_mbeats, _stagger_mbeats, _note_index, note_count, :equal)
+       when note_count == 0,
+       do: 0
+
+  defp note_duration_mbeats(duration_mbeats, _stagger_mbeats, _note_index, note_count, :equal)
+       when note_count == 1,
+       do: duration_mbeats
+
+  defp note_duration_mbeats(duration_mbeats, stagger_mbeats, _note_index, note_count, :equal) do
+    equal_note_duration_mbeats(duration_mbeats, stagger_mbeats, note_count)
+  end
+
+  defp note_duration_mbeats(
+         _duration_mbeats,
+         _stagger_mbeats,
+         _note_index,
+         note_count,
+         :align_end
+       )
+       when note_count == 0,
+       do: 0
+
+  defp note_duration_mbeats(duration_mbeats, stagger_mbeats, note_index, _note_count, :align_end)
+       when is_integer(note_index) and note_index >= 0 do
+    max(duration_mbeats - note_index * stagger_mbeats, 0)
+  end
+
+  defp normalize_note_length_mode(:align_end), do: :align_end
+  defp normalize_note_length_mode(_mode), do: :equal
+
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end
 
@@ -287,6 +336,7 @@ defimpl Mensch.Machine, for: Mensch.Machines.SimpleChord do
   def controls(%SimpleChord{params: params}) do
     %{
       stagger_mbeats: params.stagger_mbeats,
+      note_length_mode: params.note_length_mode,
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
       release_mbeats: params.release_mbeats,
