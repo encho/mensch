@@ -83,6 +83,8 @@ defmodule Mensch.Machines.SimpleChord do
     midi_notes = ChordSpec.to_midi_notes(chord_spec)
     note_count = length(midi_notes)
 
+    # Cap stagger to a frame-aligned maximum so all note durations stay non-negative
+    # and both length modes can still honor chord-end alignment.
     effective_stagger_mbeats =
       effective_stagger_mbeats(stagger_mbeats, chord_duration_mbeats, note_count, frame_mbeats)
 
