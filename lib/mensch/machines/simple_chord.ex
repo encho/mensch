@@ -101,12 +101,12 @@ defmodule Mensch.Machines.SimpleChord do
         effective_stagger_mbeats
       )
 
-    note_plan =
+    planned_notes =
       build_note_plan(timed_voiced_notes)
 
-    notes =
-      assign_envelopes(
-        note_plan,
+    planned_notes_with_adsr =
+      planned_notes
+      |> assign_envelopes(
         effective_stagger_mbeats,
         chord_duration_mbeats,
         note_length_mode,
@@ -115,16 +115,21 @@ defmodule Mensch.Machines.SimpleChord do
       )
 
     max_note_end_mbeats =
-      case notes do
-        [] -> chord_duration_mbeats
-        _ -> notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
+      case planned_notes_with_adsr do
+        [] ->
+          chord_duration_mbeats
+
+        _ ->
+          planned_notes_with_adsr
+          |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats))
+          |> Enum.max()
       end
 
     assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
 
     note_frame_streams =
-      Enum.map(notes, fn note ->
-        render_note_frame_stream(note, chord_duration_mbeats, frame_mbeats)
+      Enum.map(planned_notes_with_adsr, fn planned_note ->
+        render_note_frame_stream(planned_note, chord_duration_mbeats, frame_mbeats)
       end)
 
     %MachineFrameSequence{
