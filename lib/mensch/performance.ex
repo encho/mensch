@@ -23,6 +23,7 @@ defmodule Mensch.Performance do
         music: [
           %{
             at_ms: 0,
+            at_mbeat: 0,
             at_tick: 0,
             notes: [
               %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
@@ -37,6 +38,7 @@ defmodule Mensch.Performance do
           },
           %{
             at_ms: 31,
+            at_mbeat: 6,
             at_tick: 6,
             notes: [
               %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
@@ -74,7 +76,12 @@ defmodule Mensch.Performance do
           event_index: non_neg_integer()
         }
 
-  @type frame :: %{at_ms: non_neg_integer(), at_tick: non_neg_integer(), notes: [note_event()]}
+  @type frame :: %{
+          at_ms: non_neg_integer(),
+          at_mbeat: non_neg_integer(),
+          at_tick: non_neg_integer(),
+          notes: [note_event()]
+        }
 
   @type t :: %__MODULE__{
           bpm: pos_integer(),
@@ -154,9 +161,9 @@ defmodule Mensch.Performance do
   @doc """
   Returns one entry per frame with both musical position and timestamp.
 
-  This keeps internal tick math while exposing user-friendly timing:
+  This keeps internal mbeat math while exposing user-friendly timing:
 
-    * `:position` => `%Mensch.BeatPosition{bar, beat, tick}` (zero-based)
+    * `:position` => `%Mensch.BeatPosition{bar, beat, mbeat}` (zero-based)
     * `:timestamp` => `MM:SS.mmm`
   """
   @spec frame_time_index(t(), SampleContext.t(), BeatPosition.t()) :: [map()]
@@ -165,15 +172,16 @@ defmodule Mensch.Performance do
         %SampleContext{} = sample_context,
         %BeatPosition{} = start_beat
       ) do
-    start_tick = SampleContext.position_to_tick(sample_context, start_beat)
+    start_mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
 
     Enum.map(music, fn frame ->
-      absolute_tick = start_tick + SampleContext.ms_to_ticks(sample_context, frame.at_ms)
-      position = SampleContext.tick_to_position(sample_context, absolute_tick)
+      absolute_mbeat = start_mbeat + SampleContext.ms_to_mbeats(sample_context, frame.at_ms)
+      position = SampleContext.mbeat_to_position(sample_context, absolute_mbeat)
 
       %{
         at_ms: frame.at_ms,
-        absolute_tick: absolute_tick,
+        absolute_mbeat: absolute_mbeat,
+        absolute_tick: absolute_mbeat,
         position: position,
         timestamp: SampleContext.format_timestamp(frame.at_ms)
       }

@@ -113,14 +113,14 @@ defmodule Mensch.MidiFile do
 
   @spec mpe_report(Performance.t()) :: binary()
   def mpe_report(%Performance{} = performance) do
-    header = "tick\tms\tchannel\tnote\ttype\tvalue_1\tvalue_2\n"
+    header = "mbeat\tms\tchannel\tnote\ttype\tvalue_1\tvalue_2\n"
 
     rows =
       performance
       |> build_channel_events()
-      |> Enum.map(fn %{tick: tick, at_ms: at_ms, label: label, bytes: bytes} ->
+      |> Enum.map(fn %{tick: mbeat, at_ms: at_ms, label: label, bytes: bytes} ->
         {ch, note, type, v1, v2} = report_fields(label, bytes)
-        "#{tick}\t#{at_ms}\t#{ch}\t#{note}\t#{type}\t#{v1}\t#{v2}\n"
+        "#{mbeat}\t#{at_ms}\t#{ch}\t#{note}\t#{type}\t#{v1}\t#{v2}\n"
       end)
 
     [header | rows] |> IO.iodata_to_binary()
@@ -129,7 +129,7 @@ defmodule Mensch.MidiFile do
   defp build_channel_events(%Performance{music: music}) do
     music
     |> Enum.flat_map(fn frame ->
-      tick = Map.get(frame, :at_tick, 0)
+      mbeat = Map.get(frame, :at_mbeat, Map.get(frame, :at_tick, 0))
       at_ms = Map.get(frame, :at_ms, 0)
 
       Enum.flat_map(frame.notes, fn note ->
@@ -141,7 +141,7 @@ defmodule Mensch.MidiFile do
         events =
           []
           |> maybe_add(Map.get(note, :note_on, false), %{
-            tick: tick,
+            tick: mbeat,
             at_ms: at_ms,
             sort: {event_index, ch, midi_note, 1},
             label: :note_on,
@@ -151,7 +151,7 @@ defmodule Mensch.MidiFile do
           |> maybe_add(
             Map.get(note, :phase) != :pending and not Map.get(note, :note_off, false),
             %{
-              tick: tick,
+              tick: mbeat,
               at_ms: at_ms,
               sort: {event_index, ch, midi_note, 2},
               label: :pressure,
@@ -162,7 +162,7 @@ defmodule Mensch.MidiFile do
           |> maybe_add(
             Map.get(note, :phase) != :pending and not Map.get(note, :note_off, false),
             %{
-              tick: tick,
+              tick: mbeat,
               at_ms: at_ms,
               sort: {event_index, ch, midi_note, 3},
               label: :bend,
@@ -173,7 +173,7 @@ defmodule Mensch.MidiFile do
           |> maybe_add(
             Map.get(note, :phase) != :pending and not Map.get(note, :note_off, false),
             %{
-              tick: tick,
+              tick: mbeat,
               at_ms: at_ms,
               sort: {event_index, ch, midi_note, 4},
               label: :slide,
@@ -182,7 +182,7 @@ defmodule Mensch.MidiFile do
             }
           )
           |> maybe_add(Map.get(note, :note_off, false), %{
-            tick: tick,
+            tick: mbeat,
             at_ms: at_ms,
             sort: {event_index, ch, midi_note, 5},
             label: :note_off,

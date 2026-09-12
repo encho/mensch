@@ -41,22 +41,22 @@ defmodule Mensch.Machines.RootModulated do
       ) do
     %RootModulatedParams{} = params = machine_params!(opts)
 
-    frame_ticks = SampleContext.frame_ticks(sample_context)
+    frame_mbeats = SampleContext.frame_units(sample_context)
 
-    duration_ticks =
+    duration_mbeats =
       timeline_context
-      |> TimelineContext.duration_ticks(sample_context)
-      |> snap_ticks(frame_ticks)
+      |> TimelineContext.duration_mbeats()
+      |> snap_mbeats(frame_mbeats)
 
-    sample_start_tick =
+    sample_start_mbeat =
       timeline_context
-      |> TimelineContext.start_tick(sample_context)
-      |> snap_ticks(frame_ticks)
+      |> TimelineContext.start_mbeat(sample_context)
+      |> snap_mbeats(frame_mbeats)
 
     root_note = midi_note_number(chord_spec.root, chord_spec.octave)
     {note_name, octave} = ChordSpec.note_name(root_note)
 
-    adsr = build_adsr(duration_ticks, sample_context, params)
+    adsr = build_adsr(duration_mbeats, sample_context, params)
 
     note = %{
       note_name: note_name,
@@ -69,42 +69,43 @@ defmodule Mensch.Machines.RootModulated do
       machine_id: id(),
       chord_instance_id: 0,
       event_index: 0,
-      delay_ticks: sample_start_tick,
+      delay_mbeats: sample_start_mbeat,
       adsr: adsr
     }
 
-    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-    granularity_ms = SampleContext.ticks_to_ms(sample_context, frame_ticks)
+    duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
+    granularity_ms = SampleContext.mbeats_to_ms(sample_context, frame_mbeats)
 
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(note, duration_ticks, sample_context, frame_ticks)
+      music: build_music(note, duration_mbeats, sample_context, frame_mbeats)
     }
   end
 
   defp build_adsr(
-         duration_ticks,
+         duration_mbeats,
          %SampleContext{} = sample_context,
          %RootModulatedParams{} = params
        ) do
-    ADSR.from_mbeats(duration_ticks, sample_context, %{
+    ADSR.from_mbeats(duration_mbeats, sample_context, %{
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
       release_mbeats: params.release_mbeats
     })
   end
 
-  defp build_music(note, duration_ticks, sample_context, frame_ticks) do
-    for at_tick <- 0..duration_ticks//frame_ticks do
-      at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
+  defp build_music(note, duration_mbeats, sample_context, frame_mbeats) do
+    for at_mbeat <- 0..duration_mbeats//frame_mbeats do
+      at_ms = SampleContext.mbeats_to_ms(sample_context, at_mbeat)
 
       %{
         at_ms: at_ms,
-        at_tick: at_tick,
-        notes: [note_frame(note, at_tick, sample_context)]
+        at_mbeat: at_mbeat,
+        at_tick: at_mbeat,
+        notes: [note_frame(note, at_mbeat, sample_context)]
       }
     end
   end
@@ -123,7 +124,7 @@ defmodule Mensch.Machines.RootModulated do
     end
   end
 
-  defp note_frame(note, at_tick, _sample_context) when at_tick < note.delay_ticks do
+  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
     %{
       note_name: note.note_name,
       octave: note.octave,
@@ -142,9 +143,9 @@ defmodule Mensch.Machines.RootModulated do
     }
   end
 
-  defp note_frame(note, at_tick, sample_context) do
-    local_elapsed_ticks = at_tick - note.delay_ticks
-    local_elapsed_ms = SampleContext.ticks_to_ms(sample_context, local_elapsed_ticks)
+  defp note_frame(note, at_mbeat, sample_context) do
+    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_ms = SampleContext.mbeats_to_ms(sample_context, local_elapsed_mbeats)
 
     %{
       note_name: note.note_name,
@@ -155,20 +156,20 @@ defmodule Mensch.Machines.RootModulated do
       machine_id: note.machine_id,
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
-      phase: NoteShape.phase_at(note.adsr, local_elapsed_ticks),
-      note_on: local_elapsed_ticks == 0,
-      note_off: local_elapsed_ticks == note.adsr.total_ticks,
+      phase: NoteShape.phase_at(note.adsr, local_elapsed_mbeats),
+      note_on: local_elapsed_mbeats == 0,
+      note_off: local_elapsed_mbeats == note.adsr.total_ticks,
       pressure:
-        NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_ticks, local_elapsed_ms)
+        NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_mbeats, local_elapsed_ms)
         |> clamp_7bit(),
-      bend: NoteShape.bend(note.adsr, note.phase_offset, local_elapsed_ms, local_elapsed_ticks),
+      bend: NoteShape.bend(note.adsr, note.phase_offset, local_elapsed_ms, local_elapsed_mbeats),
       slide:
         NoteShape.slide(
           note.adsr,
           note.phase_offset,
           note.emphasis,
           local_elapsed_ms,
-          local_elapsed_ticks
+          local_elapsed_mbeats
         )
         |> clamp_7bit()
     }
@@ -194,7 +195,8 @@ defmodule Mensch.Machines.RootModulated do
     (octave + 1) * 12 + semitone
   end
 
-  defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
+  defp snap_mbeats(mbeats, mbeats_per_frame),
+    do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end

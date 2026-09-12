@@ -84,7 +84,7 @@ defmodule Mensch.PerformanceAssembler do
          entry_index
        )
        when is_integer(entry_index) do
-    start_tick = TimelineContext.start_tick(timeline_context, sample_context)
+    start_mbeat = TimelineContext.start_mbeat(timeline_context, sample_context)
 
     local_timeline_context = %TimelineContext{
       start_beat: BeatPosition.new(0, 0, 0),
@@ -92,8 +92,7 @@ defmodule Mensch.PerformanceAssembler do
     }
 
     machine_opts = [
-      entry_start_tick_abs: start_tick,
-      ticks_per_beat: SampleContext.ticks_per_beat(sample_context)
+      entry_start_mbeat_abs: start_mbeat
     ]
 
     local_performance =
@@ -101,37 +100,40 @@ defmodule Mensch.PerformanceAssembler do
       |> then(&Machine.render(machine, &1, sample_context, local_timeline_context, machine_opts))
       |> tag_sample_entry_index(entry_index)
 
-    shift_performance(local_performance, start_tick, sample_context)
+    shift_performance(local_performance, start_mbeat, sample_context)
   end
 
   defp machine_timing_opts(sample_context, timeline_context) do
+    start_mbeat = TimelineContext.start_mbeat(timeline_context, sample_context)
+
     [
-      entry_start_tick_abs: TimelineContext.start_tick(timeline_context, sample_context),
-      ticks_per_beat: SampleContext.ticks_per_beat(sample_context)
+      entry_start_mbeat_abs: start_mbeat
     ]
   end
 
   defp shift_performance(
          %Performance{} = performance,
-         start_tick,
+         start_mbeat,
          %SampleContext{} = sample_context
        ) do
     shifted_music =
       Enum.map(performance.music, fn frame ->
-        shifted_tick = frame.at_tick + start_tick
+        local_mbeat = Map.get(frame, :at_mbeat, Map.get(frame, :at_tick, 0))
+        shifted_mbeat = local_mbeat + start_mbeat
 
         %{
-          at_tick: shifted_tick,
-          at_ms: SampleContext.ticks_to_ms(sample_context, shifted_tick),
+          at_mbeat: shifted_mbeat,
+          at_tick: shifted_mbeat,
+          at_ms: SampleContext.mbeats_to_ms(sample_context, shifted_mbeat),
           notes: frame.notes
         }
       end)
 
-    last_tick = shifted_music |> List.last() |> then(&if(&1, do: &1.at_tick, else: 0))
+    last_mbeat = shifted_music |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
 
     %Performance{
       performance
-      | duration_ms: SampleContext.ticks_to_ms(sample_context, last_tick),
+      | duration_ms: SampleContext.mbeats_to_ms(sample_context, last_mbeat),
         music: shifted_music
     }
   end
@@ -155,7 +157,7 @@ defmodule Mensch.PerformanceAssembler do
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms:
-        SampleContext.ticks_to_ms(sample_context, SampleContext.frame_ticks(sample_context)),
+        SampleContext.mbeats_to_ms(sample_context, SampleContext.frame_units(sample_context)),
       duration_ms: 0,
       music: []
     }
@@ -165,15 +167,16 @@ defmodule Mensch.PerformanceAssembler do
     merged_music =
       performances
       |> Enum.flat_map(& &1.music)
-      |> Enum.group_by(& &1.at_tick)
-      |> Enum.map(fn {at_tick, frames} ->
+      |> Enum.group_by(&Map.get(&1, :at_mbeat, Map.get(&1, :at_tick, 0)))
+      |> Enum.map(fn {at_mbeat, frames} ->
         %{
-          at_tick: at_tick,
-          at_ms: SampleContext.ticks_to_ms(sample_context, at_tick),
+          at_mbeat: at_mbeat,
+          at_tick: at_mbeat,
+          at_ms: SampleContext.mbeats_to_ms(sample_context, at_mbeat),
           notes: Enum.flat_map(frames, & &1.notes)
         }
       end)
-      |> Enum.sort_by(& &1.at_tick)
+      |> Enum.sort_by(& &1.at_mbeat)
 
     %Performance{
       bpm: sample_context.bpm,

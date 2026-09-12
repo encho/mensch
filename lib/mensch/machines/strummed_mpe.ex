@@ -6,7 +6,7 @@ defmodule Mensch.Machines.StrummedMpe do
   `Mensch.ChordSpec`.
 
   Frame stepping comes from the global sample context and is resolved to
-  ticks per render, so frame timing stays tempo-aware and musically aligned.
+  millibeats per render, so frame timing stays tempo-aware and musically aligned.
   Note provenance is flat on each note event via `machine_id` and
   `chord_instance_id`.
   """
@@ -49,55 +49,55 @@ defmodule Mensch.Machines.StrummedMpe do
       ) do
     %StrummedMpeParams{} = params = machine_params!(opts)
 
-    frame_ticks = SampleContext.frame_ticks(sample_context)
+    frame_mbeats = SampleContext.frame_units(sample_context)
 
-    note_stagger_ticks =
+    note_stagger_mbeats =
       params.note_stagger_mbeats
-      |> then(&SampleContext.mbeats_to_ticks(sample_context, &1))
-      |> snap_ticks(frame_ticks)
+      |> then(&SampleContext.mbeats_to_units(sample_context, &1))
+      |> snap_mbeats(frame_mbeats)
 
-    chord_duration_ticks =
+    chord_duration_mbeats =
       timeline_context
-      |> TimelineContext.duration_ticks(sample_context)
-      |> snap_ticks(frame_ticks)
+      |> TimelineContext.duration_mbeats()
+      |> snap_mbeats(frame_mbeats)
 
-    sample_start_tick =
+    sample_start_mbeat =
       timeline_context
-      |> TimelineContext.start_tick(sample_context)
-      |> snap_ticks(frame_ticks)
+      |> TimelineContext.start_mbeat(sample_context)
+      |> snap_mbeats(frame_mbeats)
 
-    chord_end_tick = sample_start_tick + chord_duration_ticks
+    chord_end_mbeat = sample_start_mbeat + chord_duration_mbeats
 
     notes =
       build_notes(
         chord_spec,
-        sample_start_tick,
-        note_stagger_ticks,
-        chord_end_tick,
+        sample_start_mbeat,
+        note_stagger_mbeats,
+        chord_end_mbeat,
         sample_context,
         params
       )
 
-    duration_ticks =
-      notes |> Enum.map(&(&1.delay_ticks + &1.adsr.total_ticks)) |> Enum.max()
+    duration_mbeats =
+      notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_ticks)) |> Enum.max()
 
-    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-    granularity_ms = SampleContext.ticks_to_ms(sample_context, frame_ticks)
+    duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
+    granularity_ms = SampleContext.mbeats_to_ms(sample_context, frame_mbeats)
 
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(notes, duration_ticks, sample_context, frame_ticks)
+      music: build_music(notes, duration_mbeats, sample_context, frame_mbeats)
     }
   end
 
   defp build_notes(
          chord_spec,
-         sample_start_tick,
-         note_stagger_ticks,
-         chord_end_tick,
+         sample_start_mbeat,
+         note_stagger_mbeats,
+         chord_end_mbeat,
          sample_context,
          %StrummedMpeParams{} = params
        ) do
@@ -107,12 +107,12 @@ defmodule Mensch.Machines.StrummedMpe do
     chord_notes
     |> Enum.with_index()
     |> Enum.map(fn {note_number, note_index} ->
-      note_delay_ticks = note_index * note_stagger_ticks
-      note_start_tick = sample_start_tick + note_delay_ticks
-      note_duration_ticks = max(chord_end_tick - note_start_tick, 0)
+      note_delay_mbeats = note_index * note_stagger_mbeats
+      note_start_mbeat = sample_start_mbeat + note_delay_mbeats
+      note_duration_mbeats = max(chord_end_mbeat - note_start_mbeat, 0)
       {note_name, octave} = ChordSpec.note_name(note_number)
 
-      adsr = build_adsr(note_duration_ticks, sample_context, params)
+      adsr = build_adsr(note_duration_mbeats, sample_context, params)
 
       %{
         note_name: note_name,
@@ -125,32 +125,33 @@ defmodule Mensch.Machines.StrummedMpe do
         machine_id: id(),
         chord_instance_id: 0,
         event_index: note_index,
-        delay_ticks: note_start_tick,
+        delay_mbeats: note_start_mbeat,
         adsr: adsr
       }
     end)
   end
 
   defp build_adsr(
-         note_duration_ticks,
+         note_duration_mbeats,
          %SampleContext{} = sample_context,
          %StrummedMpeParams{} = params
        ) do
-    ADSR.from_mbeats(note_duration_ticks, sample_context, %{
+    ADSR.from_mbeats(note_duration_mbeats, sample_context, %{
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
       release_mbeats: params.release_mbeats
     })
   end
 
-  defp build_music(notes, duration_ticks, sample_context, frame_ticks) do
-    for at_tick <- 0..duration_ticks//frame_ticks do
-      at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
+  defp build_music(notes, duration_mbeats, sample_context, frame_mbeats) do
+    for at_mbeat <- 0..duration_mbeats//frame_mbeats do
+      at_ms = SampleContext.mbeats_to_ms(sample_context, at_mbeat)
 
       %{
         at_ms: at_ms,
-        at_tick: at_tick,
-        notes: Enum.map(notes, &note_frame(&1, at_tick, sample_context))
+        at_mbeat: at_mbeat,
+        at_tick: at_mbeat,
+        notes: Enum.map(notes, &note_frame(&1, at_mbeat, sample_context))
       }
     end
   end
@@ -169,7 +170,7 @@ defmodule Mensch.Machines.StrummedMpe do
     end
   end
 
-  defp note_frame(note, at_tick, _sample_context) when at_tick < note.delay_ticks do
+  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
     %{
       note_name: note.note_name,
       octave: note.octave,
@@ -188,9 +189,9 @@ defmodule Mensch.Machines.StrummedMpe do
     }
   end
 
-  defp note_frame(note, at_tick, sample_context) do
-    local_elapsed_ticks = at_tick - note.delay_ticks
-    local_elapsed_ms = SampleContext.ticks_to_ms(sample_context, local_elapsed_ticks)
+  defp note_frame(note, at_mbeat, sample_context) do
+    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_ms = SampleContext.mbeats_to_ms(sample_context, local_elapsed_mbeats)
 
     %{
       note_name: note.note_name,
@@ -201,26 +202,27 @@ defmodule Mensch.Machines.StrummedMpe do
       machine_id: note.machine_id,
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
-      phase: NoteShape.phase_at(note.adsr, local_elapsed_ticks),
-      note_on: local_elapsed_ticks == 0,
-      note_off: local_elapsed_ticks == note.adsr.total_ticks,
+      phase: NoteShape.phase_at(note.adsr, local_elapsed_mbeats),
+      note_on: local_elapsed_mbeats == 0,
+      note_off: local_elapsed_mbeats == note.adsr.total_ticks,
       pressure:
-        NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_ticks, local_elapsed_ms)
+        NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_mbeats, local_elapsed_ms)
         |> clamp_7bit(),
-      bend: NoteShape.bend(note.adsr, note.phase_offset, local_elapsed_ms, local_elapsed_ticks),
+      bend: NoteShape.bend(note.adsr, note.phase_offset, local_elapsed_ms, local_elapsed_mbeats),
       slide:
         NoteShape.slide(
           note.adsr,
           note.phase_offset,
           note.emphasis,
           local_elapsed_ms,
-          local_elapsed_ticks
+          local_elapsed_mbeats
         )
         |> clamp_7bit()
     }
   end
 
-  defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
+  defp snap_mbeats(mbeats, mbeats_per_frame),
+    do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end

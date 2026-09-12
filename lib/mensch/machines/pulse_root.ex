@@ -3,7 +3,7 @@ defmodule Mensch.Machines.PulseRoot do
   Machine that sustains only the chord root and adds short aftertouch pulses
   on each global beat boundary.
 
-  Pulse timing uses absolute sample ticks (passed in `opts`) so pulses stay
+  Pulse timing uses absolute sample millibeats (passed in `opts`) so pulses stay
   aligned to the global beat grid even when the chord starts off-beat.
   With mbeat-native timing, frame steps divide one beat, so beat boundaries are
   already on the render lattice.
@@ -14,6 +14,8 @@ defmodule Mensch.Machines.PulseRoot do
   alias Mensch.Performance
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
+
+  @mbeats_per_beat 1000
 
   @type t :: %__MODULE__{params: PulseRootParams.t()}
 
@@ -50,27 +52,24 @@ defmodule Mensch.Machines.PulseRoot do
       ) do
     %PulseRootParams{} = params = machine_params!(opts)
 
-    frame_ticks = SampleContext.frame_ticks(sample_context)
+    frame_mbeats = SampleContext.frame_units(sample_context)
 
-    pulse_width_ticks =
+    pulse_width_mbeats =
       params.pulse_width_mbeats
-      |> then(&SampleContext.mbeats_to_ticks(sample_context, &1))
+      |> then(&SampleContext.mbeats_to_units(sample_context, &1))
       |> max(1)
 
-    duration_ticks =
+    duration_mbeats =
       timeline_context
-      |> TimelineContext.duration_ticks(sample_context)
-      |> snap_ticks(frame_ticks)
+      |> TimelineContext.duration_mbeats()
+      |> snap_mbeats(frame_mbeats)
 
-    sample_start_tick =
+    sample_start_mbeat =
       timeline_context
-      |> TimelineContext.start_tick(sample_context)
-      |> snap_ticks(frame_ticks)
+      |> TimelineContext.start_mbeat(sample_context)
+      |> snap_mbeats(frame_mbeats)
 
-    entry_start_tick_abs = Keyword.get(opts, :entry_start_tick_abs, sample_start_tick)
-
-    ticks_per_beat =
-      Keyword.get(opts, :ticks_per_beat, SampleContext.ticks_per_beat(sample_context))
+    entry_start_mbeat_abs = Keyword.get(opts, :entry_start_mbeat_abs, sample_start_mbeat)
 
     root_note = midi_note_number(chord_spec.root, chord_spec.octave)
     {note_name, octave} = ChordSpec.note_name(root_note)
@@ -84,40 +83,40 @@ defmodule Mensch.Machines.PulseRoot do
       machine_id: id(),
       chord_instance_id: 0,
       event_index: 0,
-      delay_ticks: sample_start_tick,
-      total_ticks: duration_ticks,
-      entry_start_tick_abs: entry_start_tick_abs,
-      ticks_per_beat: ticks_per_beat,
-      pulse_width_ticks: pulse_width_ticks,
+      delay_mbeats: sample_start_mbeat,
+      total_mbeats: duration_mbeats,
+      entry_start_mbeat_abs: entry_start_mbeat_abs,
+      pulse_width_mbeats: pulse_width_mbeats,
       base_pressure: params.base_pressure,
       peak_pressure: params.peak_pressure
     }
 
-    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-    granularity_ms = SampleContext.ticks_to_ms(sample_context, frame_ticks)
+    duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
+    granularity_ms = SampleContext.mbeats_to_ms(sample_context, frame_mbeats)
 
     %Performance{
       bpm: sample_context.bpm,
       time_signature: sample_context.time_signature,
       granularity_ms: granularity_ms,
       duration_ms: duration_ms,
-      music: build_music(note, duration_ticks, sample_context, frame_ticks)
+      music: build_music(note, duration_mbeats, sample_context, frame_mbeats)
     }
   end
 
-  defp build_music(note, duration_ticks, sample_context, frame_ticks) do
-    for at_tick <- 0..duration_ticks//frame_ticks do
-      at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
+  defp build_music(note, duration_mbeats, sample_context, frame_mbeats) do
+    for at_mbeat <- 0..duration_mbeats//frame_mbeats do
+      at_ms = SampleContext.mbeats_to_ms(sample_context, at_mbeat)
 
       %{
         at_ms: at_ms,
-        at_tick: at_tick,
-        notes: [note_frame(note, at_tick, sample_context)]
+        at_mbeat: at_mbeat,
+        at_tick: at_mbeat,
+        notes: [note_frame(note, at_mbeat, sample_context)]
       }
     end
   end
 
-  defp note_frame(note, at_tick, _sample_context) when at_tick < note.delay_ticks do
+  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
     %{
       note_name: note.note_name,
       octave: note.octave,
@@ -136,15 +135,14 @@ defmodule Mensch.Machines.PulseRoot do
     }
   end
 
-  defp note_frame(note, at_tick, _sample_context) do
-    local_elapsed_ticks = at_tick - note.delay_ticks
-    absolute_tick = note.entry_start_tick_abs + at_tick
+  defp note_frame(note, at_mbeat, _sample_context) do
+    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    absolute_mbeat = note.entry_start_mbeat_abs + at_mbeat
 
     pressure =
       beat_pulse_pressure(
-        absolute_tick,
-        note.ticks_per_beat,
-        note.pulse_width_ticks,
+        absolute_mbeat,
+        note.pulse_width_mbeats,
         note.base_pressure,
         note.peak_pressure
       )
@@ -159,8 +157,8 @@ defmodule Mensch.Machines.PulseRoot do
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
       phase: :sustain,
-      note_on: local_elapsed_ticks == 0,
-      note_off: local_elapsed_ticks == note.total_ticks,
+      note_on: local_elapsed_mbeats == 0,
+      note_off: local_elapsed_mbeats == note.total_mbeats,
       pressure: pressure,
       bend: 0.0,
       slide: 0
@@ -168,21 +166,20 @@ defmodule Mensch.Machines.PulseRoot do
   end
 
   defp beat_pulse_pressure(
-         absolute_tick,
-         ticks_per_beat,
-         pulse_width_ticks,
+         absolute_mbeat,
+         pulse_width_mbeats,
          base_pressure,
          peak_pressure
        )
-       when ticks_per_beat > 0 and pulse_width_ticks > 0 do
-    phase_ticks = rem(absolute_tick, ticks_per_beat)
+       when pulse_width_mbeats > 0 do
+    phase_mbeats = rem(absolute_mbeat, @mbeats_per_beat)
 
     cond do
-      phase_ticks == 0 ->
+      phase_mbeats == 0 ->
         peak_pressure
 
-      phase_ticks < pulse_width_ticks ->
-        progress = phase_ticks / pulse_width_ticks
+      phase_mbeats < pulse_width_mbeats ->
+        progress = phase_mbeats / pulse_width_mbeats
         interpolate(peak_pressure, base_pressure, progress)
 
       true ->
@@ -192,9 +189,8 @@ defmodule Mensch.Machines.PulseRoot do
   end
 
   defp beat_pulse_pressure(
-         _absolute_tick,
-         _ticks_per_beat,
-         _pulse_width_ticks,
+         _absolute_mbeat,
+         _pulse_width_mbeats,
          base_pressure,
          _peak_pressure
        ),
@@ -238,7 +234,8 @@ defmodule Mensch.Machines.PulseRoot do
     (octave + 1) * 12 + semitone
   end
 
-  defp snap_ticks(ticks, ticks_per_frame), do: round(ticks / ticks_per_frame) * ticks_per_frame
+  defp snap_mbeats(mbeats, mbeats_per_frame),
+    do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end
