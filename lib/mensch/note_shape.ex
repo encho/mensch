@@ -12,6 +12,8 @@ defmodule Mensch.NoteShape do
   building a precomputed performance dataset.
   """
 
+  alias Mensch.Envelope.ADSR
+
   @peak_pressure 127
   @sustain_pressure 100
   @vibrato_rate_hz 4.0
@@ -36,58 +38,37 @@ defmodule Mensch.NoteShape do
   @aftertouch_hold_s 0.5
   @aftertouch_release_s 0.8
 
-  @doc "Which envelope phase `elapsed_ms` falls into, given `milestones`."
-  def phase_at(milestones, elapsed_ms) do
-    cond do
-      elapsed_ms < milestones.attack_end_ms ->
-        :attack
+  @doc "Which envelope phase `elapsed_ticks` falls into for the given ADSR envelope."
+  def phase_at(%ADSR{} = adsr, elapsed_ticks) do
+    ADSR.phase_at_tick(adsr, elapsed_ticks)
+  end
 
-      elapsed_ms < milestones.decay_end_ms ->
-        :decay
+  @doc "Channel Pressure (0-127, unclamped) at `elapsed_ticks`."
+  def pressure(%ADSR{} = adsr, phase, elapsed_ticks, elapsed_ms) do
+    base = ADSR.level_at_tick(adsr, elapsed_ticks) * @peak_pressure
 
-      not is_nil(milestones.release_start_ms) and elapsed_ms >= milestones.release_start_ms ->
-        :release
+    # Sustain breathes gently around the ADSR sustain level so note
+    # body stays alive without changing attack/decay/release semantics.
+    if ADSR.in_sustain_tick?(adsr, elapsed_ticks) do
+      sustain_center = adsr.sustain_level * @peak_pressure
+      base_offset = base - sustain_center
 
-      true ->
-        :sustain
+      angle = 2 * :math.pi() * @pressure_rate_hz * (elapsed_ms / 1000) + phase
+      sustain_center + base_offset + :math.sin(angle) * @pressure_depth
+    else
+      base
     end
   end
 
-  @doc "Channel Pressure (0-127, unclamped) at `elapsed_ms`."
-  # Attack: linear ramp up from silence to the envelope's peak.
-  def pressure(%{attack_end_ms: attack_end_ms}, _phase, elapsed_ms)
-      when elapsed_ms < attack_end_ms do
-    lerp(0, @peak_pressure, safe_ratio(elapsed_ms, attack_end_ms))
-  end
-
-  # Decay: linear ramp down from peak to the sustain level.
-  def pressure(%{attack_end_ms: attack_end_ms, decay_end_ms: decay_end_ms}, _phase, elapsed_ms)
-      when elapsed_ms < decay_end_ms do
-    ratio = safe_ratio(elapsed_ms - attack_end_ms, decay_end_ms - attack_end_ms)
-    lerp(@peak_pressure, @sustain_pressure, ratio)
-  end
-
-  # Release: linear ramp down from sustain to silence.
-  def pressure(%{release_start_ms: release_start_ms, total_ms: total_ms}, _phase, elapsed_ms)
-      when not is_nil(release_start_ms) and elapsed_ms >= release_start_ms do
-    lerp(
-      @sustain_pressure,
-      0,
-      safe_ratio(elapsed_ms - release_start_ms, total_ms - release_start_ms)
-    )
-  end
-
-  # Sustain: breathes gently and symmetrically around the sustain
-  # level - confirmed by ear that pressure alone doesn't carry the
-  # "aftertouch" character (see `slide/4` for what does).
-  def pressure(_milestones, phase, elapsed_ms) do
+  # Backward-compatible fallback for map-based milestone envelopes.
+  def pressure(_milestones, phase, _elapsed_ticks, elapsed_ms) do
     angle = 2 * :math.pi() * @pressure_rate_hz * (elapsed_ms / 1000) + phase
     @sustain_pressure + :math.sin(angle) * @pressure_depth
   end
 
   @doc "Pitch bend ratio (-1.0..1.0, unclamped) at `elapsed_ms` - vibrato only during sustain."
-  def bend(milestones, phase, elapsed_ms) do
-    if in_sustain?(milestones, elapsed_ms) do
+  def bend(%ADSR{} = adsr, phase, elapsed_ms, elapsed_ticks) do
+    if ADSR.in_sustain_tick?(adsr, elapsed_ticks) do
       angle = 2 * :math.pi() * @vibrato_rate_hz * (elapsed_ms / 1000) + phase
       :math.sin(angle) * @vibrato_depth
     else
@@ -102,8 +83,8 @@ defmodule Mensch.NoteShape do
   it starts, derived from `phase`), and only during sustain, same as
   vibrato. Every other note just sits at rest.
   """
-  def slide(milestones, phase, true = _emphasis, elapsed_ms) do
-    if in_sustain?(milestones, elapsed_ms) do
+  def slide(%ADSR{} = adsr, phase, true = _emphasis, elapsed_ms, elapsed_ticks) do
+    if ADSR.in_sustain_tick?(adsr, elapsed_ticks) do
       elapsed_seconds = elapsed_ms / 1000
       offset = phase / (2 * :math.pi()) * @aftertouch_cycle_s
       t = :math.fmod(elapsed_seconds + offset, @aftertouch_cycle_s)
@@ -128,16 +109,10 @@ defmodule Mensch.NoteShape do
     end
   end
 
-  def slide(_milestones, _phase, _emphasis, _elapsed_ms), do: @aftertouch_slide_rest
+  def slide(%ADSR{}, _phase, _emphasis, _elapsed_ms, _elapsed_ticks), do: @aftertouch_slide_rest
 
-  @doc "Whether `elapsed_ms` falls within the sustain phase of `milestones`."
-  def in_sustain?(milestones, elapsed_ms) do
-    elapsed_ms >= milestones.decay_end_ms and
-      (is_nil(milestones.release_start_ms) or elapsed_ms < milestones.release_start_ms)
+  @doc "Whether `elapsed_ticks` falls within the sustain phase of `adsr`."
+  def in_sustain?(%ADSR{} = adsr, elapsed_ticks) do
+    ADSR.in_sustain_tick?(adsr, elapsed_ticks)
   end
-
-  defp lerp(from, to, ratio), do: from + (to - from) * ratio
-
-  defp safe_ratio(_numerator, denominator) when denominator <= 0, do: 1.0
-  defp safe_ratio(numerator, denominator), do: (numerator / denominator) |> max(0.0) |> min(1.0)
 end

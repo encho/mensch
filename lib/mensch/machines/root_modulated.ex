@@ -5,6 +5,7 @@ defmodule Mensch.Machines.RootModulated do
   """
 
   alias Mensch.ChordSpec
+  alias Mensch.Envelope.ADSR
   alias Mensch.Machines.RootModulatedParams
   alias Mensch.NoteShape
   alias Mensch.Performance
@@ -52,7 +53,7 @@ defmodule Mensch.Machines.RootModulated do
     root_note = midi_note_number(chord_spec.root, chord_spec.octave)
     {note_name, octave} = ChordSpec.note_name(root_note)
 
-    milestones = build_milestones(duration_ticks, sample_context, params)
+    adsr = build_adsr(duration_ticks, sample_context, params)
 
     note = %{
       note_name: note_name,
@@ -66,7 +67,7 @@ defmodule Mensch.Machines.RootModulated do
       chord_instance_id: 0,
       event_index: 0,
       delay_ticks: sample_start_tick,
-      milestones: milestones
+      adsr: adsr
     }
 
     duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
@@ -81,47 +82,16 @@ defmodule Mensch.Machines.RootModulated do
     }
   end
 
-  defp build_milestones(
+  defp build_adsr(
          duration_ticks,
          %SampleContext{} = sample_context,
          %RootModulatedParams{} = params
        ) do
-    attack_end_ticks = SampleContext.mbeats_to_ticks(sample_context, params.attack_mbeats)
-
-    decay_end_ticks =
-      attack_end_ticks + SampleContext.mbeats_to_ticks(sample_context, params.decay_mbeats)
-
-    release_tail_ticks = SampleContext.mbeats_to_ticks(sample_context, params.release_mbeats)
-
-    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
-
-    %{
-      attack_end_ms: SampleContext.ticks_to_ms(sample_context, attack_end_ticks),
-      decay_end_ms: SampleContext.ticks_to_ms(sample_context, decay_end_ticks),
-      release_start_ms:
-        release_start_ms(
-          sample_context,
-          duration_ticks,
-          release_tail_ticks,
-          params.release_mbeats
-        ),
-      total_ms: duration_ms,
-      total_ticks: duration_ticks
-    }
-  end
-
-  defp release_start_ms(_sample_context, _duration_ticks, _release_tail_ticks, 0), do: nil
-
-  defp release_start_ms(
-         %SampleContext{} = sample_context,
-         duration_ticks,
-         release_tail_ticks,
-         _release_mbeats
-       ) do
-    duration_ticks
-    |> Kernel.-(release_tail_ticks)
-    |> max(0)
-    |> then(&SampleContext.ticks_to_ms(sample_context, &1))
+    ADSR.from_mbeats(duration_ticks, sample_context, %{
+      attack_mbeats: params.attack_mbeats,
+      decay_mbeats: params.decay_mbeats,
+      release_mbeats: params.release_mbeats
+    })
   end
 
   defp build_music(note, duration_ticks, sample_context, frame_ticks) do
@@ -182,15 +152,21 @@ defmodule Mensch.Machines.RootModulated do
       machine_id: note.machine_id,
       chord_instance_id: note.chord_instance_id,
       event_index: note.event_index,
-      phase: NoteShape.phase_at(note.milestones, local_elapsed_ms),
+      phase: NoteShape.phase_at(note.adsr, local_elapsed_ticks),
       note_on: local_elapsed_ticks == 0,
-      note_off: local_elapsed_ticks == note.milestones.total_ticks,
+      note_off: local_elapsed_ticks == note.adsr.total_ticks,
       pressure:
-        NoteShape.pressure(note.milestones, note.phase_offset, local_elapsed_ms)
+        NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_ticks, local_elapsed_ms)
         |> clamp_7bit(),
-      bend: NoteShape.bend(note.milestones, note.phase_offset, local_elapsed_ms),
+      bend: NoteShape.bend(note.adsr, note.phase_offset, local_elapsed_ms, local_elapsed_ticks),
       slide:
-        NoteShape.slide(note.milestones, note.phase_offset, note.emphasis, local_elapsed_ms)
+        NoteShape.slide(
+          note.adsr,
+          note.phase_offset,
+          note.emphasis,
+          local_elapsed_ms,
+          local_elapsed_ticks
+        )
         |> clamp_7bit()
     }
   end
