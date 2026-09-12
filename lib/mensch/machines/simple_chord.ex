@@ -14,7 +14,7 @@ defmodule Mensch.Machines.SimpleChord do
 
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
-  alias Mensch.Machine.RenderedEntry
+  alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machines.SimpleChordParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
@@ -55,7 +55,7 @@ defmodule Mensch.Machines.SimpleChord do
     }
   end
 
-  def render(
+  def build_frame_sequence(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
@@ -107,10 +107,7 @@ defmodule Mensch.Machines.SimpleChord do
         _ -> notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
       end
 
-    %RenderedEntry{
-      duration_mbeats: duration_mbeats,
-      music: build_music(notes, duration_mbeats, frame_mbeats)
-    }
+    %MachineFrameSequence{frames: build_frames(notes, duration_mbeats, frame_mbeats)}
   end
 
   defp build_notes(
@@ -174,7 +171,7 @@ defmodule Mensch.Machines.SimpleChord do
     })
   end
 
-  defp build_music(notes, duration_mbeats, frame_mbeats) do
+  defp build_frames(notes, duration_mbeats, frame_mbeats) do
     for at_mbeat <- 0..duration_mbeats//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
@@ -341,8 +338,14 @@ defimpl Mensch.Machine, for: Mensch.Machines.SimpleChord do
     }
   end
 
-  def render(%SimpleChord{params: params}, chord_spec, sample_context, timeline_context, opts) do
-    SimpleChord.render(
+  def build_frame_sequence(
+        %SimpleChord{params: params},
+        chord_spec,
+        sample_context,
+        timeline_context,
+        opts
+      ) do
+    SimpleChord.build_frame_sequence(
       chord_spec,
       sample_context,
       timeline_context,

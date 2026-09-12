@@ -126,8 +126,8 @@ defmodule Mensch.MidiFile do
     [header | rows] |> IO.iodata_to_binary()
   end
 
-  defp build_channel_events(%Performance{music: music}) do
-    music
+  defp build_channel_events(%Performance{frames: frames}) do
+    frames
     |> Enum.flat_map(fn frame ->
       mbeat = Map.get(frame, :at_mbeat, 0)
       at_ms = Map.get(frame, :at_ms, 0)

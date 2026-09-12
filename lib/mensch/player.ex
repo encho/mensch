@@ -59,7 +59,7 @@ defmodule Mensch.Player do
     state = stop_all(state)
     ref = make_ref()
 
-    Enum.each(data.music, fn frame ->
+    Enum.each(data.frames, fn frame ->
       Process.send_after(self(), {:frame, ref, frame.notes}, frame.at_ms)
     end)
 

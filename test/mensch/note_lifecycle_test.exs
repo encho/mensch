@@ -33,10 +33,12 @@ defmodule Mensch.NoteLifecycleTest do
       %SimpleChordParams{SimpleChordParams.default() | stagger_mbeats: 1000, release_mbeats: 0}
 
     machine = %SimpleChord{params: params}
-    performance = Machine.render(machine, chord_spec, sample_context, timeline_context, [])
+
+    performance =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
 
     first_note_frames =
-      Enum.map(performance.music, fn frame ->
+      Enum.map(performance.frames, fn frame ->
         note = Enum.find(frame.notes, fn note -> note.event_index == 0 end)
         {frame.at_mbeat, note}
       end)
@@ -76,10 +78,12 @@ defmodule Mensch.NoteLifecycleTest do
       }
 
     machine = %SimpleChord{params: params}
-    performance = Machine.render(machine, chord_spec, sample_context, timeline_context, [])
+
+    performance =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
 
     note_offs_by_index =
-      performance.music
+      performance.frames
       |> Enum.flat_map(fn frame ->
         frame.notes
         |> Enum.filter(& &1.note_off)

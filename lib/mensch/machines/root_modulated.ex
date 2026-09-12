@@ -6,7 +6,7 @@ defmodule Mensch.Machines.RootModulated do
 
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
-  alias Mensch.Machine.RenderedEntry
+  alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machines.RootModulatedParams
   alias Mensch.NoteShape
   alias Mensch.SampleContext
@@ -33,7 +33,7 @@ defmodule Mensch.Machines.RootModulated do
     %{}
   end
 
-  def render(
+  def build_frame_sequence(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
@@ -73,9 +73,8 @@ defmodule Mensch.Machines.RootModulated do
       adsr: adsr
     }
 
-    %RenderedEntry{
-      duration_mbeats: duration_mbeats,
-      music: build_music(note, duration_mbeats, frame_mbeats, sample_context)
+    %MachineFrameSequence{
+      frames: build_frames(note, duration_mbeats, frame_mbeats, sample_context)
     }
   end
 
@@ -91,7 +90,7 @@ defmodule Mensch.Machines.RootModulated do
     })
   end
 
-  defp build_music(note, duration_mbeats, frame_mbeats, sample_context) do
+  defp build_frames(note, duration_mbeats, frame_mbeats, sample_context) do
     for at_mbeat <- 0..duration_mbeats//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
@@ -218,8 +217,14 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootModulated do
 
   def controls(%RootModulated{}), do: %{}
 
-  def render(%RootModulated{params: params}, chord_spec, sample_context, timeline_context, opts) do
-    RootModulated.render(
+  def build_frame_sequence(
+        %RootModulated{params: params},
+        chord_spec,
+        sample_context,
+        timeline_context,
+        opts
+      ) do
+    RootModulated.build_frame_sequence(
       chord_spec,
       sample_context,
       timeline_context,

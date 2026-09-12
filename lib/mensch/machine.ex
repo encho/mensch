@@ -12,12 +12,12 @@ defprotocol Mensch.Machine do
   @spec controls(t()) :: map()
   def controls(machine)
 
-  @spec render(
+  @spec build_frame_sequence(
           t(),
           Mensch.ChordSpec.t(),
           Mensch.SampleContext.t(),
           Mensch.TimelineContext.t(),
           keyword()
-        ) :: Mensch.Machine.RenderedEntry.t()
-  def render(machine, chord_spec, sample_context, timeline_context, opts)
+        ) :: Mensch.Machine.MachineFrameSequence.t()
+  def build_frame_sequence(machine, chord_spec, sample_context, timeline_context, opts)
 end

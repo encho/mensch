@@ -10,7 +10,7 @@ defmodule Mensch.Machines.PulseRoot do
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.Machine.RenderedEntry
+  alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machines.PulseRootParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
@@ -44,7 +44,7 @@ defmodule Mensch.Machines.PulseRoot do
     }
   end
 
-  def render(
+  def build_frame_sequence(
         %ChordSpec{} = chord_spec,
         %SampleContext{} = sample_context,
         %TimelineContext{} = timeline_context,
@@ -91,13 +91,10 @@ defmodule Mensch.Machines.PulseRoot do
       peak_pressure: params.peak_pressure
     }
 
-    %RenderedEntry{
-      duration_mbeats: duration_mbeats,
-      music: build_music(note, duration_mbeats, frame_mbeats)
-    }
+    %MachineFrameSequence{frames: build_frames(note, duration_mbeats, frame_mbeats)}
   end
 
-  defp build_music(note, duration_mbeats, frame_mbeats) do
+  defp build_frames(note, duration_mbeats, frame_mbeats) do
     for at_mbeat <- 0..duration_mbeats//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
@@ -263,8 +260,14 @@ defimpl Mensch.Machine, for: Mensch.Machines.PulseRoot do
     }
   end
 
-  def render(%PulseRoot{params: params}, chord_spec, sample_context, timeline_context, opts) do
-    PulseRoot.render(
+  def build_frame_sequence(
+        %PulseRoot{params: params},
+        chord_spec,
+        sample_context,
+        timeline_context,
+        opts
+      ) do
+    PulseRoot.build_frame_sequence(
       chord_spec,
       sample_context,
       timeline_context,

@@ -2,7 +2,7 @@ defmodule Mensch.Performance do
   @moduledoc """
   Canonical shape for a precomputed performance timeline.
 
-  This wraps the rendered data (`bpm`, `time_signature`, `music`, etc.)
+  This wraps the rendered data (`bpm`, `time_signature`, `frames`, etc.)
   in a dedicated struct and provides analysis helpers so callers do not
   need to re-implement timeline inspection logic.
 
@@ -20,7 +20,7 @@ defmodule Mensch.Performance do
         time_signature: {4, 4},
         granularity_ms: 31,
         duration_ms: 2500,
-        music: [
+        frames: [
           %{
             at_ms: 0,
             at_mbeat: 0,
@@ -85,11 +85,11 @@ defmodule Mensch.Performance do
           time_signature: {pos_integer(), pos_integer()},
           granularity_ms: pos_integer(),
           duration_ms: non_neg_integer(),
-          music: [frame()]
+          frames: [frame()]
         }
 
-  @enforce_keys [:bpm, :time_signature, :granularity_ms, :duration_ms, :music]
-  defstruct [:bpm, :time_signature, :granularity_ms, :duration_ms, :music]
+  @enforce_keys [:bpm, :time_signature, :granularity_ms, :duration_ms, :frames]
+  defstruct [:bpm, :time_signature, :granularity_ms, :duration_ms, :frames]
 
   @doc "Builds a `#{inspect(__MODULE__)}` from a map with matching keys."
   @spec new(map()) :: t()
@@ -97,7 +97,7 @@ defmodule Mensch.Performance do
 
   @doc "How many frames the timeline contains."
   @spec frame_count(t()) :: non_neg_integer()
-  def frame_count(%__MODULE__{music: music}), do: length(music)
+  def frame_count(%__MODULE__{frames: frames}), do: length(frames)
 
   @doc "Duration in seconds."
   @spec duration_seconds(t()) :: float()
@@ -105,8 +105,8 @@ defmodule Mensch.Performance do
 
   @doc "Distinct MIDI note numbers present in the performance, ascending."
   @spec distinct_notes(t()) :: [non_neg_integer()]
-  def distinct_notes(%__MODULE__{music: music}) do
-    music
+  def distinct_notes(%__MODULE__{frames: frames}) do
+    frames
     |> Enum.flat_map(& &1.notes)
     |> Enum.map(& &1.note)
     |> Enum.uniq()
@@ -124,8 +124,8 @@ defmodule Mensch.Performance do
 
   @doc "All note on/off events across all frames, sorted by `at_ms` and carrying machine/chord provenance + `event_index`."
   @spec io_events(t()) :: [map()]
-  def io_events(%__MODULE__{music: music}) do
-    music
+  def io_events(%__MODULE__{frames: frames}) do
+    frames
     |> Enum.flat_map(fn frame ->
       Enum.flat_map(frame.notes, fn note ->
         base = %{
@@ -165,13 +165,13 @@ defmodule Mensch.Performance do
   """
   @spec frame_time_index(t(), SampleContext.t(), BeatPosition.t()) :: [map()]
   def frame_time_index(
-        %__MODULE__{music: music},
+        %__MODULE__{frames: frames},
         %SampleContext{} = sample_context,
         %BeatPosition{} = start_beat
       ) do
     start_mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
 
-    Enum.map(music, fn frame ->
+    Enum.map(frames, fn frame ->
       absolute_mbeat = start_mbeat + SampleContext.ms_to_mbeats(sample_context, frame.at_ms)
       position = SampleContext.mbeat_to_position(sample_context, absolute_mbeat)
 

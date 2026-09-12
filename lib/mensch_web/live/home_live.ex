@@ -614,8 +614,8 @@ defmodule MenschWeb.HomeLive do
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
   # across the whole chord performance.
-  defp debug_rows(music) do
-    Enum.flat_map(music, fn frame ->
+  defp debug_rows(frames) do
+    Enum.flat_map(frames, fn frame ->
       Enum.map(frame.notes, &Map.put(&1, :at_ms, frame.at_ms))
     end)
   end
@@ -928,11 +928,11 @@ defmodule MenschWeb.HomeLive do
     |> Enum.map(fn mbeat -> Float.round(mbeat / total_mbeats * width, 2) end)
   end
 
-  # Groups a rendered `music` timeline's frames by note (`{channel,
+  # Groups a rendered timeline's frames by note (`{channel,
   # note}`), one polyline per note, for an SVG line chart of `value_key`
   # (`:pressure`, `:bend`, or `:slide`) over time.
   defp build_chart(
-         music,
+         frames,
          value_key,
          {min_v, max_v},
          render_scope,
@@ -940,10 +940,10 @@ defmodule MenschWeb.HomeLive do
          %SampleContext{} = _sample_context,
          total_mbeats
        ) do
-    colors = note_color_map(music, render_scope, selected_note_key)
+    colors = note_color_map(frames, render_scope, selected_note_key)
     total_mbeats = max(total_mbeats, 1)
 
-    music
+    frames
     |> Enum.flat_map(fn frame ->
       local_mbeat = frame.at_mbeat
       x = local_mbeat / total_mbeats * 600
@@ -977,17 +977,17 @@ defmodule MenschWeb.HomeLive do
   # spacing matches real chromatic distance. A row may contain multiple
   # bars (same pitch reused later by another chord/channel).
   defp build_note_matrix(
-         music,
+         frames,
          render_scope,
          selected_note_key,
          %SampleContext{} = _sample_context,
          total_mbeats
        ) do
-    colors = note_color_map(music, render_scope, selected_note_key)
+    colors = note_color_map(frames, render_scope, selected_note_key)
     total_mbeats = max(total_mbeats, 1)
 
     segments =
-      music
+      frames
       |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_mbeat}) end)
       |> Enum.group_by(fn {note, _at_mbeat} -> {note.note, note.channel} end)
       |> Enum.flat_map(fn {{note_number, channel}, entries} ->
@@ -1099,17 +1099,17 @@ defmodule MenschWeb.HomeLive do
   # Assigns each distinct `{channel, note}` a stable color (ordered by
   # channel) shared by both the line charts and the note matrix, so the
   # same note always reads as the same color across visualizations.
-  defp note_color_map(music, render_scope, selected_note_key) do
-    music
+  defp note_color_map(frames, render_scope, selected_note_key) do
+    frames
     |> base_note_color_map(render_scope)
     |> Map.new(fn {note_key, color} ->
       {note_key, focus_color(note_key, color, selected_note_key)}
     end)
   end
 
-  defp base_note_color_map(music, {:entry, entry_index}) when is_integer(entry_index) do
+  defp base_note_color_map(frames, {:entry, entry_index}) when is_integer(entry_index) do
     base_color = timeline_color(entry_index)
-    events = music |> distinct_note_events() |> sort_voice_events()
+    events = frames |> distinct_note_events() |> sort_voice_events()
     total = length(events)
 
     events
@@ -1119,8 +1119,8 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp base_note_color_map(music, :full_sample) do
-    music
+  defp base_note_color_map(frames, :full_sample) do
+    frames
     |> distinct_note_events()
     |> Enum.group_by(&Map.get(&1, :sample_entry_index, 0))
     |> Enum.flat_map(fn {entry_index, events} ->
@@ -1140,8 +1140,8 @@ defmodule MenschWeb.HomeLive do
     |> Map.new()
   end
 
-  defp base_note_color_map(music, _render_scope) do
-    music
+  defp base_note_color_map(frames, _render_scope) do
+    frames
     |> Enum.flat_map(& &1.notes)
     |> Enum.uniq_by(&{&1.channel, &1.note})
     |> Enum.sort_by(& &1.channel)
@@ -1175,8 +1175,8 @@ defmodule MenschWeb.HomeLive do
     "#{pretty_note_name}#{octave} · ch #{channel}"
   end
 
-  defp distinct_note_events(music) do
-    music
+  defp distinct_note_events(frames) do
+    frames
     |> Enum.flat_map(& &1.notes)
     |> Enum.uniq_by(&{&1.channel, &1.note})
   end
@@ -1217,9 +1217,9 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp detail_total_mbeats(music, duration_ms, %SampleContext{} = sample_context) do
+  defp detail_total_mbeats(frames, duration_ms, %SampleContext{} = sample_context) do
     mbeat_by_duration = SampleContext.ms_to_mbeats(sample_context, duration_ms)
-    mbeat_by_frames = music |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
+    mbeat_by_frames = frames |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
 
     max(max(mbeat_by_duration, mbeat_by_frames), 1)
   end
@@ -1236,15 +1236,15 @@ defmodule MenschWeb.HomeLive do
         |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
         |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
 
-      %{music: music, duration_ms: duration_ms} ->
+      %{frames: frames, duration_ms: duration_ms} ->
         detail_total_mbeats =
-          detail_total_mbeats(music, duration_ms, socket.assigns.sample_context)
+          detail_total_mbeats(frames, duration_ms, socket.assigns.sample_context)
 
         socket
         |> assign(
           :pressure_chart,
           build_chart(
-            music,
+            frames,
             :pressure,
             {0, 127},
             socket.assigns.render_scope,
@@ -1256,7 +1256,7 @@ defmodule MenschWeb.HomeLive do
         |> assign(
           :slide_chart,
           build_chart(
-            music,
+            frames,
             :slide,
             {0, 127},
             socket.assigns.render_scope,
@@ -1268,20 +1268,20 @@ defmodule MenschWeb.HomeLive do
         |> assign(
           :bend_chart,
           build_chart(
-            music,
+            frames,
             :bend,
-            value_range(music),
+            value_range(frames),
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
             socket.assigns.sample_context,
             detail_total_mbeats
           )
         )
-        |> assign(:debug_rows, debug_rows(music))
+        |> assign(:debug_rows, debug_rows(frames))
         |> assign(
           :note_matrix,
           build_note_matrix(
-            music,
+            frames,
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
             socket.assigns.sample_context,
@@ -1302,8 +1302,8 @@ defmodule MenschWeb.HomeLive do
   # Bend's absolute range is tiny (see `Mensch.NoteShape`'s
   # `@vibrato_depth`), so it gets its own dynamic min/max instead of
   # being squashed flat against a fixed +/-1.0 scale.
-  defp value_range(music) do
-    values = for frame <- music, note <- frame.notes, do: note.bend
+  defp value_range(frames) do
+    values = for frame <- frames, note <- frame.notes, do: note.bend
 
     case Enum.min_max(values) do
       {same, same} -> {same - 0.0001, same + 0.0001}

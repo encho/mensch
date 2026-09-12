@@ -1,4 +1,4 @@
-defmodule Mensch.Machine.RenderedEntry do
+defmodule Mensch.Machine.MachineFrameSequence do
   @moduledoc """
   Entry-local machine render result.
 
@@ -16,10 +16,9 @@ defmodule Mensch.Machine.RenderedEntry do
         }
 
   @type t :: %__MODULE__{
-          duration_mbeats: non_neg_integer(),
-          music: [frame()]
+          frames: [frame()]
         }
 
-  @enforce_keys [:duration_mbeats, :music]
-  defstruct [:duration_mbeats, :music]
+  @enforce_keys [:frames]
+  defstruct [:frames]
 end
