@@ -434,7 +434,6 @@ defmodule MenschWeb.HomeLive do
                 <tr class="border-b border-zinc-700/70 text-zinc-400">
                   <th class="px-2 py-1.5 font-normal">ChordSpec</th>
                   <th class="px-2 py-1.5 font-normal">Machine</th>
-                  <th class="px-2 py-1.5 font-normal">Voicing</th>
                   <th class="px-2 py-1.5 font-normal">Start</th>
                   <th class="px-2 py-1.5 font-normal">Duration</th>
                   <th class="px-2 py-1.5 font-normal text-right">Status</th>
@@ -452,7 +451,6 @@ defmodule MenschWeb.HomeLive do
                     </div>
                   </td>
                   <td class="px-2 py-1.5">{machine_label(entry.machine)}</td>
-                  <td class="px-2 py-1.5 text-zinc-300">{voicing_strategy_label(entry.machine)}</td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
                       {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
