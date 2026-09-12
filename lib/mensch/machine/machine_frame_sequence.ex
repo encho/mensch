@@ -8,7 +8,7 @@ defmodule Mensch.Machine.MachineFrameSequence do
   `Mensch.PerformanceAssembler`.
   """
 
-  @type note_event :: map()
+  @type note_event :: Mensch.Machine.NoteFrame.t() | map()
 
   @type frame :: %{
           at_mbeat: non_neg_integer(),

@@ -14,6 +14,7 @@ defmodule Mensch.Machines.StrummedMpe do
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
   alias Mensch.Machine.MachineFrameSequence
+  alias Mensch.Machine.NoteFrame
   alias Mensch.Machines.StrummedMpeParams
   alias Mensch.NoteShape
   alias Mensch.SampleContext
@@ -160,57 +161,33 @@ defmodule Mensch.Machines.StrummedMpe do
   end
 
   defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
-    %{
-      note_name: note.note_name,
-      octave: note.octave,
-      midi_note: note.midi_note,
-      channel: note.channel,
-      velocity: note.velocity,
-      machine_id: note.machine_id,
-      chord_instance_id: note.chord_instance_id,
-      event_index: note.event_index,
+    NoteFrame.from_note_source(note, %{
       phase: :pending,
       note_on: false,
       note_off: false,
       pressure: 0,
       bend: 0.0,
       slide: 0
-    }
+    })
   end
 
   defp note_frame(note, at_mbeat, _sample_context)
        when at_mbeat > note.delay_mbeats + note.adsr.total_mbeats do
-    %{
-      note_name: note.note_name,
-      octave: note.octave,
-      midi_note: note.midi_note,
-      channel: note.channel,
-      velocity: note.velocity,
-      machine_id: note.machine_id,
-      chord_instance_id: note.chord_instance_id,
-      event_index: note.event_index,
+    NoteFrame.from_note_source(note, %{
       phase: :ended,
       note_on: false,
       note_off: false,
       pressure: 0,
       bend: 0.0,
       slide: 0
-    }
+    })
   end
 
   defp note_frame(note, at_mbeat, sample_context) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     local_elapsed_ms = SampleContext.mbeats_to_ms(sample_context, local_elapsed_mbeats)
 
-    %{
-      note_name: note.note_name,
-      octave: note.octave,
-      midi_note: note.midi_note,
-      channel: note.channel,
-      velocity: note.velocity,
-      machine_id: note.machine_id,
-      chord_instance_id: note.chord_instance_id,
-      event_index: note.event_index,
+    NoteFrame.from_note_source(note, %{
       phase: NoteShape.phase_at(note.adsr, local_elapsed_mbeats),
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
@@ -227,7 +204,7 @@ defmodule Mensch.Machines.StrummedMpe do
           local_elapsed_mbeats
         )
         |> clamp_7bit()
-    }
+    })
   end
 
   defp snap_mbeats(mbeats, mbeats_per_frame),

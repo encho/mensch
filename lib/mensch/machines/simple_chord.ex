@@ -15,6 +15,7 @@ defmodule Mensch.Machines.SimpleChord do
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
   alias Mensch.Machine.MachineFrameSequence
+  alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machines.SimpleChordParams
   alias Mensch.SampleContext
@@ -113,19 +114,21 @@ defmodule Mensch.Machines.SimpleChord do
         params
       )
 
-    duration_mbeats =
+    max_note_end_mbeats =
       case notes do
         [] -> chord_duration_mbeats
         _ -> notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
       end
 
+    assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
+
     note_frame_streams =
       Enum.map(notes, fn note ->
-        render_note_frame_stream(note, duration_mbeats, frame_mbeats)
+        render_note_frame_stream(note, chord_duration_mbeats, frame_mbeats)
       end)
 
     %MachineFrameSequence{
-      frames: stitch_note_frame_streams(note_frame_streams, duration_mbeats, frame_mbeats)
+      frames: stitch_note_frame_streams(note_frame_streams, chord_duration_mbeats, frame_mbeats)
     }
   end
 
@@ -241,7 +244,9 @@ defmodule Mensch.Machines.SimpleChord do
   end
 
   defp render_note_frame_stream(note, duration_mbeats, frame_mbeats) do
-    for at_mbeat <- 0..duration_mbeats//frame_mbeats do
+    note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, duration_mbeats)
+
+    for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
         note: note_frame(note, at_mbeat)
@@ -270,61 +275,11 @@ defmodule Mensch.Machines.SimpleChord do
     Enum.to_list(0..duration_mbeats//frame_mbeats)
   end
 
-  defp note_frame(note, at_mbeat) when at_mbeat < note.delay_mbeats do
-    %{
-      note_name: note.note_name,
-      octave: note.octave,
-      midi_note: note.midi_note,
-      channel: note.channel,
-      velocity: note.velocity,
-      machine_id: note.machine_id,
-      chord_instance_id: note.chord_instance_id,
-      event_index: note.event_index,
-      degree_index: note.degree_index,
-      phase: :pending,
-      note_on: false,
-      note_off: false,
-      pressure: 0,
-      bend: 0.0,
-      slide: 0
-    }
-  end
-
-  defp note_frame(note, at_mbeat)
-       when at_mbeat > note.delay_mbeats + note.adsr.total_mbeats do
-    %{
-      note_name: note.note_name,
-      octave: note.octave,
-      midi_note: note.midi_note,
-      channel: note.channel,
-      velocity: note.velocity,
-      machine_id: note.machine_id,
-      chord_instance_id: note.chord_instance_id,
-      event_index: note.event_index,
-      degree_index: note.degree_index,
-      phase: :ended,
-      note_on: false,
-      note_off: false,
-      pressure: 0,
-      bend: 0.0,
-      slide: 0
-    }
-  end
-
   defp note_frame(note, at_mbeat) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
 
-    %{
-      note_name: note.note_name,
-      octave: note.octave,
-      midi_note: note.midi_note,
-      channel: note.channel,
-      velocity: note.velocity,
-      machine_id: note.machine_id,
-      chord_instance_id: note.chord_instance_id,
-      event_index: note.event_index,
-      degree_index: note.degree_index,
+    NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
@@ -332,7 +287,7 @@ defmodule Mensch.Machines.SimpleChord do
         ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats) |> then(&(&1 * 127)) |> clamp_7bit(),
       bend: 0.0,
       slide: 0
-    }
+    })
   end
 
   defp machine_params!(opts) do
@@ -407,6 +362,15 @@ defmodule Mensch.Machines.SimpleChord do
 
   defp normalize_note_length_mode(:align_end), do: :align_end
   defp normalize_note_length_mode(_mode), do: :equal
+
+  defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
+       when max_note_end_mbeats == chord_duration_mbeats,
+       do: :ok
+
+  defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats) do
+    raise ArgumentError,
+          "simple_chord invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_duration_mbeats}"
+  end
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end
