@@ -1229,7 +1229,7 @@ defmodule MenschWeb.HomeLive do
     |> Enum.flat_map(& &1.notes)
     |> Enum.uniq_by(&note_series_key/1)
     |> Enum.sort_by(fn event ->
-      {Map.get(event, :sample_entry_index, -1), Map.get(event, :event_index, 999),
+      {Map.get(event, :sample_entry_index, -1), Map.get(event, :note_instance_id, 999),
        event.midi_note, event.channel}
     end)
     |> Enum.with_index()
@@ -1278,8 +1278,8 @@ defmodule MenschWeb.HomeLive do
   defp sort_voice_events(events) do
     Enum.sort_by(events, fn event ->
       {Map.get(event, :sample_entry_index, -1), Map.get(event, :machine_id, :unknown),
-       Map.get(event, :chord_instance_id, 0), Map.get(event, :event_index, 999), event.midi_note,
-       event.channel}
+       Map.get(event, :chord_instance_id, 0), Map.get(event, :note_instance_id, 999),
+       event.midi_note, event.channel}
     end)
   end
 
@@ -1288,14 +1288,14 @@ defmodule MenschWeb.HomeLive do
       Map.get(note, :sample_entry_index, -1),
       Map.get(note, :machine_id, :unknown),
       Map.get(note, :chord_instance_id, 0),
-      Map.get(note, :event_index, 0),
+      Map.get(note, :note_instance_id, 0),
       Map.get(note, :midi_note, 0),
       Map.get(note, :channel, -1)
     }
   end
 
   defp series_channel_note(
-         {_entry_index, _machine_id, _chord_instance_id, _event_index, note, channel}
+         {_entry_index, _machine_id, _chord_instance_id, _note_instance_id, note, channel}
        ) do
     {channel, note}
   end

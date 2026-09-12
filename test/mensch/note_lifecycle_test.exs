@@ -40,7 +40,7 @@ defmodule Mensch.NoteLifecycleTest do
     first_note_frames =
       performance.frames
       |> Enum.flat_map(fn frame ->
-        case Enum.find(frame.notes, fn note -> note.event_index == 0 end) do
+        case Enum.find(frame.notes, fn note -> note.note_instance_id == 0 end) do
           nil -> []
           note -> [{frame.at_mbeat, note}]
         end
@@ -85,7 +85,7 @@ defmodule Mensch.NoteLifecycleTest do
       |> Enum.flat_map(fn frame ->
         frame.notes
         |> Enum.filter(& &1.note_off)
-        |> Enum.map(fn note -> {note.event_index, frame.at_mbeat} end)
+        |> Enum.map(fn note -> {note.note_instance_id, frame.at_mbeat} end)
       end)
       |> Map.new()
 
@@ -121,7 +121,7 @@ defmodule Mensch.NoteLifecycleTest do
       |> Enum.flat_map(fn frame ->
         frame.notes
         |> Enum.filter(& &1.note_off)
-        |> Enum.map(fn note -> {note.event_index, frame.at_mbeat} end)
+        |> Enum.map(fn note -> {note.note_instance_id, frame.at_mbeat} end)
       end)
       |> Map.new()
 

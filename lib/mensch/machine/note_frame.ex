@@ -16,7 +16,7 @@ defmodule Mensch.Machine.NoteFrame do
     :velocity,
     :machine_id,
     :chord_instance_id,
-    :event_index,
+    :note_instance_id,
     :phase,
     :note_on,
     :note_off,
@@ -32,7 +32,7 @@ defmodule Mensch.Machine.NoteFrame do
     :velocity,
     :machine_id,
     :chord_instance_id,
-    :event_index,
+    :note_instance_id,
     :degree_index,
     :sample_entry_index,
     :phase,
@@ -51,7 +51,7 @@ defmodule Mensch.Machine.NoteFrame do
           velocity: non_neg_integer(),
           machine_id: atom(),
           chord_instance_id: non_neg_integer(),
-          event_index: non_neg_integer(),
+          note_instance_id: non_neg_integer(),
           degree_index: non_neg_integer() | nil,
           sample_entry_index: integer() | nil,
           phase: atom(),
@@ -80,7 +80,7 @@ defmodule Mensch.Machine.NoteFrame do
       velocity: note_plan_item.velocity,
       machine_id: note_plan_item.machine_id,
       chord_instance_id: note_plan_item.chord_instance_id,
-      event_index: note_plan_item.event_index,
+      note_instance_id: note_plan_item.note_instance_id,
       degree_index: note_plan_item.degree_index,
       sample_entry_index: nil
     }
@@ -103,7 +103,7 @@ defmodule Mensch.Machine.NoteFrame do
         velocity: Map.fetch!(note, :velocity),
         machine_id: Map.fetch!(note, :machine_id),
         chord_instance_id: Map.fetch!(note, :chord_instance_id),
-        event_index: Map.fetch!(note, :event_index),
+        note_instance_id: Map.fetch!(note, :note_instance_id),
         degree_index: Map.get(note, :degree_index, 0),
         delay_mbeats: Map.fetch!(note, :delay_mbeats)
       })

@@ -118,7 +118,7 @@ defmodule Mensch.Machines.StrummedMpe do
         emphasis: note_index == 0,
         machine_id: id(),
         chord_instance_id: 0,
-        event_index: note_index,
+        note_instance_id: note_index,
         delay_mbeats: note_start_mbeat,
         adsr: adsr
       }

@@ -16,7 +16,7 @@ defmodule Mensch.Machine.NotePlanItem do
 
   Design intent:
 
-  - `event_index` tracks position in the realized playback sequence.
+  - `note_instance_id` identifies one note lifecycle from note-on to note-off.
   - `degree_index` tracks harmonic source position.
 
   Those are intentionally separate so richer sequencers can diverge them.
@@ -24,13 +24,13 @@ defmodule Mensch.Machine.NotePlanItem do
   Example:
 
     # Octave walk sequence for a triad: C4, E4, G4, C5, G4
-    # event_index:  0, 1, 2, 3, 4
+    # note_instance_id:  0, 1, 2, 3, 4
     # degree_index: 0, 1, 2, 0, 2
 
   Invariants expected from builders:
 
   - `delay_mbeats` is already quantized to the machine frame grid.
-  - `event_index` and `degree_index` are non-negative.
+  - `note_instance_id` and `degree_index` are non-negative.
   - `channel` may be `nil` until global channel allocation.
   - `adsr` may be `nil` until envelope assignment.
 
@@ -44,7 +44,7 @@ defmodule Mensch.Machine.NotePlanItem do
         velocity: 100,
         machine_id: :simple_chord,
         chord_instance_id: 0,
-        event_index: 3,
+        note_instance_id: 3,
         degree_index: 0,
         delay_mbeats: 540,
         adsr: nil
@@ -60,7 +60,7 @@ defmodule Mensch.Machine.NotePlanItem do
     :velocity,
     :machine_id,
     :chord_instance_id,
-    :event_index,
+    :note_instance_id,
     :degree_index,
     :delay_mbeats
   ]
@@ -72,7 +72,7 @@ defmodule Mensch.Machine.NotePlanItem do
     :velocity,
     :machine_id,
     :chord_instance_id,
-    :event_index,
+    :note_instance_id,
     :degree_index,
     :delay_mbeats,
     :adsr
@@ -92,7 +92,7 @@ defmodule Mensch.Machine.NotePlanItem do
   - `machine_id`: Source machine identifier, e.g. `:simple_chord`.
   - `chord_instance_id`: Chord occurrence identity in a sequence/performance,
     e.g. `0` for the first entry.
-  - `event_index`: Playback sequence position, e.g. `3`.
+  - `note_instance_id`: Stable note lifecycle id, e.g. `3`.
   - `degree_index`: Harmonic source position, e.g. `0` for the root degree.
   - `delay_mbeats`: Absolute quantized note start time in mbeat units,
     e.g. `540`.
@@ -107,7 +107,7 @@ defmodule Mensch.Machine.NotePlanItem do
           velocity: integer(),
           machine_id: atom(),
           chord_instance_id: non_neg_integer(),
-          event_index: non_neg_integer(),
+          note_instance_id: non_neg_integer(),
           degree_index: non_neg_integer(),
           delay_mbeats: non_neg_integer(),
           adsr: ADSR.t() | nil

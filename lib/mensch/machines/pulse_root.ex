@@ -83,7 +83,7 @@ defmodule Mensch.Machines.PulseRoot do
       velocity: params.velocity,
       machine_id: id(),
       chord_instance_id: 0,
-      event_index: 0,
+      note_instance_id: 0,
       delay_mbeats: sample_start_mbeat,
       total_mbeats: duration_mbeats,
       entry_start_mbeat_abs: entry_start_mbeat_abs,

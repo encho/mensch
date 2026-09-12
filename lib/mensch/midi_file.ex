@@ -136,14 +136,14 @@ defmodule Mensch.MidiFile do
         ch = clamp_u7(Map.get(note, :channel, 0))
         midi_note = clamp_u7(Map.get(note, :midi_note, 0))
         velocity = clamp_u7(Map.get(note, :velocity, 0))
-        event_index = Map.get(note, :event_index, 999)
+        note_instance_id = Map.get(note, :note_instance_id, 999)
 
         events =
           []
           |> maybe_add(Map.get(note, :note_on, false), %{
             tick: mbeat,
             at_ms: at_ms,
-            sort: {event_index, ch, midi_note, 1},
+            sort: {note_instance_id, ch, midi_note, 1},
             label: :note_on,
             midi_note: midi_note,
             bytes: <<0x90 + ch, midi_note, velocity>>
@@ -154,7 +154,7 @@ defmodule Mensch.MidiFile do
             %{
               tick: mbeat,
               at_ms: at_ms,
-              sort: {event_index, ch, midi_note, 2},
+              sort: {note_instance_id, ch, midi_note, 2},
               label: :pressure,
               midi_note: midi_note,
               bytes: <<0xD0 + ch, clamp_u7(Map.get(note, :pressure, 0))>>
@@ -166,7 +166,7 @@ defmodule Mensch.MidiFile do
             %{
               tick: mbeat,
               at_ms: at_ms,
-              sort: {event_index, ch, midi_note, 3},
+              sort: {note_instance_id, ch, midi_note, 3},
               label: :bend,
               midi_note: midi_note,
               bytes: bend_bytes(ch, Map.get(note, :bend, 0.0))
@@ -178,7 +178,7 @@ defmodule Mensch.MidiFile do
             %{
               tick: mbeat,
               at_ms: at_ms,
-              sort: {event_index, ch, midi_note, 4},
+              sort: {note_instance_id, ch, midi_note, 4},
               label: :slide,
               midi_note: midi_note,
               bytes: <<0xB0 + ch, 74, clamp_u7(Map.get(note, :slide, 0))>>
@@ -187,7 +187,7 @@ defmodule Mensch.MidiFile do
           |> maybe_add(Map.get(note, :note_off, false), %{
             tick: mbeat,
             at_ms: at_ms,
-            sort: {event_index, ch, midi_note, 5},
+            sort: {note_instance_id, ch, midi_note, 5},
             label: :note_off,
             midi_note: midi_note,
             bytes: <<0x80 + ch, midi_note, 0>>

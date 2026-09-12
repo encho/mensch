@@ -272,7 +272,7 @@ defmodule Mensch.PerformanceAssembler do
       Map.get(note, :sample_entry_index, -1),
       Map.get(note, :machine_id, :unknown),
       Map.get(note, :chord_instance_id, 0),
-      Map.get(note, :event_index, 0),
+      Map.get(note, :note_instance_id, 0),
       note.midi_note
     }
   end

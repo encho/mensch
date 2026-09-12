@@ -69,7 +69,7 @@ defmodule Mensch.Machines.RootModulated do
       emphasis: true,
       machine_id: id(),
       chord_instance_id: 0,
-      event_index: 0,
+      note_instance_id: 0,
       delay_mbeats: sample_start_mbeat,
       adsr: adsr
     }

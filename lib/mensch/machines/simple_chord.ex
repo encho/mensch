@@ -136,14 +136,14 @@ defmodule Mensch.Machines.SimpleChord do
   # and quantized start delays.
   #
   # Example (plain triad order):
-  # sequence notes: [C4, E4, G4]
-  # event_index:    [0, 1, 2]
-  # degree_index:   [0, 1, 2]
+  # sequence notes:    [C4, E4, G4]
+  # note_instance_id:  [0, 1, 2]
+  # degree_index:      [0, 1, 2]
   #
   # Example (future octave walk):
-  # sequence notes: [C4, E4, G4, C5, G4, E4]
-  # event_index:    [0, 1, 2, 3, 4, 5]
-  # degree_index:   [0, 1, 2, 0, 2, 1]
+  # sequence notes:    [C4, E4, G4, C5, G4, E4]
+  # note_instance_id:  [0, 1, 2, 3, 4, 5]
+  # degree_index:      [0, 1, 2, 0, 2, 1]
   #
   # With sample_start_mbeat=240 and stagger_mbeats=10, computed delay_mbeats are:
   # [240, 250, 260, ...]
@@ -167,8 +167,8 @@ defmodule Mensch.Machines.SimpleChord do
         machine_id: id(),
         # Chord-instance identity within a generated sample/performance.
         chord_instance_id: 0,
-        # Position in the realized playback sequence.
-        event_index: voiced_note.event_index,
+        # Stable id for this note lifecycle (on->off) within the plan.
+        note_instance_id: voiced_note.note_instance_id,
         # Position in the harmonic source (may diverge in richer sequencers).
         degree_index: voiced_note.degree_index,
         # Absolute quantized start time in mbeat units.
@@ -194,8 +194,10 @@ defmodule Mensch.Machines.SimpleChord do
   end
 
   defp apply_uniform_timing(voiced_notes, sample_start_mbeat, stagger_mbeats) do
-    Enum.map(voiced_notes, fn voiced_note ->
-      delay_mbeats = sample_start_mbeat + voiced_note.event_index * stagger_mbeats
+    voiced_notes
+    |> Enum.with_index()
+    |> Enum.map(fn {voiced_note, sequence_index} ->
+      delay_mbeats = sample_start_mbeat + sequence_index * stagger_mbeats
       Map.put(voiced_note, :delay_mbeats, delay_mbeats)
     end)
   end
@@ -210,12 +212,14 @@ defmodule Mensch.Machines.SimpleChord do
        ) do
     note_count = length(note_plan)
 
-    Enum.map(note_plan, fn %NotePlanItem{} = planned_note ->
+    note_plan
+    |> Enum.with_index()
+    |> Enum.map(fn {%NotePlanItem{} = planned_note, sequence_index} ->
       note_duration_mbeats =
         note_duration_mbeats(
           chord_duration_mbeats,
           stagger_mbeats,
-          planned_note.event_index,
+          sequence_index,
           note_count,
           note_length_mode
         )
@@ -265,7 +269,7 @@ defmodule Mensch.Machines.SimpleChord do
       frame_notes =
         notes_by_mbeat
         |> Map.get(at_mbeat, [])
-        |> Enum.sort_by(&{&1.event_index, &1.midi_note})
+        |> Enum.sort_by(&{&1.note_instance_id, &1.midi_note})
 
       %{at_mbeat: at_mbeat, notes: frame_notes}
     end)

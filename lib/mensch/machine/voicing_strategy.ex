@@ -14,7 +14,7 @@ defmodule Mensch.Machine.VoicingStrategy do
   @type voiced_note :: %{
           midi_note: integer(),
           degree_index: non_neg_integer(),
-          event_index: non_neg_integer()
+          note_instance_id: non_neg_integer()
         }
 
   @callback build_voiced_notes(strategy :: struct(), chord_spec :: ChordSpec.t()) :: [

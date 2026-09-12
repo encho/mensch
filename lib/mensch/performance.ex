@@ -9,9 +9,8 @@ defmodule Mensch.Performance do
   Note provenance is flat: each note event carries `machine_id` and
   `chord_instance_id` directly.
 
-  Each note event also carries an `event_index`: a simple, stable
-  serial number for that note within its source/chord instance. It is
-  ordering metadata (not a voice-role semantic).
+  Each note event also carries a `note_instance_id`: a stable identity for one
+  note lifecycle (note-on through note-off) within its source/chord instance.
 
   Example dataset:
 
@@ -26,11 +25,11 @@ defmodule Mensch.Performance do
             at_mbeat: 0,
             notes: [
               %{note_name: :c, octave: 4, midi_note: 60, channel: 1, velocity: 100,
-                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
+                machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 0,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0},
               %{note_name: :e, octave: 4, midi_note: 64, channel: 2, velocity: 100,
-                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 1,
+                machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 1,
                 phase: :pending, note_on: false, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
             ]
@@ -40,11 +39,11 @@ defmodule Mensch.Performance do
             at_mbeat: 6,
             notes: [
               %{note_name: :c, octave: 4, midi_note: 60, channel: 1, velocity: 100,
-                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
+                machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 0,
                 phase: :attack, note_on: false, note_off: false,
                 pressure: 39, bend: 0.0, slide: 0},
               %{note_name: :e, octave: 4, midi_note: 64, channel: 2, velocity: 100,
-                machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 1,
+                machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 1,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
             ]
@@ -71,7 +70,7 @@ defmodule Mensch.Performance do
           slide: non_neg_integer(),
           machine_id: atom(),
           chord_instance_id: non_neg_integer(),
-          event_index: non_neg_integer()
+          note_instance_id: non_neg_integer()
         }
 
   @type frame :: %{
@@ -122,7 +121,7 @@ defmodule Mensch.Performance do
     end
   end
 
-  @doc "All note on/off events across all frames, sorted by `at_ms` and carrying machine/chord provenance + `event_index`."
+  @doc "All note on/off events across all frames, sorted by `at_ms` and carrying machine/chord provenance + `note_instance_id`."
   @spec io_events(t()) :: [map()]
   def io_events(%__MODULE__{frames: frames}) do
     frames
@@ -134,7 +133,7 @@ defmodule Mensch.Performance do
           channel: note.channel,
           machine_id: Map.get(note, :machine_id),
           chord_instance_id: Map.get(note, :chord_instance_id),
-          event_index: Map.get(note, :event_index)
+          note_instance_id: Map.get(note, :note_instance_id)
         }
 
         cond do
