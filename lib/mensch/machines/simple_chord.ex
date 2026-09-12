@@ -44,6 +44,7 @@ defmodule Mensch.Machines.SimpleChord do
 
     %{
       stagger_mbeats: params.stagger_mbeats,
+      voicing_strategy: params.voicing_strategy,
       note_length_mode: params.note_length_mode,
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
@@ -81,8 +82,8 @@ defmodule Mensch.Machines.SimpleChord do
       |> TimelineContext.start_mbeat(sample_context)
       |> snap_mbeats(frame_mbeats)
 
-    midi_notes = ChordSpec.to_midi_notes(chord_spec)
-    note_count = length(midi_notes)
+    voiced_notes = build_voiced_notes(chord_spec, params.voicing_strategy)
+    note_count = length(voiced_notes)
 
     # Cap stagger to a frame-aligned maximum so all note durations stay non-negative
     # and both length modes can still honor chord-end alignment.
@@ -91,12 +92,15 @@ defmodule Mensch.Machines.SimpleChord do
 
     note_length_mode = normalize_note_length_mode(params.note_length_mode)
 
-    note_plan =
-      build_note_plan(
-        midi_notes,
+    timed_voiced_notes =
+      apply_uniform_timing(
+        voiced_notes,
         sample_start_mbeat,
         effective_stagger_mbeats
       )
+
+    note_plan =
+      build_note_plan(timed_voiced_notes)
 
     notes =
       assign_envelopes(
@@ -124,8 +128,8 @@ defmodule Mensch.Machines.SimpleChord do
     }
   end
 
-  # Builds the playback sequence on a quantized grid. `event_index` is sequence position,
-  # while `degree_index` tracks harmonic source index and may diverge in future patterns.
+  # Builds note-plan items from voiced notes that already carry sequence ordering
+  # and quantized start delays.
   #
   # Example (plain triad order):
   # sequence notes: [C4, E4, G4]
@@ -137,18 +141,12 @@ defmodule Mensch.Machines.SimpleChord do
   # event_index:    [0, 1, 2, 3, 4, 5]
   # degree_index:   [0, 1, 2, 0, 2, 1]
   #
-  # With sample_start_mbeat=240 and stagger_mbeats=10, delay_mbeats are:
+  # With sample_start_mbeat=240 and stagger_mbeats=10, computed delay_mbeats are:
   # [240, 250, 260, ...]
-  defp build_note_plan(
-         midi_notes,
-         sample_start_mbeat,
-         stagger_mbeats
-       ) do
-    midi_notes
-    |> Enum.with_index()
-    |> Enum.map(fn {note_number, sequence_index} ->
+  defp build_note_plan(timed_voiced_notes) do
+    Enum.map(timed_voiced_notes, fn voiced_note ->
+      note_number = voiced_note.note
       {note_name, octave} = ChordSpec.note_name(note_number)
-      note_delay_mbeats = sequence_index * stagger_mbeats
 
       NotePlanItem.new(%{
         # Human-readable pitch class for UI/debug usage.
@@ -166,12 +164,35 @@ defmodule Mensch.Machines.SimpleChord do
         # Chord-instance identity within a generated sample/performance.
         chord_instance_id: 0,
         # Position in the realized playback sequence.
-        event_index: sequence_index,
+        event_index: voiced_note.event_index,
         # Position in the harmonic source (may diverge in richer sequencers).
-        degree_index: sequence_index,
+        degree_index: voiced_note.degree_index,
         # Absolute quantized start time in mbeat units.
-        delay_mbeats: sample_start_mbeat + note_delay_mbeats
+        delay_mbeats: voiced_note.delay_mbeats
       })
+    end)
+  end
+
+  defp build_voiced_notes(%ChordSpec{} = chord_spec, voicing_strategy) do
+    case voicing_strategy do
+      %{__struct__: module} = strategy when is_atom(module) ->
+        if Code.ensure_loaded?(module) and function_exported?(module, :build_voiced_notes, 2) do
+          module.build_voiced_notes(strategy, chord_spec)
+        else
+          raise ArgumentError,
+                "voicing strategy #{inspect(module)} must implement build_voiced_notes/2"
+        end
+
+      other ->
+        raise ArgumentError,
+              "expected voicing strategy struct, got #{inspect(other)}"
+    end
+  end
+
+  defp apply_uniform_timing(voiced_notes, sample_start_mbeat, stagger_mbeats) do
+    Enum.map(voiced_notes, fn voiced_note ->
+      delay_mbeats = sample_start_mbeat + voiced_note.event_index * stagger_mbeats
+      Map.put(voiced_note, :delay_mbeats, delay_mbeats)
     end)
   end
 
@@ -397,6 +418,7 @@ defimpl Mensch.Machine, for: Mensch.Machines.SimpleChord do
   def controls(%SimpleChord{params: params}) do
     %{
       stagger_mbeats: params.stagger_mbeats,
+      voicing_strategy: params.voicing_strategy,
       note_length_mode: params.note_length_mode,
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,

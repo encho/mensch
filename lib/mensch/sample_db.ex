@@ -8,6 +8,8 @@ defmodule Mensch.SampleDb do
   """
 
   alias Mensch.SampleContext
+  alias Mensch.SampleDb.Sample0SimpleChordTraversal
+  alias Mensch.SampleDb.Sample0bSimpleChordTraversalUp
   alias Mensch.SampleDb.Sample1
   alias Mensch.SampleDb.Sample1NoRelease
   alias Mensch.SampleDb.Sample2
@@ -19,6 +21,8 @@ defmodule Mensch.SampleDb do
   @default_frame_mbeats 50
 
   @samples [
+    Sample0SimpleChordTraversal.sample(@default_frame_mbeats),
+    Sample0bSimpleChordTraversalUp.sample(@default_frame_mbeats),
     Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample1.sample(@default_frame_mbeats),
     Sample1NoRelease.sample(@default_frame_mbeats),

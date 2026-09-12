@@ -167,6 +167,17 @@ defmodule MenschWeb.HomeLive do
     {:noreply, socket}
   end
 
+  def handle_event("panic_all_notes", _params, socket) do
+    Player.panic()
+
+    socket =
+      socket
+      |> assign(:player_status, Player.status())
+      |> clear_playback_state(true)
+
+    {:noreply, socket}
+  end
+
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
   end
@@ -258,6 +269,7 @@ defmodule MenschWeb.HomeLive do
                   <th class="px-2 py-1.5 font-normal">Tempo</th>
                   <th class="px-2 py-1.5 font-normal">Time Sig</th>
                   <th class="px-2 py-1.5 font-normal">Chords</th>
+                  <th class="px-2 py-1.5 font-normal">Voicing</th>
                   <th class="px-2 py-1.5 font-normal">Duration</th>
                   <th class="px-2 py-1.5 font-normal text-right">Status</th>
                 </tr>
@@ -279,6 +291,9 @@ defmodule MenschWeb.HomeLive do
                     )}
                   </td>
                   <td class="px-2 py-1.5">{length(Map.get(sample, :sample_entries, []))}</td>
+                  <td class="px-2 py-1.5 text-zinc-300">
+                    {sample_voicing_strategies_label(Map.get(sample, :sample_entries, []))}
+                  </td>
                   <td class="px-2 py-1.5">
                     {sample_duration_label(
                       Map.get(sample, :sample_entries, []),
@@ -316,6 +331,10 @@ defmodule MenschWeb.HomeLive do
 
           <div class="font-mono text-[11px] text-zinc-300">
             Timing settings: {sample_context_label(@sample_context)}
+          </div>
+
+          <div class="font-mono text-[11px] text-zinc-300">
+            Voicing strategies: {sample_voicing_strategies_label(@sample_entries)}
           </div>
 
           <div class="font-mono text-[11px] text-zinc-400">
@@ -376,14 +395,23 @@ defmodule MenschWeb.HomeLive do
             >
               <.icon name="hero-stop-solid" class="size-4" />
             </button>
+            <button
+              type="button"
+              id="panic-all-notes"
+              phx-click="panic_all_notes"
+              class="flex h-9 items-center border border-red-500/60 bg-red-500/10 px-3 text-[11px] uppercase tracking-wide text-red-200 transition-colors duration-150 hover:border-red-400 hover:bg-red-500/20"
+            >
+              Panic All Notes
+            </button>
           </div>
 
           <div class="overflow-x-auto border border-zinc-700/60">
-            <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
+            <table class="w-full min-w-[980px] text-left font-mono text-[11px]">
               <thead>
                 <tr class="border-b border-zinc-700/70 text-zinc-400">
                   <th class="px-2 py-1.5 font-normal">ChordSpec</th>
                   <th class="px-2 py-1.5 font-normal">Machine</th>
+                  <th class="px-2 py-1.5 font-normal">Voicing</th>
                   <th class="px-2 py-1.5 font-normal">Start</th>
                   <th class="px-2 py-1.5 font-normal">Duration</th>
                   <th class="px-2 py-1.5 font-normal text-right">Status</th>
@@ -401,6 +429,7 @@ defmodule MenschWeb.HomeLive do
                     </div>
                   </td>
                   <td class="px-2 py-1.5">{machine_label(entry.machine)}</td>
+                  <td class="px-2 py-1.5 text-zinc-300">{voicing_strategy_label(entry.machine)}</td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
                       {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
@@ -643,6 +672,34 @@ defmodule MenschWeb.HomeLive do
     |> Mensch.Machine.id()
     |> Atom.to_string()
   end
+
+  defp sample_voicing_strategies_label(sample_entries) when is_list(sample_entries) do
+    labels =
+      sample_entries
+      |> Enum.map(&voicing_strategy_label(&1.machine))
+      |> Enum.reject(&(&1 in ["-", ""]))
+      |> Enum.uniq()
+
+    case labels do
+      [] -> "-"
+      _ -> Enum.join(labels, ", ")
+    end
+  end
+
+  defp voicing_strategy_label(%Mensch.Machines.SimpleChord{params: params}) do
+    case Map.get(params, :voicing_strategy) do
+      %{__struct__: module} when is_atom(module) ->
+        module
+        |> Module.split()
+        |> List.last()
+        |> Macro.underscore()
+
+      _ ->
+        "-"
+    end
+  end
+
+  defp voicing_strategy_label(_machine), do: "-"
 
   defp start_label_primary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
     mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
@@ -948,17 +1005,22 @@ defmodule MenschWeb.HomeLive do
       local_mbeat = frame.at_mbeat
       x = local_mbeat / total_mbeats * 600
 
-      Enum.map(frame.notes, &{{&1.channel, &1.note}, x, Map.fetch!(&1, value_key)})
+      Enum.map(frame.notes, fn note ->
+        {note_series_key(note), x, Map.fetch!(note, value_key)}
+      end)
     end)
     |> Enum.group_by(
       fn {id, _x, _value} -> id end,
       fn {_id, x, value} -> {x, value} end
     )
-    |> Enum.map(fn {{channel, note}, points} ->
+    |> Enum.map(fn {series_key, points} ->
+      {channel, note} = series_channel_note(series_key)
+
       %{
+        series_key: series_key,
         channel: channel,
         note: note,
-        color: Map.fetch!(colors, {channel, note}),
+        color: Map.fetch!(colors, series_key),
         points: chart_points(points, min_v, max_v)
       }
     end)
@@ -989,8 +1051,10 @@ defmodule MenschWeb.HomeLive do
     segments =
       frames
       |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_mbeat}) end)
-      |> Enum.group_by(fn {note, _at_mbeat} -> {note.note, note.channel} end)
-      |> Enum.flat_map(fn {{note_number, channel}, entries} ->
+      |> Enum.group_by(fn {note, _at_mbeat} -> note_series_key(note) end)
+      |> Enum.flat_map(fn {series_key, entries} ->
+        {channel, note_number} = series_channel_note(series_key)
+
         entries
         |> lifecycle_segments(total_mbeats)
         |> Enum.map(fn %{start_mbeat: start_mbeat, end_mbeat: end_mbeat, label: label} ->
@@ -1000,9 +1064,10 @@ defmodule MenschWeb.HomeLive do
           style =
             "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
               "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
-              "background-color: #{Map.fetch!(colors, {channel, note_number})};"
+              "background-color: #{Map.fetch!(colors, series_key)};"
 
           %{
+            series_key: series_key,
             channel: channel,
             note: note_number,
             label: label,
@@ -1096,9 +1161,9 @@ defmodule MenschWeb.HomeLive do
     |> Enum.filter(fn segment -> segment.end_mbeat >= segment.start_mbeat end)
   end
 
-  # Assigns each distinct `{channel, note}` a stable color (ordered by
-  # channel) shared by both the line charts and the note matrix, so the
-  # same note always reads as the same color across visualizations.
+  # Assigns each distinct logical note-event key a stable color shared by both
+  # the line charts and the note matrix, preventing channel/note reuse from
+  # inheriting colors across distinct events.
   defp note_color_map(frames, render_scope, selected_note_key) do
     frames
     |> base_note_color_map(render_scope)
@@ -1114,8 +1179,8 @@ defmodule MenschWeb.HomeLive do
 
     events
     |> Enum.with_index()
-    |> Map.new(fn {%{channel: channel, note: note}, index} ->
-      {{channel, note}, color_with_alpha(base_color, voice_alpha(index, total))}
+    |> Map.new(fn {event, index} ->
+      {note_series_key(event), color_with_alpha(base_color, voice_alpha(index, total))}
     end)
   end
 
@@ -1132,8 +1197,8 @@ defmodule MenschWeb.HomeLive do
       |> then(fn {sorted_events, total} ->
         sorted_events
         |> Enum.with_index()
-        |> Enum.map(fn {%{channel: channel, note: note}, index} ->
-          {{channel, note}, color_with_alpha(base_color, voice_alpha(index, total))}
+        |> Enum.map(fn {event, index} ->
+          {note_series_key(event), color_with_alpha(base_color, voice_alpha(index, total))}
         end)
       end)
     end)
@@ -1143,23 +1208,33 @@ defmodule MenschWeb.HomeLive do
   defp base_note_color_map(frames, _render_scope) do
     frames
     |> Enum.flat_map(& &1.notes)
-    |> Enum.uniq_by(&{&1.channel, &1.note})
-    |> Enum.sort_by(& &1.channel)
+    |> Enum.uniq_by(&note_series_key/1)
+    |> Enum.sort_by(fn event ->
+      {Map.get(event, :sample_entry_index, -1), Map.get(event, :event_index, 999), event.note,
+       event.channel}
+    end)
     |> Enum.with_index()
-    |> Map.new(fn {%{channel: channel, note: note}, index} ->
-      {{channel, note}, Enum.at(@chart_colors, rem(index, length(@chart_colors)))}
+    |> Map.new(fn {event, index} ->
+      {note_series_key(event), Enum.at(@chart_colors, rem(index, length(@chart_colors)))}
     end)
   end
 
   defp note_selected?(_note_key, nil), do: true
   defp note_selected?(note_key, selected_note_key), do: note_key == selected_note_key
 
-  defp focus_color(_note_key, color, nil), do: color
+  defp focus_color(_series_key, color, nil), do: color
 
-  defp focus_color(note_key, color, selected_note_key) when note_key == selected_note_key,
-    do: color
+  defp focus_color(series_key, color, {selected_channel, selected_note}) do
+    {channel, note} = series_channel_note(series_key)
 
-  defp focus_color(_note_key, _color, _selected_note_key), do: @inactive_note_color
+    if channel == selected_channel and note == selected_note do
+      color
+    else
+      @inactive_note_color
+    end
+  end
+
+  defp focus_color(_series_key, color, _selected_note_key), do: color
 
   defp selected_note_label(nil), do: "all"
 
@@ -1178,13 +1253,32 @@ defmodule MenschWeb.HomeLive do
   defp distinct_note_events(frames) do
     frames
     |> Enum.flat_map(& &1.notes)
-    |> Enum.uniq_by(&{&1.channel, &1.note})
+    |> Enum.uniq_by(&note_series_key/1)
   end
 
   defp sort_voice_events(events) do
     Enum.sort_by(events, fn event ->
-      {Map.get(event, :event_index, 999), event.note, event.channel}
+      {Map.get(event, :sample_entry_index, -1), Map.get(event, :machine_id, :unknown),
+       Map.get(event, :chord_instance_id, 0), Map.get(event, :event_index, 999), event.note,
+       event.channel}
     end)
+  end
+
+  defp note_series_key(note) do
+    {
+      Map.get(note, :sample_entry_index, -1),
+      Map.get(note, :machine_id, :unknown),
+      Map.get(note, :chord_instance_id, 0),
+      Map.get(note, :event_index, 0),
+      Map.get(note, :note, 0),
+      Map.get(note, :channel, -1)
+    }
+  end
+
+  defp series_channel_note(
+         {_entry_index, _machine_id, _chord_instance_id, _event_index, note, channel}
+       ) do
+    {channel, note}
   end
 
   defp voice_alpha(_index, total) when total <= 1, do: 0.92

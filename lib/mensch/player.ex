@@ -49,6 +49,11 @@ defmodule Mensch.Player do
     GenServer.call(__MODULE__, :status)
   end
 
+  @doc "Force-silences all member channels (panic/all-notes-off)."
+  def panic do
+    GenServer.call(__MODULE__, :panic)
+  end
+
   # Server callbacks
 
   @impl true
@@ -70,6 +75,10 @@ defmodule Mensch.Player do
 
   def handle_call(:stop, _from, state) do
     {:reply, :ok, stop_all(state)}
+  end
+
+  def handle_call(:panic, _from, state) do
+    {:reply, :ok, panic_all(state)}
   end
 
   def handle_call(:status, _from, state) do
@@ -135,6 +144,26 @@ defmodule Mensch.Player do
   defp stop_all(state) do
     Enum.each(state.active, fn {channel, note} ->
       Connection.send_message(<<0x80 + channel, note, 0>>)
+    end)
+
+    %{state | status: :stopped, ref: make_ref(), active: MapSet.new()}
+  end
+
+  defp panic_all(state) do
+    Enum.each(Connection.member_channels(), fn channel ->
+      # Channel pressure zero prevents hanging expression after note-off.
+      Connection.send_message(<<0xD0 + channel, 0>>)
+      # Reset pitch bend to center.
+      Connection.send_message(<<0xE0 + channel, 0, 64>>)
+      # Reset timbre/slide controller.
+      Connection.send_message(<<0xB0 + channel, 74, 0>>)
+      # Panic CCs: all sound off + all notes off.
+      Connection.send_message(<<0xB0 + channel, 120, 0>>)
+      Connection.send_message(<<0xB0 + channel, 123, 0>>)
+
+      Enum.each(0..127, fn note ->
+        Connection.send_message(<<0x80 + channel, note, 0>>)
+      end)
     end)
 
     %{state | status: :stopped, ref: make_ref(), active: MapSet.new()}
