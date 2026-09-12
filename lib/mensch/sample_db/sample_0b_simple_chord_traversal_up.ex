@@ -3,23 +3,19 @@ defmodule Mensch.SampleDb.Sample0bSimpleChordTraversalUp do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.Machine.VoicingStrategies.Traversal
-  alias Mensch.Machines.SimpleChord
-  alias Mensch.Machines.SimpleChordParams
+  alias Mensch.Machines.ArpMachine
+  alias Mensch.Machines.ArpMachineParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
-    params = %SimpleChordParams{
-      SimpleChordParams.default()
-      | voicing_strategy:
-          Traversal.new(
-            direction: :up,
-            octave_min_offset: 0,
-            octave_max_offset: 1,
-            cycle_count: 2
-          ),
+    params = %ArpMachineParams{
+      ArpMachineParams.default()
+      | direction: :up,
+        octave_min_offset: 0,
+        octave_max_offset: 1,
+        cycle_count: 2,
         stagger_mbeats: 700,
         note_length_mode: :equal,
         attack_mbeats: 120,
@@ -31,11 +27,11 @@ defmodule Mensch.SampleDb.Sample0bSimpleChordTraversalUp do
         sustain_level: 0.68
     }
 
-    machine = %SimpleChord{params: params}
+    machine = %ArpMachine{params: params}
 
     %{
       id: "sample-0b-simple-chord-traversal-up",
-      name: "Sample 0b · Simple Chord Traversal Up",
+      name: "ArpMachine · Traversal Up",
       sample_context:
         SampleContext.new!(%{bpm: 104, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

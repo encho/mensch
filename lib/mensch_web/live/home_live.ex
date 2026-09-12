@@ -274,7 +274,6 @@ defmodule MenschWeb.HomeLive do
                   <th class="px-2 py-1.5 font-normal">Tempo</th>
                   <th class="px-2 py-1.5 font-normal">Time Sig</th>
                   <th class="px-2 py-1.5 font-normal">Chords</th>
-                  <th class="px-2 py-1.5 font-normal">Voicing</th>
                   <th class="px-2 py-1.5 font-normal">Duration</th>
                   <th class="px-2 py-1.5 font-normal text-right">Status</th>
                 </tr>
@@ -296,9 +295,6 @@ defmodule MenschWeb.HomeLive do
                     )}
                   </td>
                   <td class="px-2 py-1.5">{length(Map.get(sample, :sample_entries, []))}</td>
-                  <td class="px-2 py-1.5 text-zinc-300">
-                    {sample_voicing_strategies_label(Map.get(sample, :sample_entries, []))}
-                  </td>
                   <td class="px-2 py-1.5">
                     {sample_duration_label(
                       Map.get(sample, :sample_entries, []),
@@ -705,17 +701,10 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  defp voicing_strategy_label(%Mensch.Machines.SimpleChord{params: params}) do
-    case Map.get(params, :voicing_strategy) do
-      %{__struct__: module} when is_atom(module) ->
-        module
-        |> Module.split()
-        |> List.last()
-        |> Macro.underscore()
+  defp voicing_strategy_label(%Mensch.Machines.SimpleChord{}), do: "chord_tones"
 
-      _ ->
-        "-"
-    end
+  defp voicing_strategy_label(%Mensch.Machines.ArpMachine{params: params}) do
+    "traversal/#{params.direction} (oct #{params.octave_min_offset}..#{params.octave_max_offset}, cycles #{params.cycle_count})"
   end
 
   defp voicing_strategy_label(_machine), do: "-"

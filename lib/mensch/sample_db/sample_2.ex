@@ -12,7 +12,7 @@ defmodule Mensch.SampleDb.Sample2 do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     %{
       id: "sample-2",
-      name: "Sample 2 · Cmaj7 Drone",
+      name: "StrummedMpe · Cmaj7 Drone",
       sample_context:
         SampleContext.new!(%{bpm: 80, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

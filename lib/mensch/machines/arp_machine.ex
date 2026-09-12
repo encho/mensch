@@ -1,7 +1,7 @@
-defmodule Mensch.Machines.SimpleChord do
+defmodule Mensch.Machines.ArpMachine do
   @moduledoc """
-  Simple machine that plays full chords with a configurable note stagger and
-  internally computed per-note durations.
+  Arpeggiator machine that traverses chord tones using internal traversal
+  strategy configuration.
 
   `note_length_mode` controls duration behavior:
 
@@ -17,26 +17,26 @@ defmodule Mensch.Machines.SimpleChord do
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
-  alias Mensch.Machine.VoicingStrategies.ChordTones
-  alias Mensch.Machines.SimpleChordParams
+  alias Mensch.Machine.VoicingStrategies.Traversal
+  alias Mensch.Machines.ArpMachineParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
   @velocity 100
 
-  @type t :: %__MODULE__{params: SimpleChordParams.t()}
+  @type t :: %__MODULE__{params: ArpMachineParams.t()}
 
   @enforce_keys [:params]
   defstruct [:params]
 
-  def id, do: :simple_chord
+  def id, do: :arp_machine
 
-  def params_module, do: SimpleChordParams
+  def params_module, do: ArpMachineParams
 
-  def default_params, do: SimpleChordParams.default()
+  def default_params, do: ArpMachineParams.default()
 
-  @spec new(SimpleChordParams.t()) :: t()
-  def new(%SimpleChordParams{} = params), do: %__MODULE__{params: params}
+  @spec new(ArpMachineParams.t()) :: t()
+  def new(%ArpMachineParams{} = params), do: %__MODULE__{params: params}
 
   @spec new() :: t()
   def new, do: %__MODULE__{params: default_params()}
@@ -46,6 +46,10 @@ defmodule Mensch.Machines.SimpleChord do
 
     %{
       stagger_mbeats: params.stagger_mbeats,
+      direction: params.direction,
+      octave_min_offset: params.octave_min_offset,
+      octave_max_offset: params.octave_max_offset,
+      cycle_count: params.cycle_count,
       note_length_mode: params.note_length_mode,
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
@@ -64,9 +68,8 @@ defmodule Mensch.Machines.SimpleChord do
         %TimelineContext{} = timeline_context,
         opts \\ []
       ) do
-    %SimpleChordParams{} = params = machine_params!(opts)
+    %ArpMachineParams{} = params = machine_params!(opts)
 
-    # TODO frame_units? better name? what for?
     frame_mbeats = SampleContext.frame_units(sample_context)
 
     stagger_mbeats =
@@ -84,11 +87,9 @@ defmodule Mensch.Machines.SimpleChord do
       |> TimelineContext.start_mbeat(sample_context)
       |> snap_mbeats(frame_mbeats)
 
-    voiced_notes = build_voiced_notes(chord_spec)
+    voiced_notes = build_voiced_notes(chord_spec, params)
     note_count = length(voiced_notes)
 
-    # Cap stagger to a frame-aligned maximum so all note durations stay non-negative
-    # and both length modes can still honor chord-end alignment.
     effective_stagger_mbeats =
       effective_stagger_mbeats(stagger_mbeats, chord_duration_mbeats, note_count, frame_mbeats)
 
@@ -137,53 +138,36 @@ defmodule Mensch.Machines.SimpleChord do
     }
   end
 
-  # Builds note-plan items from voiced notes that already carry sequence ordering
-  # and quantized start delays.
-  #
-  # Example (plain triad order):
-  # sequence notes:    [C4, E4, G4]
-  # note_instance_id:  [0, 1, 2]
-  # degree_index:      [0, 1, 2]
-  #
-  # Example (future octave walk):
-  # sequence notes:    [C4, E4, G4, C5, G4, E4]
-  # note_instance_id:  [0, 1, 2, 3, 4, 5]
-  # degree_index:      [0, 1, 2, 0, 2, 1]
-  #
-  # With sample_start_mbeat=240 and stagger_mbeats=10, computed delay_mbeats are:
-  # [240, 250, 260, ...]
   defp build_note_plan(timed_voiced_notes) do
     Enum.map(timed_voiced_notes, fn voiced_note ->
       note_number = voiced_note.midi_note
       {note_name, octave} = ChordSpec.note_name(note_number)
 
       NotePlanItem.new(%{
-        # Human-readable pitch class for UI/debug usage.
         note_name: note_name,
-        # Octave register paired with note_name for display/debug context.
         octave: octave,
-        # MIDI note number used for playback/export.
         midi_note: note_number,
-        # Filled later by channel allocation in assembly.
         channel: nil,
-        # Note-on velocity emitted for this machine.
         velocity: @velocity,
-        # Source machine identifier for downstream grouping.
         machine_id: id(),
-        # Chord-instance identity within a generated sample/performance.
         chord_instance_id: 0,
-        # Stable id for this note lifecycle (on->off) within the plan.
         note_instance_id: voiced_note.note_instance_id,
-        # Position in the harmonic source (may diverge in richer sequencers).
         degree_index: voiced_note.degree_index,
-        # Absolute quantized start time in mbeat units.
         delay_mbeats: voiced_note.delay_mbeats
       })
     end)
   end
 
-  defp build_voiced_notes(%ChordSpec{} = chord_spec) do
-    ChordTones.build_voiced_notes(ChordTones.new(), chord_spec)
+  defp build_voiced_notes(%ChordSpec{} = chord_spec, %ArpMachineParams{} = params) do
+    traversal =
+      Traversal.new(
+        direction: params.direction,
+        octave_min_offset: params.octave_min_offset,
+        octave_max_offset: params.octave_max_offset,
+        cycle_count: params.cycle_count
+      )
+
+    Traversal.build_voiced_notes(traversal, chord_spec)
   end
 
   defp apply_uniform_timing(voiced_notes, sample_start_mbeat, stagger_mbeats) do
@@ -201,7 +185,7 @@ defmodule Mensch.Machines.SimpleChord do
          chord_duration_mbeats,
          note_length_mode,
          sample_context,
-         %SimpleChordParams{} = params
+         %ArpMachineParams{} = params
        ) do
     note_count = length(note_plan)
 
@@ -226,7 +210,7 @@ defmodule Mensch.Machines.SimpleChord do
   defp build_adsr(
          note_duration_mbeats,
          %SampleContext{} = sample_context,
-         %SimpleChordParams{} = params
+         %ArpMachineParams{} = params
        ) do
     ADSR.from_mbeats(note_duration_mbeats, sample_context, %{
       attack_mbeats: params.attack_mbeats,
@@ -289,12 +273,12 @@ defmodule Mensch.Machines.SimpleChord do
 
   defp machine_params!(opts) do
     case Keyword.fetch(opts, :machine_params) do
-      {:ok, %SimpleChordParams{} = params} ->
+      {:ok, %ArpMachineParams{} = params} ->
         params
 
       {:ok, other} ->
         raise ArgumentError,
-              "expected #{inspect(SimpleChordParams)} in :machine_params, got #{inspect(other)}"
+              "expected #{inspect(ArpMachineParams)} in :machine_params, got #{inspect(other)}"
 
       :error ->
         raise ArgumentError, "missing :machine_params for #{inspect(__MODULE__)}"
@@ -366,20 +350,24 @@ defmodule Mensch.Machines.SimpleChord do
 
   defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats) do
     raise ArgumentError,
-          "simple_chord invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_duration_mbeats}"
+          "arp_machine invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_duration_mbeats}"
   end
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end
 
-defimpl Mensch.Machine, for: Mensch.Machines.SimpleChord do
-  alias Mensch.Machines.SimpleChord
+defimpl Mensch.Machine, for: Mensch.Machines.ArpMachine do
+  alias Mensch.Machines.ArpMachine
 
-  def id(_machine), do: SimpleChord.id()
+  def id(_machine), do: ArpMachine.id()
 
-  def controls(%SimpleChord{params: params}) do
+  def controls(%ArpMachine{params: params}) do
     %{
       stagger_mbeats: params.stagger_mbeats,
+      direction: params.direction,
+      octave_min_offset: params.octave_min_offset,
+      octave_max_offset: params.octave_max_offset,
+      cycle_count: params.cycle_count,
       note_length_mode: params.note_length_mode,
       attack_mbeats: params.attack_mbeats,
       decay_mbeats: params.decay_mbeats,
@@ -393,13 +381,13 @@ defimpl Mensch.Machine, for: Mensch.Machines.SimpleChord do
   end
 
   def build_frame_sequence(
-        %SimpleChord{params: params},
+        %ArpMachine{params: params},
         chord_spec,
         sample_context,
         timeline_context,
         opts
       ) do
-    SimpleChord.build_frame_sequence(
+    ArpMachine.build_frame_sequence(
       chord_spec,
       sample_context,
       timeline_context,

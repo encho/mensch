@@ -19,7 +19,7 @@ defmodule Mensch.SampleDb.Sample2CMajorChords do
 
     %{
       id: "sample-2-c-major-chords",
-      name: "Sample 2 · C Major ii-V-I-vi Turnaround · No Release",
+      name: "StrummedMpe · C Major ii-V-I-vi Turnaround · No Release",
       sample_context:
         SampleContext.new!(%{bpm: 80, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
