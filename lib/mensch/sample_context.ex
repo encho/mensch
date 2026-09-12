@@ -10,9 +10,7 @@ defmodule Mensch.SampleContext do
   `frame_mbeats` must divide 1000 so every beat boundary always lands on
   a frame boundary.
 
-  For compatibility with existing callers and MIDI export code, this module
-  still exposes tick-named helpers, where one internal "tick" equals one
-  mbeat.
+  Internal timeline calculations are expressed directly in millibeats.
   """
 
   alias Mensch.BeatPosition
@@ -75,17 +73,9 @@ defmodule Mensch.SampleContext do
   @spec beats_per_bar(t()) :: pos_integer()
   def beats_per_bar(%__MODULE__{time_signature: {beats, _denominator}}), do: beats
 
-  @doc "Millibeats represented by one internal tick (compatibility alias)."
-  @spec mbeats_per_tick(t()) :: pos_integer()
-  def mbeats_per_tick(%__MODULE__{}), do: 1
-
   @doc "Millibeats in one beat."
   @spec mbeats_per_beat(t()) :: pos_integer()
   def mbeats_per_beat(%__MODULE__{}), do: 1000
-
-  @doc "Internal ticks per beat (compatibility alias), always 1000."
-  @spec ticks_per_beat(t()) :: pos_integer()
-  def ticks_per_beat(%__MODULE__{} = sample_context), do: mbeats_per_beat(sample_context)
 
   @doc "Global render frame size in millibeats."
   @spec frame_mbeats(t()) :: pos_integer()
@@ -95,28 +85,11 @@ defmodule Mensch.SampleContext do
   @spec frame_step_mbeats(t()) :: pos_integer()
   def frame_step_mbeats(%__MODULE__{} = sample_context), do: frame_mbeats(sample_context)
 
-  @doc "Converts millibeats to nearest tick."
-  @spec mbeats_to_ticks(t(), non_neg_integer()) :: non_neg_integer()
-  def mbeats_to_ticks(%__MODULE__{} = sample_context, mbeats)
-      when is_integer(mbeats) and mbeats >= 0 do
-    _ = sample_context
-    mbeats
-  end
-
   @doc "Converts millibeats to internal timeline units."
   @spec mbeats_to_units(t(), non_neg_integer()) :: non_neg_integer()
-  def mbeats_to_units(%__MODULE__{} = sample_context, mbeats)
+  def mbeats_to_units(%__MODULE__{} = _sample_context, mbeats)
       when is_integer(mbeats) and mbeats >= 0 do
-    mbeats_to_ticks(sample_context, mbeats)
-  end
-
-  @doc "Global render frame size in ticks (at least 1)."
-  @spec frame_ticks(t()) :: pos_integer()
-  def frame_ticks(%__MODULE__{} = sample_context) do
-    sample_context
-    |> frame_step_mbeats()
-    |> then(&mbeats_to_ticks(sample_context, &1))
-    |> max(1)
+    mbeats
   end
 
   @doc "Global render frame size in internal timeline units (at least 1)."
@@ -134,25 +107,15 @@ defmodule Mensch.SampleContext do
     beats_per_bar(sample_context) * mbeats_per_beat(sample_context)
   end
 
-  @doc "Ticks per bar."
-  @spec ticks_per_bar(t()) :: pos_integer()
-  def ticks_per_bar(%__MODULE__{} = sample_context) do
-    mbeats_per_bar(sample_context)
-  end
-
   @doc "Milliseconds per beat."
   @spec ms_per_beat(t()) :: float()
   def ms_per_beat(%__MODULE__{bpm: bpm}), do: 60_000 / bpm
 
-  @doc "Milliseconds per tick."
-  @spec ms_per_tick(t()) :: float()
-  def ms_per_tick(%__MODULE__{} = sample_context) do
-    ms_per_beat(sample_context) / ticks_per_beat(sample_context)
-  end
-
   @doc "Milliseconds per millibeat."
   @spec ms_per_mbeat(t()) :: float()
-  def ms_per_mbeat(%__MODULE__{} = sample_context), do: ms_per_tick(sample_context)
+  def ms_per_mbeat(%__MODULE__{} = sample_context) do
+    ms_per_beat(sample_context) / mbeats_per_beat(sample_context)
+  end
 
   @doc "Converts millibeats to milliseconds from sample start."
   @spec mbeats_to_ms(t(), non_neg_integer()) :: non_neg_integer()
@@ -167,30 +130,12 @@ defmodule Mensch.SampleContext do
     round(ms / ms_per_mbeat(sample_context))
   end
 
-  @doc "Converts absolute ticks to milliseconds from sample start."
-  @spec ticks_to_ms(t(), non_neg_integer()) :: non_neg_integer()
-  def ticks_to_ms(%__MODULE__{} = sample_context, ticks) when is_integer(ticks) and ticks >= 0 do
-    mbeats_to_ms(sample_context, ticks)
-  end
-
-  @doc "Converts milliseconds from sample start to nearest absolute tick."
-  @spec ms_to_ticks(t(), non_neg_integer()) :: non_neg_integer()
-  def ms_to_ticks(%__MODULE__{} = sample_context, ms) when is_integer(ms) and ms >= 0 do
-    ms_to_mbeats(sample_context, ms)
-  end
-
   @doc "Converts a beat position (`bar`/`beat`/`mbeat`) to absolute mbeat."
   @spec position_to_mbeat(t(), BeatPosition.t()) :: non_neg_integer()
   def position_to_mbeat(%__MODULE__{} = sample_context, %BeatPosition{} = beat_position) do
     beat_position.bar * mbeats_per_bar(sample_context) +
       beat_position.beat * mbeats_per_beat(sample_context) +
       beat_position.mbeat
-  end
-
-  @doc "Converts a beat position (`bar`/`beat`/`mbeat`) to absolute tick."
-  @spec position_to_tick(t(), BeatPosition.t()) :: non_neg_integer()
-  def position_to_tick(%__MODULE__{} = sample_context, %BeatPosition{} = beat_position) do
-    position_to_mbeat(sample_context, beat_position)
   end
 
   @doc "Converts an absolute mbeat to zero-based `bar`/`beat`/`mbeat`."
@@ -206,13 +151,6 @@ defmodule Mensch.SampleContext do
     mbeat = rem(in_bar, mbeats_per_beat)
 
     BeatPosition.new(bar, beat, min(mbeat, 999))
-  end
-
-  @doc "Converts an absolute tick to zero-based `bar`/`beat`/`mbeat`."
-  @spec tick_to_position(t(), non_neg_integer()) :: BeatPosition.t()
-  def tick_to_position(%__MODULE__{} = sample_context, absolute_tick)
-      when is_integer(absolute_tick) and absolute_tick >= 0 do
-    mbeat_to_position(sample_context, absolute_tick)
   end
 
   @doc "Converts milliseconds to `MM:SS.mmm` format."

@@ -18,7 +18,7 @@ defmodule Mensch.MidiFile do
         %SampleContext{} = sample_context,
         opts \\ []
       ) do
-    ppq = SampleContext.ticks_per_beat(sample_context)
+    ppq = SampleContext.mbeats_per_beat(sample_context)
 
     channel_events =
       performance
@@ -54,7 +54,7 @@ defmodule Mensch.MidiFile do
         %SampleContext{} = sample_context,
         opts \\ []
       ) do
-    ppq = SampleContext.ticks_per_beat(sample_context)
+    ppq = SampleContext.mbeats_per_beat(sample_context)
 
     channel_events =
       performance
@@ -129,7 +129,7 @@ defmodule Mensch.MidiFile do
   defp build_channel_events(%Performance{music: music}) do
     music
     |> Enum.flat_map(fn frame ->
-      mbeat = Map.get(frame, :at_mbeat, Map.get(frame, :at_tick, 0))
+      mbeat = Map.get(frame, :at_mbeat, 0)
       at_ms = Map.get(frame, :at_ms, 0)
 
       Enum.flat_map(frame.notes, fn note ->

@@ -38,18 +38,18 @@ defmodule Mensch.NoteShape do
   @aftertouch_hold_s 0.5
   @aftertouch_release_s 0.8
 
-  @doc "Which envelope phase `elapsed_ticks` falls into for the given ADSR envelope."
-  def phase_at(%ADSR{} = adsr, elapsed_ticks) do
-    ADSR.phase_at_tick(adsr, elapsed_ticks)
+  @doc "Which envelope phase `elapsed_mbeats` falls into for the given ADSR envelope."
+  def phase_at(%ADSR{} = adsr, elapsed_mbeats) do
+    ADSR.phase_at_mbeat(adsr, elapsed_mbeats)
   end
 
-  @doc "Channel Pressure (0-127, unclamped) at `elapsed_ticks`."
-  def pressure(%ADSR{} = adsr, phase, elapsed_ticks, elapsed_ms) do
-    base = ADSR.level_at_tick(adsr, elapsed_ticks) * @peak_pressure
+  @doc "Channel Pressure (0-127, unclamped) at `elapsed_mbeats`."
+  def pressure(%ADSR{} = adsr, phase, elapsed_mbeats, elapsed_ms) do
+    base = ADSR.level_at_mbeat(adsr, elapsed_mbeats) * @peak_pressure
 
     # Sustain breathes gently around the ADSR sustain level so note
     # body stays alive without changing attack/decay/release semantics.
-    if ADSR.in_sustain_tick?(adsr, elapsed_ticks) do
+    if ADSR.in_sustain_mbeat?(adsr, elapsed_mbeats) do
       sustain_center = adsr.sustain_level * @peak_pressure
       base_offset = base - sustain_center
 
@@ -61,14 +61,14 @@ defmodule Mensch.NoteShape do
   end
 
   # Backward-compatible fallback for map-based milestone envelopes.
-  def pressure(_milestones, phase, _elapsed_ticks, elapsed_ms) do
+  def pressure(_milestones, phase, _elapsed_mbeats, elapsed_ms) do
     angle = 2 * :math.pi() * @pressure_rate_hz * (elapsed_ms / 1000) + phase
     @sustain_pressure + :math.sin(angle) * @pressure_depth
   end
 
   @doc "Pitch bend ratio (-1.0..1.0, unclamped) at `elapsed_ms` - vibrato only during sustain."
-  def bend(%ADSR{} = adsr, phase, elapsed_ms, elapsed_ticks) do
-    if ADSR.in_sustain_tick?(adsr, elapsed_ticks) do
+  def bend(%ADSR{} = adsr, phase, elapsed_ms, elapsed_mbeats) do
+    if ADSR.in_sustain_mbeat?(adsr, elapsed_mbeats) do
       angle = 2 * :math.pi() * @vibrato_rate_hz * (elapsed_ms / 1000) + phase
       :math.sin(angle) * @vibrato_depth
     else
@@ -83,8 +83,8 @@ defmodule Mensch.NoteShape do
   it starts, derived from `phase`), and only during sustain, same as
   vibrato. Every other note just sits at rest.
   """
-  def slide(%ADSR{} = adsr, phase, true = _emphasis, elapsed_ms, elapsed_ticks) do
-    if ADSR.in_sustain_tick?(adsr, elapsed_ticks) do
+  def slide(%ADSR{} = adsr, phase, true = _emphasis, elapsed_ms, elapsed_mbeats) do
+    if ADSR.in_sustain_mbeat?(adsr, elapsed_mbeats) do
       elapsed_seconds = elapsed_ms / 1000
       offset = phase / (2 * :math.pi()) * @aftertouch_cycle_s
       t = :math.fmod(elapsed_seconds + offset, @aftertouch_cycle_s)
@@ -109,10 +109,10 @@ defmodule Mensch.NoteShape do
     end
   end
 
-  def slide(%ADSR{}, _phase, _emphasis, _elapsed_ms, _elapsed_ticks), do: @aftertouch_slide_rest
+  def slide(%ADSR{}, _phase, _emphasis, _elapsed_ms, _elapsed_mbeats), do: @aftertouch_slide_rest
 
-  @doc "Whether `elapsed_ticks` falls within the sustain phase of `adsr`."
-  def in_sustain?(%ADSR{} = adsr, elapsed_ticks) do
-    ADSR.in_sustain_tick?(adsr, elapsed_ticks)
+  @doc "Whether `elapsed_mbeats` falls within the sustain phase of `adsr`."
+  def in_sustain?(%ADSR{} = adsr, elapsed_mbeats) do
+    ADSR.in_sustain_mbeat?(adsr, elapsed_mbeats)
   end
 end

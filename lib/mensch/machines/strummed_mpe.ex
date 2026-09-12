@@ -79,7 +79,7 @@ defmodule Mensch.Machines.StrummedMpe do
       )
 
     duration_mbeats =
-      notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_ticks)) |> Enum.max()
+      notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
 
     duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
     granularity_ms = SampleContext.mbeats_to_ms(sample_context, frame_mbeats)
@@ -150,7 +150,6 @@ defmodule Mensch.Machines.StrummedMpe do
       %{
         at_ms: at_ms,
         at_mbeat: at_mbeat,
-        at_tick: at_mbeat,
         notes: Enum.map(notes, &note_frame(&1, at_mbeat, sample_context))
       }
     end
@@ -204,7 +203,7 @@ defmodule Mensch.Machines.StrummedMpe do
       event_index: note.event_index,
       phase: NoteShape.phase_at(note.adsr, local_elapsed_mbeats),
       note_on: local_elapsed_mbeats == 0,
-      note_off: local_elapsed_mbeats == note.adsr.total_ticks,
+      note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
       pressure:
         NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_mbeats, local_elapsed_ms)
         |> clamp_7bit(),

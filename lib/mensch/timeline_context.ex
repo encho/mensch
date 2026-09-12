@@ -54,22 +54,4 @@ defmodule Mensch.TimelineContext do
   @doc "Entry duration in millibeats for internal scheduling math."
   @spec duration_mbeats(t()) :: non_neg_integer()
   def duration_mbeats(%__MODULE__{duration_mbeats: duration_mbeats}), do: duration_mbeats
-
-  @doc "Absolute start tick for this timeline context."
-  @spec start_tick(t(), SampleContext.t()) :: non_neg_integer()
-  def start_tick(%__MODULE__{} = timeline_context, %SampleContext{} = sample_context) do
-    start_mbeat(timeline_context, sample_context)
-  end
-
-  @doc "Absolute end tick for this timeline context."
-  @spec end_tick(t(), SampleContext.t()) :: non_neg_integer()
-  def end_tick(%__MODULE__{} = timeline_context, %SampleContext{} = sample_context) do
-    end_mbeat(timeline_context, sample_context)
-  end
-
-  @doc "Entry duration converted to ticks for internal scheduling math."
-  @spec duration_ticks(t(), SampleContext.t()) :: non_neg_integer()
-  def duration_ticks(%__MODULE__{} = timeline_context, %SampleContext{} = sample_context) do
-    SampleContext.mbeats_to_ticks(sample_context, duration_mbeats(timeline_context))
-  end
 end

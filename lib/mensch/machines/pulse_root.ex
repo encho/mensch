@@ -110,7 +110,6 @@ defmodule Mensch.Machines.PulseRoot do
       %{
         at_ms: at_ms,
         at_mbeat: at_mbeat,
-        at_tick: at_mbeat,
         notes: [note_frame(note, at_mbeat, sample_context)]
       }
     end

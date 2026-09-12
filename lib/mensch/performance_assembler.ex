@@ -118,12 +118,11 @@ defmodule Mensch.PerformanceAssembler do
        ) do
     shifted_music =
       Enum.map(performance.music, fn frame ->
-        local_mbeat = Map.get(frame, :at_mbeat, Map.get(frame, :at_tick, 0))
+        local_mbeat = Map.get(frame, :at_mbeat, 0)
         shifted_mbeat = local_mbeat + start_mbeat
 
         %{
           at_mbeat: shifted_mbeat,
-          at_tick: shifted_mbeat,
           at_ms: SampleContext.mbeats_to_ms(sample_context, shifted_mbeat),
           notes: frame.notes
         }
@@ -167,11 +166,10 @@ defmodule Mensch.PerformanceAssembler do
     merged_music =
       performances
       |> Enum.flat_map(& &1.music)
-      |> Enum.group_by(&Map.get(&1, :at_mbeat, Map.get(&1, :at_tick, 0)))
+      |> Enum.group_by(&Map.get(&1, :at_mbeat, 0))
       |> Enum.map(fn {at_mbeat, frames} ->
         %{
           at_mbeat: at_mbeat,
-          at_tick: at_mbeat,
           at_ms: SampleContext.mbeats_to_ms(sample_context, at_mbeat),
           notes: Enum.flat_map(frames, & &1.notes)
         }

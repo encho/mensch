@@ -455,7 +455,7 @@ defmodule MenschWeb.HomeLive do
       <div class="flex items-center justify-between font-mono text-[11px] text-zinc-400">
         <span class="uppercase tracking-wide">Timeline</span>
         <span>
-          {@model.row_count} rows · {@model.bar_count} bars · {@model.beat_count} beats · {@model.total_ticks} ticks
+          {@model.row_count} rows · {@model.bar_count} bars · {@model.beat_count} beats · {@model.total_mbeats} mbeats
         </span>
       </div>
 
@@ -553,7 +553,7 @@ defmodule MenschWeb.HomeLive do
 
       <div class="flex items-center justify-between font-mono text-[10px] text-zinc-500">
         <span>0</span>
-        <span>{@model.total_ticks} ticks</span>
+        <span>{@model.total_mbeats} mbeats</span>
       </div>
     </div>
     """
@@ -645,52 +645,52 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp start_label_primary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
-    tick = SampleContext.position_to_tick(sample_context, start_beat)
-    ms = SampleContext.ticks_to_ms(sample_context, tick)
+    mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
+    ms = SampleContext.mbeats_to_ms(sample_context, mbeat)
 
     "bar #{start_beat.bar} · beat #{start_beat.beat} · #{SampleContext.format_timestamp(ms)}"
   end
 
   defp start_label_secondary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
-    tick = SampleContext.position_to_tick(sample_context, start_beat)
-    "tick #{tick}"
+    mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
+    "mbeat #{mbeat}"
   end
 
   defp duration_label_primary(
          %SampleContext{} = sample_context,
          %TimelineContext{} = timeline_context
        ) do
-    duration_ticks = TimelineContext.duration_ticks(timeline_context, sample_context)
-    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
-    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
-    duration_ms = SampleContext.ticks_to_ms(sample_context, duration_ticks)
+    duration_mbeats = TimelineContext.duration_mbeats(timeline_context)
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
+    duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
     duration_s = duration_ms / 1000
 
     musical =
       cond do
-        rem(duration_ticks, ticks_per_bar) == 0 ->
-          bars = div(duration_ticks, ticks_per_bar)
+        rem(duration_mbeats, mbeats_per_bar) == 0 ->
+          bars = div(duration_mbeats, mbeats_per_bar)
           "#{bars} bar"
 
-        rem(duration_ticks, ticks_per_beat) == 0 ->
-          beats = div(duration_ticks, ticks_per_beat)
+        rem(duration_mbeats, mbeats_per_beat) == 0 ->
+          beats = div(duration_mbeats, mbeats_per_beat)
           "#{beats} beats"
 
         true ->
-          beats = div(duration_ticks, ticks_per_beat)
-          ticks = rem(duration_ticks, ticks_per_beat)
-          "#{beats} beats + #{ticks} ticks"
+          beats = div(duration_mbeats, mbeats_per_beat)
+          remainder_mbeats = rem(duration_mbeats, mbeats_per_beat)
+          "#{beats} beats + #{remainder_mbeats} mbeats"
       end
 
     "#{musical} · #{:erlang.float_to_binary(duration_s, decimals: 2)}s"
   end
 
   defp duration_label_secondary(
-         %SampleContext{} = sample_context,
+         %SampleContext{} = _sample_context,
          %TimelineContext{} = timeline_context
        ) do
-    duration_ticks = TimelineContext.duration_ticks(timeline_context, sample_context)
-    "#{duration_ticks} ticks"
+    duration_mbeats = TimelineContext.duration_mbeats(timeline_context)
+    "#{duration_mbeats} mbeats"
   end
 
   defp sample_duration_label(sample_entries, %SampleContext{} = sample_context)
@@ -705,7 +705,7 @@ defmodule MenschWeb.HomeLive do
 
   defp sample_duration_ms(sample_entries, %SampleContext{} = sample_context)
        when is_list(sample_entries) do
-    max_end_tick =
+    max_end_mbeat =
       case sample_entries do
         [] ->
           0
@@ -713,15 +713,15 @@ defmodule MenschWeb.HomeLive do
         _ ->
           sample_entries
           |> Enum.map(fn %{timeline_context: timeline_context} ->
-            start_tick =
-              SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
+            start_mbeat =
+              SampleContext.position_to_mbeat(sample_context, timeline_context.start_beat)
 
-            start_tick + TimelineContext.duration_ticks(timeline_context, sample_context)
+            start_mbeat + TimelineContext.duration_mbeats(timeline_context)
           end)
           |> Enum.max()
       end
 
-    SampleContext.ticks_to_ms(sample_context, max_end_tick)
+    SampleContext.mbeats_to_ms(sample_context, max_end_mbeat)
   end
 
   defp local_timeline_start_label do
@@ -729,20 +729,20 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp local_timeline_end_label(%SampleContext{} = sample_context, duration_ms) do
-    total_ticks = SampleContext.ms_to_ticks(sample_context, duration_ms)
-    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
-    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
+    total_mbeats = SampleContext.ms_to_mbeats(sample_context, duration_ms)
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
 
-    bar = div(total_ticks, ticks_per_bar)
-    bar_remainder = rem(total_ticks, ticks_per_bar)
-    beat = div(bar_remainder, ticks_per_beat)
-    tick_remainder = rem(bar_remainder, ticks_per_beat)
+    bar = div(total_mbeats, mbeats_per_bar)
+    bar_remainder = rem(total_mbeats, mbeats_per_bar)
+    beat = div(bar_remainder, mbeats_per_beat)
+    mbeat_remainder = rem(bar_remainder, mbeats_per_beat)
 
     musical_label =
-      if tick_remainder == 0 do
+      if mbeat_remainder == 0 do
         "bar #{bar} · beat #{beat}"
       else
-        "bar #{bar} · beat #{beat} + #{tick_remainder}t"
+        "bar #{bar} · beat #{beat} + #{mbeat_remainder}mbeats"
       end
 
     "#{musical_label} · #{duration_ms}ms"
@@ -755,28 +755,28 @@ defmodule MenschWeb.HomeLive do
     lanes_top = 22
     lanes_bottom = 12
 
-    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
-    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
-    ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
+    mbeats_per_subbeat = max(div(mbeats_per_beat, 4), 1)
 
     entries =
       Enum.map(sample_entries, fn %{chord_spec: chord_spec, timeline_context: timeline_context} ->
-        start_tick = SampleContext.position_to_tick(sample_context, timeline_context.start_beat)
-        end_tick = start_tick + TimelineContext.duration_ticks(timeline_context, sample_context)
+        start_mbeat = SampleContext.position_to_mbeat(sample_context, timeline_context.start_beat)
+        end_mbeat = start_mbeat + TimelineContext.duration_mbeats(timeline_context)
 
-        %{label: short_chord_label(chord_spec), start_tick: start_tick, end_tick: end_tick}
+        %{label: short_chord_label(chord_spec), start_mbeat: start_mbeat, end_mbeat: end_mbeat}
       end)
 
-    max_end_tick =
+    max_end_mbeat =
       case entries do
-        [] -> ticks_per_bar * 2
-        _ -> entries |> Enum.map(& &1.end_tick) |> Enum.max()
+        [] -> mbeats_per_bar * 2
+        _ -> entries |> Enum.map(& &1.end_mbeat) |> Enum.max()
       end
 
-    bar_count = max(div(max_end_tick + ticks_per_bar - 1, ticks_per_bar), 2)
-    total_ticks = bar_count * ticks_per_bar
+    bar_count = max(div(max_end_mbeat + mbeats_per_bar - 1, mbeats_per_bar), 2)
+    total_mbeats = bar_count * mbeats_per_bar
     beat_count = bar_count * SampleContext.beats_per_bar(sample_context)
-    total_ticks = max(total_ticks, 1)
+    total_mbeats = max(total_mbeats, 1)
     row_count = max(length(entries), 1)
     lanes_height = row_count * lane_height + (row_count - 1) * lane_gap
     svg_height = lanes_top + lanes_height + lanes_bottom
@@ -793,10 +793,10 @@ defmodule MenschWeb.HomeLive do
     entries_with_geometry =
       entries
       |> Enum.with_index()
-      |> Enum.map(fn {%{label: label, start_tick: start_tick, end_tick: end_tick}, index} ->
+      |> Enum.map(fn {%{label: label, start_mbeat: start_mbeat, end_mbeat: end_mbeat}, index} ->
         lane_y = lanes_top + index * (lane_height + lane_gap)
-        x = tick_to_svg_x(start_tick, total_ticks)
-        width = max(tick_to_svg_x(end_tick, total_ticks) - x, 8)
+        x = mbeat_to_svg_x(start_mbeat, total_mbeats)
+        width = max(mbeat_to_svg_x(end_mbeat, total_mbeats) - x, 8)
 
         %{
           label: label,
@@ -815,15 +815,15 @@ defmodule MenschWeb.HomeLive do
       lanes: lanes,
       entries: entries_with_geometry,
       source_entries: entries,
-      subbeat_xs: timeline_xs(total_ticks, ticks_per_subbeat),
-      beat_xs: timeline_xs(total_ticks, ticks_per_beat),
+      subbeat_xs: timeline_xs(total_mbeats, mbeats_per_subbeat),
+      beat_xs: timeline_xs(total_mbeats, mbeats_per_beat),
       bar_xs:
-        timeline_xs(total_ticks, ticks_per_bar)
+        timeline_xs(total_mbeats, mbeats_per_bar)
         |> Enum.with_index(1),
       row_count: row_count,
       bar_count: bar_count,
       beat_count: beat_count,
-      total_ticks: total_ticks
+      total_mbeats: total_mbeats
     }
   end
 
@@ -832,28 +832,28 @@ defmodule MenschWeb.HomeLive do
   defp sample_timeline_with_playhead(
          %{
            source_entries: source_entries,
-           total_ticks: total_ticks
+           total_mbeats: total_mbeats
          } = model,
          render_scope,
          playhead_pct
        ) do
-    playhead_x = timeline_playhead_x(playhead_pct, render_scope, source_entries, total_ticks)
+    playhead_x = timeline_playhead_x(playhead_pct, render_scope, source_entries, total_mbeats)
     Map.put(model, :playhead_x, playhead_x)
   end
 
-  defp timeline_playhead_x(nil, _render_scope, _entries, _total_ticks), do: nil
+  defp timeline_playhead_x(nil, _render_scope, _entries, _total_mbeats), do: nil
 
-  defp timeline_playhead_x(playhead_pct, :full_sample, _entries, total_ticks)
+  defp timeline_playhead_x(playhead_pct, :full_sample, _entries, total_mbeats)
        when is_number(playhead_pct) do
-    tick_to_svg_x(total_ticks * (playhead_pct / 100), total_ticks)
+    mbeat_to_svg_x(total_mbeats * (playhead_pct / 100), total_mbeats)
   end
 
-  defp timeline_playhead_x(playhead_pct, {:entry, index}, entries, total_ticks)
+  defp timeline_playhead_x(playhead_pct, {:entry, index}, entries, total_mbeats)
        when is_number(playhead_pct) and is_integer(index) do
     case Enum.at(entries, index) do
-      %{start_tick: start_tick, end_tick: end_tick} ->
-        start_x = tick_to_svg_x(start_tick, total_ticks)
-        end_x = tick_to_svg_x(end_tick, total_ticks)
+      %{start_mbeat: start_mbeat, end_mbeat: end_mbeat} ->
+        start_x = mbeat_to_svg_x(start_mbeat, total_mbeats)
+        end_x = mbeat_to_svg_x(end_mbeat, total_mbeats)
         Float.round(start_x + (end_x - start_x) * (playhead_pct / 100), 2)
 
       _ ->
@@ -861,7 +861,7 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  defp timeline_playhead_x(_playhead_pct, _render_scope, _entries, _total_ticks), do: nil
+  defp timeline_playhead_x(_playhead_pct, _render_scope, _entries, _total_mbeats), do: nil
 
   defp timeline_color(index) do
     Enum.at(@chart_colors, rem(index, length(@chart_colors)))
@@ -879,53 +879,53 @@ defmodule MenschWeb.HomeLive do
     "#{root} #{modifier}"
   end
 
-  defp timeline_xs(total_ticks, step) do
-    0..total_ticks//step
-    |> Enum.map(&tick_to_svg_x(&1, total_ticks))
+  defp timeline_xs(total_mbeats, step) do
+    0..total_mbeats//step
+    |> Enum.map(&mbeat_to_svg_x(&1, total_mbeats))
   end
 
-  defp tick_to_svg_x(tick, total_ticks) do
-    tick
-    |> Kernel./(total_ticks)
+  defp mbeat_to_svg_x(mbeat, total_mbeats) do
+    mbeat
+    |> Kernel./(total_mbeats)
     |> Kernel.*(1000)
     |> Float.round(2)
   end
 
-  defp chart_grid_model(%SampleContext{} = sample_context, total_ticks) do
+  defp chart_grid_model(%SampleContext{} = sample_context, total_mbeats) do
     width = 600
-    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
-    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
-    ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
-    total_ticks = max(total_ticks, 1)
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
+    mbeats_per_subbeat = max(div(mbeats_per_beat, 4), 1)
+    total_mbeats = max(total_mbeats, 1)
 
     %{
-      subbeat_xs: chart_grid_xs(total_ticks, ticks_per_subbeat, width),
-      beat_xs: chart_grid_xs(total_ticks, ticks_per_beat, width),
-      bar_xs: chart_grid_xs(total_ticks, ticks_per_bar, width)
+      subbeat_xs: chart_grid_xs(total_mbeats, mbeats_per_subbeat, width),
+      beat_xs: chart_grid_xs(total_mbeats, mbeats_per_beat, width),
+      bar_xs: chart_grid_xs(total_mbeats, mbeats_per_bar, width)
     }
   end
 
-  defp note_matrix_grid_model(%SampleContext{} = sample_context, total_ticks) do
-    ticks_per_bar = SampleContext.ticks_per_bar(sample_context)
-    ticks_per_beat = SampleContext.ticks_per_beat(sample_context)
-    ticks_per_subbeat = max(div(ticks_per_beat, 4), 1)
-    total_ticks = max(total_ticks, 1)
+  defp note_matrix_grid_model(%SampleContext{} = sample_context, total_mbeats) do
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
+    mbeats_per_subbeat = max(div(mbeats_per_beat, 4), 1)
+    total_mbeats = max(total_mbeats, 1)
 
     %{
-      subbeat_pcts: timeline_pct_marks(total_ticks, ticks_per_subbeat),
-      beat_pcts: timeline_pct_marks(total_ticks, ticks_per_beat),
-      bar_pcts: timeline_pct_marks(total_ticks, ticks_per_bar)
+      subbeat_pcts: timeline_pct_marks(total_mbeats, mbeats_per_subbeat),
+      beat_pcts: timeline_pct_marks(total_mbeats, mbeats_per_beat),
+      bar_pcts: timeline_pct_marks(total_mbeats, mbeats_per_bar)
     }
   end
 
-  defp timeline_pct_marks(total_ticks, step) do
-    0..total_ticks//step
-    |> Enum.map(fn tick -> Float.round(tick / total_ticks * 100, 3) end)
+  defp timeline_pct_marks(total_mbeats, step) do
+    0..total_mbeats//step
+    |> Enum.map(fn mbeat -> Float.round(mbeat / total_mbeats * 100, 3) end)
   end
 
-  defp chart_grid_xs(total_ticks, step, width) do
-    0..total_ticks//step
-    |> Enum.map(fn tick -> Float.round(tick / total_ticks * width, 2) end)
+  defp chart_grid_xs(total_mbeats, step, width) do
+    0..total_mbeats//step
+    |> Enum.map(fn mbeat -> Float.round(mbeat / total_mbeats * width, 2) end)
   end
 
   # Groups a rendered `music` timeline's frames by note (`{channel,
@@ -938,15 +938,15 @@ defmodule MenschWeb.HomeLive do
          render_scope,
          selected_note_key,
          %SampleContext{} = _sample_context,
-         total_ticks
+         total_mbeats
        ) do
     colors = note_color_map(music, render_scope, selected_note_key)
-    total_ticks = max(total_ticks, 1)
+    total_mbeats = max(total_mbeats, 1)
 
     music
     |> Enum.flat_map(fn frame ->
-      local_tick = frame.at_tick
-      x = local_tick / total_ticks * 600
+      local_mbeat = frame.at_mbeat
+      x = local_mbeat / total_mbeats * 600
 
       Enum.map(frame.notes, &{{&1.channel, &1.note}, x, Map.fetch!(&1, value_key)})
     end)
@@ -981,25 +981,25 @@ defmodule MenschWeb.HomeLive do
          render_scope,
          selected_note_key,
          %SampleContext{} = _sample_context,
-         total_ticks
+         total_mbeats
        ) do
     colors = note_color_map(music, render_scope, selected_note_key)
-    total_ticks = max(total_ticks, 1)
+    total_mbeats = max(total_mbeats, 1)
 
     segments =
       music
-      |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_tick}) end)
-      |> Enum.group_by(fn {note, _at_tick} -> {note.note, note.channel} end)
+      |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_mbeat}) end)
+      |> Enum.group_by(fn {note, _at_mbeat} -> {note.note, note.channel} end)
       |> Enum.flat_map(fn {{note_number, channel}, entries} ->
-        {sample, _at_tick} = hd(entries)
+        {sample, _at_mbeat} = hd(entries)
         start_entry = Enum.find(entries, fn {note, _} -> note.note_on end)
         end_entry = Enum.find(entries, fn {note, _} -> note.note_off end)
 
         if start_entry && end_entry do
-          start_tick = elem(start_entry, 1)
-          end_tick = elem(end_entry, 1)
-          left_pct = start_tick / total_ticks * 100
-          width_pct = max((end_tick - start_tick) / total_ticks * 100, 0.5)
+          start_mbeat = elem(start_entry, 1)
+          end_mbeat = elem(end_entry, 1)
+          left_pct = start_mbeat / total_mbeats * 100
+          width_pct = max((end_mbeat - start_mbeat) / total_mbeats * 100, 0.5)
 
           style =
             "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
@@ -1189,11 +1189,11 @@ defmodule MenschWeb.HomeLive do
     end)
   end
 
-  defp detail_total_ticks(music, duration_ms, %SampleContext{} = sample_context) do
-    tick_by_duration = SampleContext.ms_to_ticks(sample_context, duration_ms)
-    tick_by_frames = music |> List.last() |> then(&if(&1, do: &1.at_tick, else: 0))
+  defp detail_total_mbeats(music, duration_ms, %SampleContext{} = sample_context) do
+    mbeat_by_duration = SampleContext.ms_to_mbeats(sample_context, duration_ms)
+    mbeat_by_frames = music |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
 
-    max(max(tick_by_duration, tick_by_frames), 1)
+    max(max(mbeat_by_duration, mbeat_by_frames), 1)
   end
 
   defp assign_detail_content(socket) do
@@ -1209,8 +1209,8 @@ defmodule MenschWeb.HomeLive do
         |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
 
       %{music: music, duration_ms: duration_ms} ->
-        detail_total_ticks =
-          detail_total_ticks(music, duration_ms, socket.assigns.sample_context)
+        detail_total_mbeats =
+          detail_total_mbeats(music, duration_ms, socket.assigns.sample_context)
 
         socket
         |> assign(
@@ -1222,7 +1222,7 @@ defmodule MenschWeb.HomeLive do
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
             socket.assigns.sample_context,
-            detail_total_ticks
+            detail_total_mbeats
           )
         )
         |> assign(
@@ -1234,7 +1234,7 @@ defmodule MenschWeb.HomeLive do
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
             socket.assigns.sample_context,
-            detail_total_ticks
+            detail_total_mbeats
           )
         )
         |> assign(
@@ -1246,7 +1246,7 @@ defmodule MenschWeb.HomeLive do
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
             socket.assigns.sample_context,
-            detail_total_ticks
+            detail_total_mbeats
           )
         )
         |> assign(:debug_rows, debug_rows(music))
@@ -1257,16 +1257,16 @@ defmodule MenschWeb.HomeLive do
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
             socket.assigns.sample_context,
-            detail_total_ticks
+            detail_total_mbeats
           )
         )
         |> assign(
           :chart_grid,
-          chart_grid_model(socket.assigns.sample_context, detail_total_ticks)
+          chart_grid_model(socket.assigns.sample_context, detail_total_mbeats)
         )
         |> assign(
           :note_matrix_grid,
-          note_matrix_grid_model(socket.assigns.sample_context, detail_total_ticks)
+          note_matrix_grid_model(socket.assigns.sample_context, detail_total_mbeats)
         )
     end
   end

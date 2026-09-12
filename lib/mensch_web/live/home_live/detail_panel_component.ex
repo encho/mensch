@@ -85,7 +85,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
         {@render_data.bpm} bpm · {elem(@render_data.time_signature, 0)}/{elem(
           @render_data.time_signature,
           1
-        )} · {@render_data.granularity_ms}ms ticks · {@render_data.duration_ms}ms · {length(
+        )} · {@render_data.granularity_ms}ms mbeats · {@render_data.duration_ms}ms · {length(
           @render_data.music
         )} frames
       </div>

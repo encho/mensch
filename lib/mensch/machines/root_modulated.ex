@@ -104,7 +104,6 @@ defmodule Mensch.Machines.RootModulated do
       %{
         at_ms: at_ms,
         at_mbeat: at_mbeat,
-        at_tick: at_mbeat,
         notes: [note_frame(note, at_mbeat, sample_context)]
       }
     end
@@ -158,7 +157,7 @@ defmodule Mensch.Machines.RootModulated do
       event_index: note.event_index,
       phase: NoteShape.phase_at(note.adsr, local_elapsed_mbeats),
       note_on: local_elapsed_mbeats == 0,
-      note_off: local_elapsed_mbeats == note.adsr.total_ticks,
+      note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
       pressure:
         NoteShape.pressure(note.adsr, note.phase_offset, local_elapsed_mbeats, local_elapsed_ms)
         |> clamp_7bit(),

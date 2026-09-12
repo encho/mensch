@@ -24,7 +24,6 @@ defmodule Mensch.Performance do
           %{
             at_ms: 0,
             at_mbeat: 0,
-            at_tick: 0,
             notes: [
               %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
@@ -39,7 +38,6 @@ defmodule Mensch.Performance do
           %{
             at_ms: 31,
             at_mbeat: 6,
-            at_tick: 6,
             notes: [
               %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
@@ -79,7 +77,6 @@ defmodule Mensch.Performance do
   @type frame :: %{
           at_ms: non_neg_integer(),
           at_mbeat: non_neg_integer(),
-          at_tick: non_neg_integer(),
           notes: [note_event()]
         }
 
@@ -181,7 +178,6 @@ defmodule Mensch.Performance do
       %{
         at_ms: frame.at_ms,
         absolute_mbeat: absolute_mbeat,
-        absolute_tick: absolute_mbeat,
         position: position,
         timestamp: SampleContext.format_timestamp(frame.at_ms)
       }

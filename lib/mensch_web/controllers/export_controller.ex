@@ -14,7 +14,7 @@ defmodule MenschWeb.ExportController do
 
       midi_bytes =
         MidiFile.from_performance(performance, sample.sample_context,
-          trim_end_tick: sample_end_tick(sample)
+          trim_end_tick: sample_end_mbeat(sample)
         )
 
       filename = "#{sample_slug(sample.name)}-mpe.mid"
@@ -48,7 +48,7 @@ defmodule MenschWeb.ExportController do
 
       midi_bytes =
         MidiFile.from_performance_bitwig(performance, sample.sample_context,
-          trim_end_tick: sample_end_tick(sample)
+          trim_end_tick: sample_end_mbeat(sample)
         )
 
       filename = "#{sample_slug(sample.name)}-bitwig-mpe.mid"
@@ -75,11 +75,11 @@ defmodule MenschWeb.ExportController do
     |> String.trim("-")
   end
 
-  defp sample_end_tick(%{sample_entries: entries, sample_context: sample_context})
+  defp sample_end_mbeat(%{sample_entries: entries, sample_context: sample_context})
        when is_list(entries) do
     entries
     |> Enum.map(fn %{timeline_context: timeline_context} ->
-      TimelineContext.end_tick(timeline_context, sample_context)
+      TimelineContext.end_mbeat(timeline_context, sample_context)
     end)
     |> Enum.max(fn -> 0 end)
   end
