@@ -5,8 +5,8 @@ defmodule Mensch.Machines.PulseRoot do
 
   Pulse timing uses absolute sample ticks (passed in `opts`) so pulses stay
   aligned to the global beat grid even when the chord starts off-beat.
-  Beat-boundary frames are inserted explicitly so pulse peaks can land exactly
-  on the beat tick even when the base frame grid is off-phase.
+  With mbeat-native timing, frame steps divide one beat, so beat boundaries are
+  already on the render lattice.
   """
 
   alias Mensch.ChordSpec
@@ -106,7 +106,7 @@ defmodule Mensch.Machines.PulseRoot do
   end
 
   defp build_music(note, duration_ticks, sample_context, frame_ticks) do
-    for at_tick <- timeline_ticks(note, duration_ticks, frame_ticks) do
+    for at_tick <- 0..duration_ticks//frame_ticks do
       at_ms = SampleContext.ticks_to_ms(sample_context, at_tick)
 
       %{
@@ -199,27 +199,6 @@ defmodule Mensch.Machines.PulseRoot do
          _peak_pressure
        ),
        do: base_pressure
-
-  defp timeline_ticks(note, duration_ticks, frame_ticks) do
-    base_ticks = Enum.to_list(0..duration_ticks//frame_ticks)
-    beat_ticks = beat_ticks_within(note.entry_start_tick_abs, note.ticks_per_beat, duration_ticks)
-
-    (base_ticks ++ beat_ticks)
-    |> Enum.uniq()
-    |> Enum.sort()
-  end
-
-  defp beat_ticks_within(_entry_start_tick_abs, ticks_per_beat, _duration_ticks)
-       when ticks_per_beat <= 0,
-       do: []
-
-  defp beat_ticks_within(entry_start_tick_abs, ticks_per_beat, duration_ticks) do
-    start_phase = rem(entry_start_tick_abs, ticks_per_beat)
-    first_beat_local_tick = if start_phase == 0, do: 0, else: ticks_per_beat - start_phase
-
-    first_beat_local_tick..duration_ticks//ticks_per_beat
-    |> Enum.to_list()
-  end
 
   defp machine_params!(opts) do
     case Keyword.fetch(opts, :machine_params) do

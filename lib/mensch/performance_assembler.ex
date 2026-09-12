@@ -26,6 +26,8 @@ defmodule Mensch.PerformanceAssembler do
   @doc "Assembles and aggregates a full sample timeline from entry maps."
   @spec generate_sample([map()], SampleContext.t()) :: Performance.t()
   def generate_sample(entries, %SampleContext{} = sample_context) when is_list(entries) do
+    sample_context = SampleContext.validate!(sample_context)
+
     entries
     |> Enum.with_index()
     |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context} = entry,
@@ -62,6 +64,7 @@ defmodule Mensch.PerformanceAssembler do
         %TimelineContext{} = timeline_context,
         machine
       ) do
+    sample_context = SampleContext.validate!(sample_context)
     machine_opts = machine_timing_opts(sample_context, timeline_context)
 
     Machine.render(machine, chord_spec, sample_context, timeline_context, machine_opts)
