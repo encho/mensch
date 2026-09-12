@@ -49,7 +49,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
             <div
               :for={segment <- Map.get(row, :segments, [])}
               phx-click="toggle_note_focus"
-              phx-value-note={to_string(segment.note)}
+              phx-value-note={to_string(segment.midi_note)}
               phx-value-channel={to_string(segment.channel)}
               class={[
                 "absolute inset-y-0 z-20 cursor-pointer transition-opacity duration-150",

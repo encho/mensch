@@ -33,6 +33,22 @@ defmodule Mensch.Machine.NotePlanItem do
   - `event_index` and `degree_index` are non-negative.
   - `channel` may be `nil` until global channel allocation.
   - `adsr` may be `nil` until envelope assignment.
+
+  Example item (pre-envelope):
+
+      %Mensch.Machine.NotePlanItem{
+        note_name: :c,
+        octave: 4,
+        midi_note: 60,
+        channel: nil,
+        velocity: 100,
+        machine_id: :simple_chord,
+        chord_instance_id: 0,
+        event_index: 3,
+        degree_index: 0,
+        delay_mbeats: 540,
+        adsr: nil
+      }
   """
 
   alias Mensch.Envelope.ADSR
@@ -40,7 +56,7 @@ defmodule Mensch.Machine.NotePlanItem do
   @enforce_keys [
     :note_name,
     :octave,
-    :note,
+    :midi_note,
     :velocity,
     :machine_id,
     :chord_instance_id,
@@ -51,7 +67,7 @@ defmodule Mensch.Machine.NotePlanItem do
   defstruct [
     :note_name,
     :octave,
-    :note,
+    :midi_note,
     :channel,
     :velocity,
     :machine_id,
@@ -67,22 +83,26 @@ defmodule Mensch.Machine.NotePlanItem do
 
   Field semantics:
 
-  - `note_name`: Human-readable pitch class (for UI/debug contexts).
-  - `octave`: Octave register paired with `note_name`.
-  - `note`: MIDI note number used for playback/export.
-  - `channel`: Output channel; typically assigned later by global allocation.
-  - `velocity`: Initial note-on velocity.
-  - `machine_id`: Source machine identifier.
-  - `chord_instance_id`: Chord occurrence identity in a sequence/performance.
-  - `event_index`: Playback sequence position.
-  - `degree_index`: Harmonic source position.
-  - `delay_mbeats`: Absolute quantized note start time in mbeat units.
-  - `adsr`: Envelope assigned in the articulation stage.
+  - `note_name`: Human-readable pitch class (for UI/debug contexts), e.g. `:c`.
+  - `octave`: Octave register paired with `note_name`, e.g. `4`.
+  - `midi_note`: MIDI note number used for playback/export, e.g. `60`.
+  - `channel`: Output channel; typically assigned later by global allocation,
+    e.g. `nil` before allocation, then `2`.
+  - `velocity`: Initial note-on velocity, e.g. `100`.
+  - `machine_id`: Source machine identifier, e.g. `:simple_chord`.
+  - `chord_instance_id`: Chord occurrence identity in a sequence/performance,
+    e.g. `0` for the first entry.
+  - `event_index`: Playback sequence position, e.g. `3`.
+  - `degree_index`: Harmonic source position, e.g. `0` for the root degree.
+  - `delay_mbeats`: Absolute quantized note start time in mbeat units,
+    e.g. `540`.
+  - `adsr`: Envelope assigned in the articulation stage, e.g. `nil` before
+    assignment, then `%Mensch.Envelope.ADSR{...}`.
   """
   @type t :: %__MODULE__{
           note_name: atom(),
           octave: integer(),
-          note: integer(),
+          midi_note: integer(),
           channel: integer() | nil,
           velocity: integer(),
           machine_id: atom(),

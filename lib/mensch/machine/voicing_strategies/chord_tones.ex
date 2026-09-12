@@ -21,7 +21,7 @@ defmodule Mensch.Machine.VoicingStrategies.ChordTones do
     |> ChordSpec.to_midi_notes()
     |> Enum.with_index()
     |> Enum.map(fn {note_number, index} ->
-      %{note: note_number, degree_index: index, event_index: index}
+      %{midi_note: note_number, degree_index: index, event_index: index}
     end)
   end
 end

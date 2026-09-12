@@ -12,7 +12,7 @@ defmodule Mensch.Machine.VoicingStrategy do
   alias Mensch.ChordSpec
 
   @type voiced_note :: %{
-          note: integer(),
+          midi_note: integer(),
           degree_index: non_neg_integer(),
           event_index: non_neg_integer()
         }

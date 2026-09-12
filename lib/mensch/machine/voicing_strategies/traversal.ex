@@ -58,7 +58,7 @@ defmodule Mensch.Machine.VoicingStrategies.Traversal do
     |> repeat_pattern(strategy.cycle_count)
     |> Enum.with_index()
     |> Enum.map(fn {{note_number, degree_index}, event_index} ->
-      %{note: note_number, degree_index: degree_index, event_index: event_index}
+      %{midi_note: note_number, degree_index: degree_index, event_index: event_index}
     end)
   end
 

@@ -77,7 +77,7 @@ defmodule Mensch.Machines.PulseRoot do
     note = %{
       note_name: note_name,
       octave: octave,
-      note: root_note,
+      midi_note: root_note,
       channel: nil,
       velocity: params.velocity,
       machine_id: id(),
@@ -107,7 +107,7 @@ defmodule Mensch.Machines.PulseRoot do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -127,7 +127,7 @@ defmodule Mensch.Machines.PulseRoot do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -157,7 +157,7 @@ defmodule Mensch.Machines.PulseRoot do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,

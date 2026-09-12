@@ -89,7 +89,7 @@ defmodule Mensch.Player do
   def handle_info({:frame, ref, notes}, %{ref: ref} = state) do
     active =
       Enum.reduce(notes, state.active, fn note, active ->
-        note_id = {note.channel, note.note}
+        note_id = {note.channel, note.midi_note}
 
         send_frame(note)
 
@@ -112,7 +112,7 @@ defmodule Mensch.Player do
 
   defp send_frame(note) do
     if note.note_on do
-      Connection.send_message(<<0x90 + note.channel, note.note, note.velocity>>)
+      Connection.send_message(<<0x90 + note.channel, note.midi_note, note.velocity>>)
     end
 
     # Drive channel expression from machine phase data directly. This
@@ -128,7 +128,7 @@ defmodule Mensch.Player do
     end
 
     if note.note_off do
-      Connection.send_message(<<0x80 + note.channel, note.note, 0>>)
+      Connection.send_message(<<0x80 + note.channel, note.midi_note, 0>>)
     end
   end
 

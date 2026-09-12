@@ -1005,7 +1005,7 @@ defmodule MenschWeb.HomeLive do
   end
 
   # Groups a rendered timeline's frames by note (`{channel,
-  # note}`), one polyline per note, for an SVG line chart of `value_key`
+  # midi_note}`), one polyline per note, for an SVG line chart of `value_key`
   # (`:pressure`, `:bend`, or `:slide`) over time.
   defp build_chart(
          frames,
@@ -1033,12 +1033,12 @@ defmodule MenschWeb.HomeLive do
       fn {_id, x, value} -> {x, value} end
     )
     |> Enum.map(fn {series_key, points} ->
-      {channel, note} = series_channel_note(series_key)
+      {channel, midi_note} = series_channel_note(series_key)
 
       %{
         series_key: series_key,
         channel: channel,
-        note: note,
+        midi_note: midi_note,
         color: Map.fetch!(colors, series_key),
         points: chart_points(points, min_v, max_v)
       }
@@ -1048,9 +1048,9 @@ defmodule MenschWeb.HomeLive do
 
   defp chart_series_sort_key(series, selected_note_key) do
     is_selected =
-      not is_nil(selected_note_key) and {series.channel, series.note} == selected_note_key
+      not is_nil(selected_note_key) and {series.channel, series.midi_note} == selected_note_key
 
-    {is_selected, series.channel, series.note}
+    {is_selected, series.channel, series.midi_note}
   end
 
   # A piano-roll style matrix: one row per semitone between the lowest
@@ -1072,7 +1072,7 @@ defmodule MenschWeb.HomeLive do
       |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_mbeat}) end)
       |> Enum.group_by(fn {note, _at_mbeat} -> note_series_key(note) end)
       |> Enum.flat_map(fn {series_key, entries} ->
-        {channel, note_number} = series_channel_note(series_key)
+        {channel, midi_note_number} = series_channel_note(series_key)
 
         entries
         |> lifecycle_segments(total_mbeats)
@@ -1088,9 +1088,9 @@ defmodule MenschWeb.HomeLive do
           %{
             series_key: series_key,
             channel: channel,
-            note: note_number,
+            midi_note: midi_note_number,
             label: label,
-            active: note_selected?({channel, note_number}, selected_note_key),
+            active: note_selected?({channel, midi_note_number}, selected_note_key),
             style: style
           }
         end)
@@ -1103,7 +1103,7 @@ defmodule MenschWeb.HomeLive do
       _ ->
         rows_by_note =
           segments
-          |> Enum.group_by(& &1.note)
+          |> Enum.group_by(& &1.midi_note)
 
         {min_note, max_note} = rows_by_note |> Map.keys() |> Enum.min_max()
 
@@ -1113,7 +1113,7 @@ defmodule MenschWeb.HomeLive do
               {note_name, octave} = PerformanceAssembler.note_name(note_number)
 
               %{
-                note: note_number,
+                midi_note: note_number,
                 label: "#{note_name}#{octave}",
                 segments: [],
                 has_active_segment: false
@@ -1128,13 +1128,13 @@ defmodule MenschWeb.HomeLive do
                   %{
                     style: segment.style,
                     channel: segment.channel,
-                    note: segment.note,
+                    midi_note: segment.midi_note,
                     active: segment.active
                   }
                 end)
 
               %{
-                note: note_number,
+                midi_note: note_number,
                 label: label,
                 segments: segments,
                 has_active_segment: Enum.any?(segments, & &1.active)
@@ -1229,8 +1229,8 @@ defmodule MenschWeb.HomeLive do
     |> Enum.flat_map(& &1.notes)
     |> Enum.uniq_by(&note_series_key/1)
     |> Enum.sort_by(fn event ->
-      {Map.get(event, :sample_entry_index, -1), Map.get(event, :event_index, 999), event.note,
-       event.channel}
+      {Map.get(event, :sample_entry_index, -1), Map.get(event, :event_index, 999),
+       event.midi_note, event.channel}
     end)
     |> Enum.with_index()
     |> Map.new(fn {event, index} ->
@@ -1244,9 +1244,9 @@ defmodule MenschWeb.HomeLive do
   defp focus_color(_series_key, color, nil), do: color
 
   defp focus_color(series_key, color, {selected_channel, selected_note}) do
-    {channel, note} = series_channel_note(series_key)
+    {channel, midi_note} = series_channel_note(series_key)
 
-    if channel == selected_channel and note == selected_note do
+    if channel == selected_channel and midi_note == selected_note do
       color
     else
       @inactive_note_color
@@ -1278,7 +1278,7 @@ defmodule MenschWeb.HomeLive do
   defp sort_voice_events(events) do
     Enum.sort_by(events, fn event ->
       {Map.get(event, :sample_entry_index, -1), Map.get(event, :machine_id, :unknown),
-       Map.get(event, :chord_instance_id, 0), Map.get(event, :event_index, 999), event.note,
+       Map.get(event, :chord_instance_id, 0), Map.get(event, :event_index, 999), event.midi_note,
        event.channel}
     end)
   end
@@ -1289,7 +1289,7 @@ defmodule MenschWeb.HomeLive do
       Map.get(note, :machine_id, :unknown),
       Map.get(note, :chord_instance_id, 0),
       Map.get(note, :event_index, 0),
-      Map.get(note, :note, 0),
+      Map.get(note, :midi_note, 0),
       Map.get(note, :channel, -1)
     }
   end

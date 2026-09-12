@@ -134,7 +134,7 @@ defmodule Mensch.MidiFile do
 
       Enum.flat_map(frame.notes, fn note ->
         ch = clamp_u7(Map.get(note, :channel, 0))
-        midi_note = clamp_u7(Map.get(note, :note, 0))
+        midi_note = clamp_u7(Map.get(note, :midi_note, 0))
         velocity = clamp_u7(Map.get(note, :velocity, 0))
         event_index = Map.get(note, :event_index, 999)
 
@@ -145,7 +145,7 @@ defmodule Mensch.MidiFile do
             at_ms: at_ms,
             sort: {event_index, ch, midi_note, 1},
             label: :note_on,
-            note: midi_note,
+            midi_note: midi_note,
             bytes: <<0x90 + ch, midi_note, velocity>>
           })
           |> maybe_add(
@@ -156,7 +156,7 @@ defmodule Mensch.MidiFile do
               at_ms: at_ms,
               sort: {event_index, ch, midi_note, 2},
               label: :pressure,
-              note: midi_note,
+              midi_note: midi_note,
               bytes: <<0xD0 + ch, clamp_u7(Map.get(note, :pressure, 0))>>
             }
           )
@@ -168,7 +168,7 @@ defmodule Mensch.MidiFile do
               at_ms: at_ms,
               sort: {event_index, ch, midi_note, 3},
               label: :bend,
-              note: midi_note,
+              midi_note: midi_note,
               bytes: bend_bytes(ch, Map.get(note, :bend, 0.0))
             }
           )
@@ -180,7 +180,7 @@ defmodule Mensch.MidiFile do
               at_ms: at_ms,
               sort: {event_index, ch, midi_note, 4},
               label: :slide,
-              note: midi_note,
+              midi_note: midi_note,
               bytes: <<0xB0 + ch, 74, clamp_u7(Map.get(note, :slide, 0))>>
             }
           )
@@ -189,7 +189,7 @@ defmodule Mensch.MidiFile do
             at_ms: at_ms,
             sort: {event_index, ch, midi_note, 5},
             label: :note_off,
-            note: midi_note,
+            midi_note: midi_note,
             bytes: <<0x80 + ch, midi_note, 0>>
           })
 
@@ -220,8 +220,8 @@ defmodule Mensch.MidiFile do
       |> Enum.sort_by(fn %{tick: tick, sort: sort} -> {tick, sort} end)
       |> Enum.reduce({[], %{}}, fn event, {acc, active} ->
         channel = status_channel(event_status(event.bytes))
-        note = Map.get(event, :note)
-        note_key = {channel, note}
+        midi_note = Map.get(event, :midi_note)
+        note_key = {channel, midi_note}
 
         cond do
           event.tick <= trim_end_tick and event.label == :note_on ->
@@ -253,14 +253,14 @@ defmodule Mensch.MidiFile do
       active
       |> Map.keys()
       |> Enum.with_index(1)
-      |> Enum.map(fn {{channel, note}, idx} ->
+      |> Enum.map(fn {{channel, midi_note}, idx} ->
         %{
           tick: trim_end_tick,
           at_ms: nil,
-          sort: {9_000, channel, note, idx},
+          sort: {9_000, channel, midi_note, idx},
           label: :note_off,
-          note: note,
-          bytes: <<0x80 + channel, note, 0>>
+          midi_note: midi_note,
+          bytes: <<0x80 + channel, midi_note, 0>>
         }
       end)
 

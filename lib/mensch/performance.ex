@@ -25,11 +25,11 @@ defmodule Mensch.Performance do
             at_ms: 0,
             at_mbeat: 0,
             notes: [
-              %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
+              %{note_name: :c, octave: 4, midi_note: 60, channel: 1, velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0},
-              %{note_name: :e, octave: 4, note: 64, channel: 2, velocity: 100,
+              %{note_name: :e, octave: 4, midi_note: 64, channel: 2, velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 1,
                 phase: :pending, note_on: false, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
@@ -39,11 +39,11 @@ defmodule Mensch.Performance do
             at_ms: 31,
             at_mbeat: 6,
             notes: [
-              %{note_name: :c, octave: 4, note: 60, channel: 1, velocity: 100,
+              %{note_name: :c, octave: 4, midi_note: 60, channel: 1, velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 0,
                 phase: :attack, note_on: false, note_off: false,
                 pressure: 39, bend: 0.0, slide: 0},
-              %{note_name: :e, octave: 4, note: 64, channel: 2, velocity: 100,
+              %{note_name: :e, octave: 4, midi_note: 64, channel: 2, velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, event_index: 1,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
@@ -60,7 +60,7 @@ defmodule Mensch.Performance do
           at_ms: non_neg_integer(),
           note_name: atom(),
           octave: integer(),
-          note: non_neg_integer(),
+          midi_note: non_neg_integer(),
           channel: non_neg_integer(),
           velocity: non_neg_integer(),
           phase: atom(),
@@ -108,7 +108,7 @@ defmodule Mensch.Performance do
   def distinct_notes(%__MODULE__{frames: frames}) do
     frames
     |> Enum.flat_map(& &1.notes)
-    |> Enum.map(& &1.note)
+    |> Enum.map(& &1.midi_note)
     |> Enum.uniq()
     |> Enum.sort()
   end
@@ -130,7 +130,7 @@ defmodule Mensch.Performance do
       Enum.flat_map(frame.notes, fn note ->
         base = %{
           at_ms: frame.at_ms,
-          note: note.note,
+          midi_note: note.midi_note,
           channel: note.channel,
           machine_id: Map.get(note, :machine_id),
           chord_instance_id: Map.get(note, :chord_instance_id),
@@ -152,7 +152,7 @@ defmodule Mensch.Performance do
         end
       end)
     end)
-    |> Enum.sort_by(fn event -> {event.at_ms, event.channel, event.note, event.type} end)
+    |> Enum.sort_by(fn event -> {event.at_ms, event.channel, event.midi_note, event.type} end)
   end
 
   @doc """

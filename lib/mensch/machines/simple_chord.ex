@@ -65,6 +65,7 @@ defmodule Mensch.Machines.SimpleChord do
       ) do
     %SimpleChordParams{} = params = machine_params!(opts)
 
+    # TODO frame_units? better name? what for?
     frame_mbeats = SampleContext.frame_units(sample_context)
 
     stagger_mbeats =
@@ -145,7 +146,7 @@ defmodule Mensch.Machines.SimpleChord do
   # [240, 250, 260, ...]
   defp build_note_plan(timed_voiced_notes) do
     Enum.map(timed_voiced_notes, fn voiced_note ->
-      note_number = voiced_note.note
+      note_number = voiced_note.midi_note
       {note_name, octave} = ChordSpec.note_name(note_number)
 
       NotePlanItem.new(%{
@@ -154,7 +155,7 @@ defmodule Mensch.Machines.SimpleChord do
         # Octave register paired with note_name for display/debug context.
         octave: octave,
         # MIDI note number used for playback/export.
-        note: note_number,
+        midi_note: note_number,
         # Filled later by channel allocation in assembly.
         channel: nil,
         # Note-on velocity emitted for this machine.
@@ -259,7 +260,7 @@ defmodule Mensch.Machines.SimpleChord do
       frame_notes =
         notes_by_mbeat
         |> Map.get(at_mbeat, [])
-        |> Enum.sort_by(&{&1.event_index, &1.note})
+        |> Enum.sort_by(&{&1.event_index, &1.midi_note})
 
       %{at_mbeat: at_mbeat, notes: frame_notes}
     end)
@@ -273,7 +274,7 @@ defmodule Mensch.Machines.SimpleChord do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -294,7 +295,7 @@ defmodule Mensch.Machines.SimpleChord do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -317,7 +318,7 @@ defmodule Mensch.Machines.SimpleChord do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,

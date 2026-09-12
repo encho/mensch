@@ -61,7 +61,7 @@ defmodule Mensch.Machines.RootModulated do
     note = %{
       note_name: note_name,
       octave: octave,
-      note: root_note,
+      midi_note: root_note,
       channel: nil,
       velocity: params.velocity,
       phase_offset: 0.0,
@@ -117,7 +117,7 @@ defmodule Mensch.Machines.RootModulated do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -137,7 +137,7 @@ defmodule Mensch.Machines.RootModulated do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -159,7 +159,7 @@ defmodule Mensch.Machines.RootModulated do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,

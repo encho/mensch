@@ -110,7 +110,7 @@ defmodule Mensch.Machines.StrummedMpe do
       %{
         note_name: note_name,
         octave: octave,
-        note: note_number,
+        midi_note: note_number,
         channel: nil,
         velocity: params.velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
@@ -163,7 +163,7 @@ defmodule Mensch.Machines.StrummedMpe do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -183,7 +183,7 @@ defmodule Mensch.Machines.StrummedMpe do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
@@ -205,7 +205,7 @@ defmodule Mensch.Machines.StrummedMpe do
     %{
       note_name: note.note_name,
       octave: note.octave,
-      note: note.note,
+      midi_note: note.midi_note,
       channel: note.channel,
       velocity: note.velocity,
       machine_id: note.machine_id,
