@@ -62,6 +62,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
       |> assign(:show_detail_panel, false)
+      |> assign(:show_samples_modal, false)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
       |> assign_detail_content()
@@ -95,6 +96,14 @@ defmodule MenschWeb.HomeLive do
     {:noreply, update(socket, :show_detail_panel, &(!&1))}
   end
 
+  def handle_event("open_samples_modal", _params, socket) do
+    {:noreply, assign(socket, :show_samples_modal, true)}
+  end
+
+  def handle_event("close_samples_modal", _params, socket) do
+    {:noreply, assign(socket, :show_samples_modal, false)}
+  end
+
   def handle_event("activate_sample", %{"index" => index_str}, socket) do
     case Integer.parse(index_str) do
       {index, ""} ->
@@ -116,6 +125,7 @@ defmodule MenschWeb.HomeLive do
              |> assign(:render_scope, :full_sample)
              |> assign(:player_status, Player.status())
              |> clear_playback_state(true)
+             |> assign(:show_samples_modal, false)
              |> assign(:selected_note_key, nil)
              |> assign_detail_content()}
 
@@ -263,11 +273,39 @@ defmodule MenschWeb.HomeLive do
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
-      <div class="mx-auto max-w-6xl space-y-6">
-        <div id="samples-section" class="space-y-3 border border-zinc-700/70 bg-zinc-950/85 p-4">
-          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Samples</div>
+      <div
+        id="samples-modal"
+        class={[
+          "fixed inset-0 z-50 transition-opacity duration-200",
+          @show_samples_modal && "pointer-events-auto opacity-100",
+          !@show_samples_modal && "pointer-events-none opacity-0"
+        ]}
+      >
+        <button
+          type="button"
+          phx-click="close_samples_modal"
+          aria-label="Close samples modal"
+          class="absolute inset-0 bg-zinc-950/75"
+        ></button>
 
-          <div class="overflow-x-auto border border-zinc-700/60">
+        <div class={[
+          "relative mx-auto mt-8 w-[min(96vw,1100px)] border border-zinc-700/70 bg-zinc-950 p-4 shadow-2xl transition-all duration-200",
+          @show_samples_modal && "translate-y-0 scale-100",
+          !@show_samples_modal && "-translate-y-2 scale-[0.98]"
+        ]}>
+          <div class="mb-3 flex items-center justify-between">
+            <div class="text-[11px] uppercase tracking-wide text-zinc-400">Samples</div>
+            <button
+              type="button"
+              phx-click="close_samples_modal"
+              class="flex size-8 items-center justify-center border border-zinc-600 text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+              aria-label="Close samples"
+            >
+              <.icon name="hero-x-mark" class="size-4" />
+            </button>
+          </div>
+
+          <div class="max-h-[70vh] overflow-auto border border-zinc-700/60">
             <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
               <thead>
                 <tr class="border-b border-zinc-700/70 text-zinc-400">
@@ -330,9 +368,23 @@ defmodule MenschWeb.HomeLive do
             </table>
           </div>
         </div>
+      </div>
 
+      <div class="mx-auto max-w-6xl space-y-6">
         <div id="render-section" class="space-y-4 border border-zinc-700/70 bg-zinc-950/85 p-4">
-          <div class="text-[11px] uppercase tracking-wide text-zinc-400">Active Sample Playback</div>
+          <div class="flex items-center justify-between">
+            <div class="text-[11px] uppercase tracking-wide text-zinc-400">
+              Active Sample Playback
+            </div>
+            <button
+              type="button"
+              id="open-samples-modal"
+              phx-click="open_samples_modal"
+              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+            >
+              Browse Samples
+            </button>
+          </div>
 
           <div class="font-mono text-[11px] text-zinc-200">
             Selected sample: {active_sample_name(@samples, @active_sample_index)}

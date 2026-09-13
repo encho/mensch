@@ -21,9 +21,9 @@ defmodule Mensch.SampleDb do
   @default_frame_mbeats 50
 
   @samples [
+    Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample0SimpleChordTraversal.sample(@default_frame_mbeats),
     Sample0bSimpleChordTraversalUp.sample(@default_frame_mbeats),
-    Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample1.sample(@default_frame_mbeats),
     Sample1NoRelease.sample(@default_frame_mbeats),
     Sample2CMajorChords.sample(@default_frame_mbeats),
