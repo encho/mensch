@@ -35,6 +35,10 @@ defmodule MenschWeb.Layouts do
     default: nil,
     doc: "current MIDI connection status, e.g. {:connected, name} or :disconnected"
 
+  attr :show_samples_button, :boolean,
+    default: false,
+    doc: "shows the Sample Library button in the navbar"
+
   attr :bpm, :integer,
     default: nil,
     doc: "current global tempo (beats per minute), shared by every chord"
@@ -101,6 +105,16 @@ defmodule MenschWeb.Layouts do
               </button>
             </div>
           </div>
+
+          <button
+            :if={@show_samples_button}
+            type="button"
+            id="open-samples-modal"
+            phx-click="open_samples_modal"
+            class="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
+          >
+            <.icon name="hero-queue-list" class="size-4" /> Sample Library
+          </button>
         </div>
       </div>
     </header>

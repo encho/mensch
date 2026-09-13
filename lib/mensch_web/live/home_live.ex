@@ -61,7 +61,7 @@ defmodule MenschWeb.HomeLive do
       )
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
-      |> assign(:show_detail_panel, false)
+      |> assign(:show_detail_panel, true)
       |> assign(:show_samples_modal, false)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
@@ -272,7 +272,7 @@ defmodule MenschWeb.HomeLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status}>
+    <Layouts.app flash={@flash} midi_status={@midi_status} show_samples_button={true}>
       <div
         id="samples-modal"
         class={[
@@ -294,7 +294,7 @@ defmodule MenschWeb.HomeLive do
           !@show_samples_modal && "-translate-y-2 scale-[0.98]"
         ]}>
           <div class="mb-3 flex items-center justify-between">
-            <div class="text-[11px] uppercase tracking-wide text-zinc-400">Samples</div>
+            <div class="text-[11px] uppercase tracking-wide text-zinc-400">Sample Library</div>
             <button
               type="button"
               phx-click="close_samples_modal"
@@ -372,34 +372,15 @@ defmodule MenschWeb.HomeLive do
 
       <div class="mx-auto max-w-6xl space-y-6">
         <div id="render-section" class="space-y-4 border border-zinc-700/70 bg-zinc-950/85 p-4">
-          <div class="flex items-center justify-between">
-            <div class="text-[11px] uppercase tracking-wide text-zinc-400">
-              Active Sample Playback
-            </div>
-            <button
-              type="button"
-              id="open-samples-modal"
-              phx-click="open_samples_modal"
-              class="flex h-9 items-center border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-            >
-              Browse Samples
-            </button>
-          </div>
-
-          <div class="font-mono text-[11px] text-zinc-200">
-            Selected sample: {active_sample_name(@samples, @active_sample_index)}
+          <div class="font-mono text-xl text-zinc-100 md:text-2xl">
+            {active_sample_name(@samples, @active_sample_index)}
           </div>
 
           <div class="font-mono text-[11px] text-zinc-300">
-            Timing settings: {sample_context_label(@sample_context)}
-          </div>
-
-          <div class="font-mono text-[11px] text-zinc-300">
-            Voicing strategies: {sample_voicing_strategies_label(@sample_entries)}
-          </div>
-
-          <div class="font-mono text-[11px] text-zinc-400">
-            Total playback length: {sample_duration_label(@sample_entries, @sample_context)}
+            {sample_context_label(@sample_context)} · {sample_duration_label(
+              @sample_entries,
+              @sample_context
+            )}
           </div>
 
           <div class="flex items-center justify-end gap-2">
@@ -502,7 +483,12 @@ defmodule MenschWeb.HomeLive do
                       <span>{chord_label(entry.chord_spec)}</span>
                     </div>
                   </td>
-                  <td class="px-2 py-1.5">{machine_label(entry.machine)}</td>
+                  <td class="px-2 py-1.5">
+                    <div class="flex items-center gap-1.5">
+                      <.icon name={machine_icon_name(entry.machine)} class="size-3.5 text-zinc-400" />
+                      <span>{machine_label(entry.machine)}</span>
+                    </div>
+                  </td>
                   <td class="px-2 py-1.5 align-top">
                     <div class="leading-tight text-zinc-100">
                       {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
@@ -731,7 +717,7 @@ defmodule MenschWeb.HomeLive do
 
   defp sample_context_label(%SampleContext{} = sample_context) do
     {num, den} = sample_context.time_signature
-    "#{sample_context.bpm} bpm · #{num}/#{den} · frame #{sample_context.frame_mbeats} mbeats"
+    "#{sample_context.bpm} bpm · #{num}/#{den}"
   end
 
   defp chord_label(%ChordSpec{} = chord_spec) do
@@ -745,6 +731,10 @@ defmodule MenschWeb.HomeLive do
     |> Mensch.Machine.id()
     |> Atom.to_string()
   end
+
+  defp machine_icon_name(%Mensch.Machines.SimpleChord{}), do: "hero-rectangle-group"
+  defp machine_icon_name(%Mensch.Machines.ArpMachine{}), do: "hero-arrows-up-down"
+  defp machine_icon_name(_machine), do: "hero-cpu-chip"
 
   defp build_sample_folders(samples) when is_list(samples) do
     indexed_samples = Enum.with_index(samples)
@@ -769,27 +759,6 @@ defmodule MenschWeb.HomeLive do
     end)
     |> Enum.reject(fn folder -> folder.samples == [] end)
   end
-
-  defp sample_voicing_strategies_label(sample_entries) when is_list(sample_entries) do
-    labels =
-      sample_entries
-      |> Enum.map(&voicing_strategy_label(&1.machine))
-      |> Enum.reject(&(&1 in ["-", ""]))
-      |> Enum.uniq()
-
-    case labels do
-      [] -> "-"
-      _ -> Enum.join(labels, ", ")
-    end
-  end
-
-  defp voicing_strategy_label(%Mensch.Machines.SimpleChord{}), do: "chord_tones"
-
-  defp voicing_strategy_label(%Mensch.Machines.ArpMachine{params: params}) do
-    "traversal/#{params.direction} (oct #{params.octave_min_offset}..#{params.octave_max_offset}, cycles #{params.cycle_count})"
-  end
-
-  defp voicing_strategy_label(_machine), do: "-"
 
   defp start_label_primary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
     mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
