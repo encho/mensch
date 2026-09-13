@@ -702,7 +702,7 @@ defmodule MenschWeb.HomeLive do
         Map.get(sample, :folder, "Unfiled")
       end)
 
-    preferred_order = ["New Architecture", "Legacy"]
+    preferred_order = ["Arp Machine", "Simple Chord", "Legacy"]
 
     folder_names =
       preferred_order ++

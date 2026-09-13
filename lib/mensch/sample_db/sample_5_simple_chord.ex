@@ -41,7 +41,7 @@ defmodule Mensch.SampleDb.Sample5SimpleChord do
 
     %{
       id: "sample-5-simple-chord",
-      folder: "New Architecture",
+      folder: "Simple Chord",
       name: "SimpleChord · Bb Key Curves",
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
