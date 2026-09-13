@@ -121,7 +121,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 <td class="px-3 py-1.5">{row.phase}</td>
                 <td class="px-3 py-1.5">{row.note_on}</td>
                 <td class="px-3 py-1.5">{row.note_off}</td>
-                <td class="px-3 py-1.5">{Map.get(row, :velocity, "-")}</td>
+                <td class="px-3 py-1.5">{if row.note_on, do: row.note_on_velocity, else: "-"}</td>
                 <td class="px-3 py-1.5">{row.pressure}</td>
                 <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
                 <td class="px-3 py-1.5">{row.slide}</td>

@@ -13,7 +13,7 @@ defmodule Mensch.Machine.NoteFrame do
     :octave,
     :midi_note,
     :channel,
-    :velocity,
+    :note_on_velocity,
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
@@ -29,7 +29,7 @@ defmodule Mensch.Machine.NoteFrame do
     :octave,
     :midi_note,
     :channel,
-    :velocity,
+    :note_on_velocity,
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
@@ -48,7 +48,7 @@ defmodule Mensch.Machine.NoteFrame do
           octave: integer(),
           midi_note: non_neg_integer(),
           channel: non_neg_integer() | nil,
-          velocity: non_neg_integer(),
+          note_on_velocity: non_neg_integer() | nil,
           machine_id: atom(),
           chord_instance_id: non_neg_integer(),
           note_instance_id: non_neg_integer(),
@@ -77,7 +77,7 @@ defmodule Mensch.Machine.NoteFrame do
       octave: note_plan_item.octave,
       midi_note: note_plan_item.midi_note,
       channel: note_plan_item.channel,
-      velocity: note_plan_item.velocity,
+      note_on_velocity: note_plan_item.note_on_velocity,
       machine_id: note_plan_item.machine_id,
       chord_instance_id: note_plan_item.chord_instance_id,
       note_instance_id: note_plan_item.note_instance_id,
@@ -85,7 +85,16 @@ defmodule Mensch.Machine.NoteFrame do
       sample_entry_index: nil
     }
 
-    new(Map.merge(base, attrs))
+    merged = Map.merge(base, attrs)
+
+    merged =
+      if Map.get(merged, :note_on, false) do
+        merged
+      else
+        Map.put(merged, :note_on_velocity, nil)
+      end
+
+    new(merged)
   end
 
   @doc """
@@ -100,7 +109,7 @@ defmodule Mensch.Machine.NoteFrame do
         octave: Map.fetch!(note, :octave),
         midi_note: Map.fetch!(note, :midi_note),
         channel: Map.fetch!(note, :channel),
-        velocity: Map.fetch!(note, :velocity),
+        note_on_velocity: Map.fetch!(note, :note_on_velocity),
         machine_id: Map.fetch!(note, :machine_id),
         chord_instance_id: Map.fetch!(note, :chord_instance_id),
         note_instance_id: Map.fetch!(note, :note_instance_id),

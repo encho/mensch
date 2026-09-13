@@ -80,7 +80,7 @@ defmodule Mensch.Machines.PulseRoot do
       octave: octave,
       midi_note: root_note,
       channel: nil,
-      velocity: params.velocity,
+      note_on_velocity: params.velocity,
       machine_id: id(),
       chord_instance_id: 0,
       note_instance_id: 0,

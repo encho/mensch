@@ -148,7 +148,7 @@ defmodule Mensch.Machines.ArpMachine do
         octave: octave,
         midi_note: note_number,
         channel: nil,
-        velocity: @velocity,
+        note_on_velocity: @velocity,
         machine_id: id(),
         chord_instance_id: 0,
         note_instance_id: voiced_note.note_instance_id,

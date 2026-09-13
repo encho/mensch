@@ -113,7 +113,7 @@ defmodule Mensch.Machines.StrummedMpe do
         octave: octave,
         midi_note: note_number,
         channel: nil,
-        velocity: params.velocity,
+        note_on_velocity: params.velocity,
         phase_offset: note_index / note_count * 2 * :math.pi(),
         emphasis: note_index == 0,
         machine_id: id(),

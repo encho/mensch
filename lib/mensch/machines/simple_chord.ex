@@ -167,7 +167,7 @@ defmodule Mensch.Machines.SimpleChord do
         # Filled later by channel allocation in assembly.
         channel: nil,
         # Note-on velocity emitted for this machine.
-        velocity: @velocity,
+        note_on_velocity: @velocity,
         # Source machine identifier for downstream grouping.
         machine_id: id(),
         # Chord-instance identity within a generated sample/performance.

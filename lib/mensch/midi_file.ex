@@ -135,7 +135,7 @@ defmodule Mensch.MidiFile do
       Enum.flat_map(frame.notes, fn note ->
         ch = clamp_u7(Map.get(note, :channel, 0))
         midi_note = clamp_u7(Map.get(note, :midi_note, 0))
-        velocity = clamp_u7(Map.get(note, :velocity, 0))
+        velocity = clamp_u7(Map.get(note, :note_on_velocity, 0))
         note_instance_id = Map.get(note, :note_instance_id, 999)
 
         events =

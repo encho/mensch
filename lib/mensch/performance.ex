@@ -24,11 +24,11 @@ defmodule Mensch.Performance do
             at_ms: 0,
             at_mbeat: 0,
             notes: [
-              %{note_name: :c, octave: 4, midi_note: 60, channel: 1, velocity: 100,
+              %{note_name: :c, octave: 4, midi_note: 60, channel: 1, note_on_velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 0,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0},
-              %{note_name: :e, octave: 4, midi_note: 64, channel: 2, velocity: 100,
+              %{note_name: :e, octave: 4, midi_note: 64, channel: 2, note_on_velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 1,
                 phase: :pending, note_on: false, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
@@ -38,11 +38,11 @@ defmodule Mensch.Performance do
             at_ms: 31,
             at_mbeat: 6,
             notes: [
-              %{note_name: :c, octave: 4, midi_note: 60, channel: 1, velocity: 100,
+              %{note_name: :c, octave: 4, midi_note: 60, channel: 1, note_on_velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 0,
                 phase: :attack, note_on: false, note_off: false,
                 pressure: 39, bend: 0.0, slide: 0},
-              %{note_name: :e, octave: 4, midi_note: 64, channel: 2, velocity: 100,
+              %{note_name: :e, octave: 4, midi_note: 64, channel: 2, note_on_velocity: 100,
                 machine_id: :strummed_mpe, chord_instance_id: 0, note_instance_id: 1,
                 phase: :attack, note_on: true, note_off: false,
                 pressure: 0, bend: 0.0, slide: 0}
@@ -61,7 +61,7 @@ defmodule Mensch.Performance do
           octave: integer(),
           midi_note: non_neg_integer(),
           channel: non_neg_integer(),
-          velocity: non_neg_integer(),
+          note_on_velocity: non_neg_integer(),
           phase: atom(),
           note_on: boolean(),
           note_off: boolean(),

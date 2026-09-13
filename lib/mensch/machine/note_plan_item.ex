@@ -41,7 +41,7 @@ defmodule Mensch.Machine.NotePlanItem do
         octave: 4,
         midi_note: 60,
         channel: nil,
-        velocity: 100,
+        note_on_velocity: 100,
         machine_id: :simple_chord,
         chord_instance_id: 0,
         note_instance_id: 3,
@@ -57,7 +57,7 @@ defmodule Mensch.Machine.NotePlanItem do
     :note_name,
     :octave,
     :midi_note,
-    :velocity,
+    :note_on_velocity,
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
@@ -69,7 +69,7 @@ defmodule Mensch.Machine.NotePlanItem do
     :octave,
     :midi_note,
     :channel,
-    :velocity,
+    :note_on_velocity,
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
@@ -88,7 +88,7 @@ defmodule Mensch.Machine.NotePlanItem do
   - `midi_note`: MIDI note number used for playback/export, e.g. `60`.
   - `channel`: Output channel; typically assigned later by global allocation,
     e.g. `nil` before allocation, then `2`.
-  - `velocity`: Initial note-on velocity, e.g. `100`.
+  - `note_on_velocity`: Initial note-on velocity, e.g. `100`.
   - `machine_id`: Source machine identifier, e.g. `:simple_chord`.
   - `chord_instance_id`: Chord occurrence identity in a sequence/performance,
     e.g. `0` for the first entry.
@@ -104,7 +104,7 @@ defmodule Mensch.Machine.NotePlanItem do
           octave: integer(),
           midi_note: integer(),
           channel: integer() | nil,
-          velocity: integer(),
+          note_on_velocity: integer(),
           machine_id: atom(),
           chord_instance_id: non_neg_integer(),
           note_instance_id: non_neg_integer(),

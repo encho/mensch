@@ -112,7 +112,7 @@ defmodule Mensch.Player do
 
   defp send_frame(note) do
     if note.note_on do
-      Connection.send_message(<<0x90 + note.channel, note.midi_note, note.velocity>>)
+      Connection.send_message(<<0x90 + note.channel, note.midi_note, note.note_on_velocity>>)
     end
 
     # Drive channel expression from machine phase data directly. This

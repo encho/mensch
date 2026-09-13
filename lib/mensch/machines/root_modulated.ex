@@ -64,7 +64,7 @@ defmodule Mensch.Machines.RootModulated do
       octave: octave,
       midi_note: root_note,
       channel: nil,
-      velocity: params.velocity,
+      note_on_velocity: params.velocity,
       phase_offset: 0.0,
       emphasis: true,
       machine_id: id(),
