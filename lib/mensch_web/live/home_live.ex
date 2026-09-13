@@ -62,7 +62,6 @@ defmodule MenschWeb.HomeLive do
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
       |> assign(:show_detail_panel, true)
-      |> assign(:show_samples_modal, false)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
       |> assign_detail_content()
@@ -96,14 +95,6 @@ defmodule MenschWeb.HomeLive do
     {:noreply, update(socket, :show_detail_panel, &(!&1))}
   end
 
-  def handle_event("open_samples_modal", _params, socket) do
-    {:noreply, assign(socket, :show_samples_modal, true)}
-  end
-
-  def handle_event("close_samples_modal", _params, socket) do
-    {:noreply, assign(socket, :show_samples_modal, false)}
-  end
-
   def handle_event("activate_sample", %{"index" => index_str}, socket) do
     case Integer.parse(index_str) do
       {index, ""} ->
@@ -125,7 +116,6 @@ defmodule MenschWeb.HomeLive do
              |> assign(:render_scope, :full_sample)
              |> assign(:player_status, Player.status())
              |> clear_playback_state(true)
-             |> assign(:show_samples_modal, false)
              |> assign(:selected_note_key, nil)
              |> assign_detail_content()}
 
@@ -272,278 +262,222 @@ defmodule MenschWeb.HomeLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status} show_samples_button={true}>
-      <div
-        id="samples-modal"
-        class={[
-          "fixed inset-0 z-50 transition-opacity duration-200",
-          @show_samples_modal && "pointer-events-auto opacity-100",
-          !@show_samples_modal && "pointer-events-none opacity-0"
-        ]}
-      >
-        <button
-          type="button"
-          phx-click="close_samples_modal"
-          aria-label="Close samples modal"
-          class="absolute inset-0 bg-zinc-950/75"
-        ></button>
+    <Layouts.app flash={@flash} midi_status={@midi_status}>
+      <div class="mx-auto max-w-6xl">
+        <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <aside class="space-y-3 lg:sticky lg:top-6 lg:self-start">
+            <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-400">
+              <.icon name="hero-queue-list" class="size-4" /> Sample Library
+            </div>
 
-        <div class={[
-          "relative mx-auto mt-8 w-[min(96vw,1100px)] border border-zinc-700/70 bg-zinc-950 p-4 shadow-2xl transition-all duration-200",
-          @show_samples_modal && "translate-y-0 scale-100",
-          !@show_samples_modal && "-translate-y-2 scale-[0.98]"
-        ]}>
-          <div class="mb-3 flex items-center justify-between">
-            <div class="text-[11px] uppercase tracking-wide text-zinc-400">Sample Library</div>
-            <button
-              type="button"
-              phx-click="close_samples_modal"
-              class="flex size-8 items-center justify-center border border-zinc-600 text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-              aria-label="Close samples"
-            >
-              <.icon name="hero-x-mark" class="size-4" />
-            </button>
-          </div>
+            <div class="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+              <div :for={folder <- @sample_folders} class="space-y-2">
+                <div class="text-[10px] uppercase tracking-wide text-zinc-500">{folder.name}</div>
 
-          <div class="max-h-[70vh] overflow-auto border border-zinc-700/60">
-            <table class="w-full min-w-[860px] text-left font-mono text-[11px]">
-              <thead>
-                <tr class="border-b border-zinc-700/70 text-zinc-400">
-                  <th class="px-2 py-1.5 font-normal">Name</th>
-                  <th class="px-2 py-1.5 font-normal">Tempo</th>
-                  <th class="px-2 py-1.5 font-normal">Time Sig</th>
-                  <th class="px-2 py-1.5 font-normal">Chords</th>
-                  <th class="px-2 py-1.5 font-normal">Duration</th>
-                  <th class="px-2 py-1.5 font-normal text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <%= for folder <- @sample_folders do %>
-                  <tr class="border-y border-zinc-700/60 bg-zinc-900/60 text-zinc-300">
-                    <td colspan="6" class="px-2 py-1.5 uppercase tracking-wide">
-                      {folder.name}
-                    </td>
-                  </tr>
-                  <tr
-                    :for={{sample, index} <- folder.samples}
-                    class={[
-                      "text-zinc-200",
-                      @active_sample_index == index && "bg-amber-500/10"
-                    ]}
-                  >
-                    <td class="px-2 py-1.5 text-zinc-100">{Map.get(sample, :name, "Unnamed")}</td>
-                    <td class="px-2 py-1.5">{Map.get(sample.sample_context, :bpm, 0)} bpm</td>
-                    <td class="px-2 py-1.5">
-                      {elem(sample.sample_context.time_signature, 0)}/{elem(
-                        sample.sample_context.time_signature,
-                        1
-                      )}
-                    </td>
-                    <td class="px-2 py-1.5">{length(Map.get(sample, :sample_entries, []))}</td>
-                    <td class="px-2 py-1.5">
-                      {sample_duration_label(
-                        Map.get(sample, :sample_entries, []),
-                        Map.get(sample, :sample_context, @sample_context)
-                      )}
-                    </td>
-                    <td class="px-2 py-1.5 text-right">
-                      <button
-                        type="button"
-                        id={"activate-sample-#{index}"}
-                        phx-click="activate_sample"
-                        phx-value-index={index}
-                        class={[
-                          "h-9 border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
-                          (@active_sample_index == index &&
-                             "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
-                            "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
-                        ]}
-                      >
-                        {if @active_sample_index == index, do: "Active", else: "Activate"}
-                      </button>
-                    </td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+                <button
+                  :for={{sample, index} <- folder.samples}
+                  type="button"
+                  id={"activate-sample-#{index}"}
+                  phx-click="activate_sample"
+                  phx-value-index={index}
+                  class={[
+                    "w-full space-y-1 border px-3 py-2 text-left transition-colors duration-150",
+                    (@active_sample_index == index &&
+                       "border-amber-400 bg-amber-500/10") ||
+                      "border-zinc-700/80 bg-zinc-950/55 hover:border-amber-400/80"
+                  ]}
+                >
+                  <div class="font-mono text-[12px] text-zinc-100">
+                    {Map.get(sample, :name, "Unnamed")}
+                  </div>
+                  <div class="font-mono text-[10px] text-zinc-400">
+                    {Map.get(sample.sample_context, :bpm, 0)} bpm · {elem(
+                      sample.sample_context.time_signature,
+                      0
+                    )}/{elem(sample.sample_context.time_signature, 1)} · {sample_duration_label(
+                      Map.get(sample, :sample_entries, []),
+                      Map.get(sample, :sample_context, @sample_context)
+                    )}
+                  </div>
+                </button>
+              </div>
+            </div>
+          </aside>
 
-      <div class="mx-auto max-w-6xl space-y-6">
-        <div id="render-section" class="space-y-4">
-          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div class="space-y-1">
-              <div class="font-mono text-xl text-zinc-100 md:text-2xl">
-                {active_sample_name(@samples, @active_sample_index)}
+          <div id="render-section" class="space-y-4">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div class="space-y-1">
+                <div class="font-mono text-xl text-zinc-100 md:text-2xl">
+                  {active_sample_name(@samples, @active_sample_index)}
+                </div>
+
+                <div class="font-mono text-[11px] text-zinc-300">
+                  {sample_context_label(@sample_context)} · {sample_duration_label(
+                    @sample_entries,
+                    @sample_context
+                  )}
+                </div>
               </div>
 
-              <div class="font-mono text-[11px] text-zinc-300">
-                {sample_context_label(@sample_context)} · {sample_duration_label(
-                  @sample_entries,
-                  @sample_context
-                )}
+              <div class="flex items-center justify-end gap-2">
+                <.link
+                  id="download-bitwig-mpe-midi"
+                  href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
+                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+                >
+                  <.icon name="hero-arrow-down-tray" class="size-4" /> Bitwig MIDI
+                </.link>
+                <.link
+                  id="download-mpe-report"
+                  href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
+                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+                >
+                  <.icon name="hero-document-text" class="size-4" /> Event Report
+                </.link>
               </div>
             </div>
 
-            <div class="flex items-center justify-end gap-2">
-              <.link
-                id="download-bitwig-mpe-midi"
-                href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
-                class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-              >
-                <.icon name="hero-arrow-down-tray" class="size-4" /> Bitwig MIDI
-              </.link>
-              <.link
-                id="download-mpe-report"
-                href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
-                class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
-              >
-                <.icon name="hero-document-text" class="size-4" /> Event Report
-              </.link>
+            <div class="overflow-x-auto border border-zinc-700/60">
+              <table class="w-full min-w-[980px] text-left font-mono text-[11px]">
+                <thead>
+                  <tr class="border-b border-zinc-700/70 text-zinc-400">
+                    <th class="px-2 py-1.5 font-normal">ChordSpec</th>
+                    <th class="px-2 py-1.5 font-normal">Machine</th>
+                    <th class="px-2 py-1.5 font-normal">Start</th>
+                    <th class="px-2 py-1.5 font-normal">Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr :for={{entry, index} <- Enum.with_index(@sample_entries)} class="text-zinc-200">
+                    <td class="px-2 py-1.5 text-zinc-100">
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="inline-block size-2.5 rounded-full"
+                          style={entry_color_dot_style(index)}
+                        ></span>
+                        <span>{chord_label(entry.chord_spec)}</span>
+                      </div>
+                    </td>
+                    <td class="px-2 py-1.5">
+                      <div class="flex items-center gap-1.5">
+                        <.icon name={machine_icon_name(entry.machine)} class="size-3.5 text-zinc-400" />
+                        <span>{machine_label(entry.machine)}</span>
+                      </div>
+                    </td>
+                    <td class="px-2 py-1.5 align-top">
+                      <div class="leading-tight text-zinc-100">
+                        {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
+                      </div>
+                    </td>
+                    <td class="px-2 py-1.5 align-top">
+                      <div class="leading-tight text-zinc-100">
+                        {duration_label_primary(@sample_context, entry.timeline_context)}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+
+            <div class="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                id="toggle-loop-full-sample"
+                phx-click="toggle_loop_full_sample"
+                aria-label="Toggle loop"
+                title={if @loop_full_sample, do: "Loop on", else: "Loop off"}
+                aria-pressed={@loop_full_sample}
+                class={[
+                  "flex size-9 items-center justify-center border transition-colors duration-150",
+                  (@loop_full_sample &&
+                     "border-amber-300 bg-amber-500/20 text-amber-100") ||
+                    "border-zinc-600 bg-transparent text-zinc-300 hover:border-amber-400 hover:text-amber-200"
+                ]}
+              >
+                <.icon
+                  name="hero-arrow-path"
+                  class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
+                />
+              </button>
+              <button
+                type="button"
+                id="play-full-sample"
+                aria-label="Play full sample"
+                title="Play"
+                phx-click="play_full_sample"
+                class={[
+                  "flex size-9 items-center justify-center border transition-colors duration-150",
+                  (@player_status == :playing &&
+                     "border-emerald-300 bg-emerald-500/20 text-emerald-100") ||
+                    "border-emerald-500/60 bg-transparent text-emerald-300 hover:border-emerald-400 hover:text-emerald-200"
+                ]}
+              >
+                <.icon name="hero-play-solid" class="size-4" />
+              </button>
+              <button
+                type="button"
+                id="stop-full-sample"
+                aria-label="Stop full sample"
+                title="Stop"
+                phx-click="stop"
+                class={[
+                  "flex size-9 items-center justify-center border transition-colors duration-150",
+                  (@player_status != :playing &&
+                     "border-white bg-white/15 text-white") ||
+                    "border-white/60 bg-transparent text-white/90 hover:border-white hover:text-white"
+                ]}
+              >
+                <.icon name="hero-stop-solid" class="size-4" />
+              </button>
+              <button
+                type="button"
+                id="panic-all-notes"
+                aria-label="Panic stop all notes"
+                title="Panic Stop"
+                phx-click="panic_all_notes"
+                class="flex size-9 items-center justify-center border border-red-500/60 bg-transparent text-red-300 transition-colors duration-150 hover:border-red-400 hover:text-red-200"
+              >
+                <.icon name="hero-exclamation-triangle" class="size-4" />
+              </button>
+            </div>
+
+            <.sample_timeline model={@sample_timeline} />
+
+            <div class="flex items-center justify-end">
+              <button
+                type="button"
+                id="toggle-detail-panel"
+                phx-click="toggle_detail_panel"
+                aria-pressed={@show_detail_panel}
+                class={[
+                  "flex h-9 items-center border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
+                  (@show_detail_panel &&
+                     "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
+                    "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
+                ]}
+              >
+                {if @show_detail_panel, do: "Hide Detail Charts", else: "Show Detail Charts"}
+              </button>
+            </div>
+
+            <.live_component
+              :if={@render_data && @show_detail_panel}
+              module={DetailPanelComponent}
+              id="detail-panel"
+              render_data={@render_data}
+              selected_note_key={@selected_note_key}
+              selected_note_label={selected_note_label(@selected_note_key)}
+              note_matrix={@note_matrix}
+              note_matrix_grid={@note_matrix_grid}
+              timeline_start_label={local_timeline_start_label()}
+              timeline_end_label={local_timeline_end_label(@sample_context, @render_data.duration_ms)}
+              pressure_chart={@pressure_chart}
+              slide_chart={@slide_chart}
+              bend_chart={@bend_chart}
+              chart_grid={@chart_grid}
+              debug_rows={@debug_rows}
+            />
           </div>
-
-          <div class="overflow-x-auto border border-zinc-700/60">
-            <table class="w-full min-w-[980px] text-left font-mono text-[11px]">
-              <thead>
-                <tr class="border-b border-zinc-700/70 text-zinc-400">
-                  <th class="px-2 py-1.5 font-normal">ChordSpec</th>
-                  <th class="px-2 py-1.5 font-normal">Machine</th>
-                  <th class="px-2 py-1.5 font-normal">Start</th>
-                  <th class="px-2 py-1.5 font-normal">Duration</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr :for={{entry, index} <- Enum.with_index(@sample_entries)} class="text-zinc-200">
-                  <td class="px-2 py-1.5 text-zinc-100">
-                    <div class="flex items-center gap-2">
-                      <span
-                        class="inline-block size-2.5 rounded-full"
-                        style={entry_color_dot_style(index)}
-                      ></span>
-                      <span>{chord_label(entry.chord_spec)}</span>
-                    </div>
-                  </td>
-                  <td class="px-2 py-1.5">
-                    <div class="flex items-center gap-1.5">
-                      <.icon name={machine_icon_name(entry.machine)} class="size-3.5 text-zinc-400" />
-                      <span>{machine_label(entry.machine)}</span>
-                    </div>
-                  </td>
-                  <td class="px-2 py-1.5 align-top">
-                    <div class="leading-tight text-zinc-100">
-                      {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
-                    </div>
-                  </td>
-                  <td class="px-2 py-1.5 align-top">
-                    <div class="leading-tight text-zinc-100">
-                      {duration_label_primary(@sample_context, entry.timeline_context)}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="flex items-center justify-center gap-2">
-            <button
-              type="button"
-              id="toggle-loop-full-sample"
-              phx-click="toggle_loop_full_sample"
-              aria-label="Toggle loop"
-              title={if @loop_full_sample, do: "Loop on", else: "Loop off"}
-              aria-pressed={@loop_full_sample}
-              class={[
-                "flex size-9 items-center justify-center border transition-colors duration-150",
-                (@loop_full_sample &&
-                   "border-amber-300 bg-amber-500/20 text-amber-100") ||
-                  "border-zinc-600 bg-transparent text-zinc-300 hover:border-amber-400 hover:text-amber-200"
-              ]}
-            >
-              <.icon
-                name="hero-arrow-path"
-                class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
-              />
-            </button>
-            <button
-              type="button"
-              id="play-full-sample"
-              aria-label="Play full sample"
-              title="Play"
-              phx-click="play_full_sample"
-              class={[
-                "flex size-9 items-center justify-center border transition-colors duration-150",
-                (@player_status == :playing &&
-                   "border-emerald-300 bg-emerald-500/20 text-emerald-100") ||
-                  "border-emerald-500/60 bg-transparent text-emerald-300 hover:border-emerald-400 hover:text-emerald-200"
-              ]}
-            >
-              <.icon name="hero-play-solid" class="size-4" />
-            </button>
-            <button
-              type="button"
-              id="stop-full-sample"
-              aria-label="Stop full sample"
-              title="Stop"
-              phx-click="stop"
-              class={[
-                "flex size-9 items-center justify-center border transition-colors duration-150",
-                (@player_status != :playing &&
-                   "border-white bg-white/15 text-white") ||
-                  "border-white/60 bg-transparent text-white/90 hover:border-white hover:text-white"
-              ]}
-            >
-              <.icon name="hero-stop-solid" class="size-4" />
-            </button>
-            <button
-              type="button"
-              id="panic-all-notes"
-              aria-label="Panic stop all notes"
-              title="Panic Stop"
-              phx-click="panic_all_notes"
-              class="flex size-9 items-center justify-center border border-red-500/60 bg-transparent text-red-300 transition-colors duration-150 hover:border-red-400 hover:text-red-200"
-            >
-              <.icon name="hero-exclamation-triangle" class="size-4" />
-            </button>
-          </div>
-
-          <.sample_timeline model={@sample_timeline} />
-
-          <div class="flex items-center justify-end">
-            <button
-              type="button"
-              id="toggle-detail-panel"
-              phx-click="toggle_detail_panel"
-              aria-pressed={@show_detail_panel}
-              class={[
-                "flex h-9 items-center border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
-                (@show_detail_panel &&
-                   "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
-                  "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
-              ]}
-            >
-              {if @show_detail_panel, do: "Hide Detail Charts", else: "Show Detail Charts"}
-            </button>
-          </div>
-
-          <.live_component
-            :if={@render_data && @show_detail_panel}
-            module={DetailPanelComponent}
-            id="detail-panel"
-            render_data={@render_data}
-            selected_note_key={@selected_note_key}
-            selected_note_label={selected_note_label(@selected_note_key)}
-            note_matrix={@note_matrix}
-            note_matrix_grid={@note_matrix_grid}
-            timeline_start_label={local_timeline_start_label()}
-            timeline_end_label={local_timeline_end_label(@sample_context, @render_data.duration_ms)}
-            pressure_chart={@pressure_chart}
-            slide_chart={@slide_chart}
-            bend_chart={@bend_chart}
-            chart_grid={@chart_grid}
-            debug_rows={@debug_rows}
-          />
         </div>
       </div>
     </Layouts.app>
