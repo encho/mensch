@@ -18,12 +18,14 @@ defmodule Mensch.SampleDb do
   alias Mensch.SampleDb.Sample4
   alias Mensch.SampleDb.Sample5SimpleChord
   alias Mensch.SampleDb.Sample6SimpleChordCMajorInversions
+  alias Mensch.SampleDb.Sample7DynamicVoicing
 
   @default_frame_mbeats 50
 
   @samples [
     Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample6SimpleChordCMajorInversions.sample(@default_frame_mbeats),
+    Sample7DynamicVoicing.sample(@default_frame_mbeats),
     Sample0SimpleChordTraversal.sample(@default_frame_mbeats),
     Sample0bSimpleChordTraversalUp.sample(@default_frame_mbeats),
     Sample1.sample(@default_frame_mbeats),
