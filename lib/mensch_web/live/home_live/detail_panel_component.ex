@@ -4,9 +4,9 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="space-y-4 border border-zinc-700/60 bg-zinc-950/75 p-4">
-      <div id="note-matrix" class="border border-zinc-700/60">
-        <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5">
+    <div class="space-y-4 bg-zinc-950/75 py-4">
+      <div id="note-matrix">
+        <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 py-1.5">
           <div class="text-[11px] uppercase tracking-wide text-zinc-400">Note matrix</div>
           <div class="flex items-center gap-3 font-mono text-[10px] text-zinc-500">
             <span>Focus: {@selected_note_label}</span>
@@ -140,7 +140,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
     ~H"""
     <div>
       <div class="mb-1 text-[11px] uppercase tracking-wide text-zinc-400">{@title}</div>
-      <svg viewBox="0 0 600 120" class="w-full border border-zinc-700/60 bg-zinc-950">
+      <svg viewBox="0 0 600 120" class="w-full bg-zinc-950">
         <line
           :for={x <- @grid.subbeat_xs}
           x1={x}

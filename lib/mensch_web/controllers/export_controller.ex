@@ -6,25 +6,6 @@ defmodule MenschWeb.ExportController do
   alias Mensch.SampleDb
   alias Mensch.TimelineContext
 
-  def mpe_midi(conn, %{"index" => index_str}) do
-    with {index, ""} <- Integer.parse(index_str),
-         {:ok, sample} <- sample_by_index(index) do
-      performance =
-        PerformanceAssembler.generate_sample(sample.sample_entries, sample.sample_context)
-
-      midi_bytes =
-        MidiFile.from_performance(performance, sample.sample_context,
-          trim_end_tick: sample_end_mbeat(sample)
-        )
-
-      filename = "#{sample_slug(sample.name)}-mpe.mid"
-
-      send_download(conn, {:binary, midi_bytes}, filename: filename, content_type: "audio/midi")
-    else
-      _ -> send_resp(conn, 404, "sample not found")
-    end
-  end
-
   def mpe_report(conn, %{"index" => index_str}) do
     with {index, ""} <- Integer.parse(index_str),
          {:ok, sample} <- sample_by_index(index) do
