@@ -461,7 +461,10 @@ defmodule MenschWeb.HomeLive do
                   "border-zinc-600 bg-transparent text-zinc-300 hover:border-amber-400 hover:text-amber-200"
               ]}
             >
-              <.icon name="hero-arrow-path" class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]} />
+              <.icon
+                name="hero-arrow-path"
+                class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
+              />
             </button>
             <button
               type="button"
@@ -888,9 +891,9 @@ defmodule MenschWeb.HomeLive do
         _ -> entries |> Enum.map(& &1.end_mbeat) |> Enum.max()
       end
 
-    bar_count = max(div(max_end_mbeat + mbeats_per_bar - 1, mbeats_per_bar), 2)
-    total_mbeats = bar_count * mbeats_per_bar
-    beat_count = bar_count * SampleContext.beats_per_bar(sample_context)
+    total_mbeats = max(max_end_mbeat, 1)
+    bar_count = total_mbeats / mbeats_per_bar
+    beat_count = total_mbeats / mbeats_per_beat
     total_mbeats = max(total_mbeats, 1)
     row_count = max(length(entries), 1)
     lanes_height = row_count * lane_height + (row_count - 1) * lane_gap
