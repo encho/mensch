@@ -136,7 +136,9 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 class="border-b border-zinc-800/70 text-zinc-300 last:border-0"
               >
                 <td class="px-3 py-1.5">{row.at_ms}</td>
-                <td class="px-3 py-1.5">{if is_integer(row.chord_id), do: row.chord_id, else: "-"}</td>
+                <td class="px-3 py-1.5">
+                  {if is_integer(row.chord_id), do: row.chord_id, else: "-"}
+                </td>
                 <td class="px-3 py-1.5 text-zinc-200">{row.chord_label}</td>
                 <td class="px-3 py-1.5 text-zinc-100">
                   {Map.get(row, :note_label, "#{row.note_name}#{row.octave}")}

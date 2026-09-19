@@ -55,9 +55,11 @@ defmodule Mensch.Machines.DynamicVoicing do
     direction = normalize_direction!(params.direction)
     requested_voicing_count = normalize_number_of_inversions!(params.number_of_inversions)
 
+    # Quantization step for this render: how many mbeats each frame advances.
     frame_mbeats = SampleContext.frame_units(sample_context)
     entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
 
+    # Snap total chord duration to the frame grid so slot boundaries land on frame ticks.
     chord_duration_mbeats =
       timeline_context
       |> TimelineContext.duration_mbeats()
