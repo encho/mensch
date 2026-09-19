@@ -662,7 +662,7 @@ defmodule MenschWeb.HomeLive do
 
       <svg
         viewBox={"0 0 #{@model.svg_width} #{@model.svg_height}"}
-        class="w-full bg-zinc-950/80"
+        class="w-full overflow-visible bg-zinc-950/80"
       >
         <line
           :for={x <- @model.subbeat_xs}
@@ -692,6 +692,18 @@ defmodule MenschWeb.HomeLive do
           y2={@model.svg_height}
           stroke="var(--ui-grid-bar)"
           stroke-opacity="0.4"
+          stroke-width="1.2"
+        />
+
+        <circle
+          :for={{x, _bar_number} <- @model.bar_xs}
+          cx={x}
+          cy="10"
+          r="6.5"
+          fill="#000000"
+          fill-opacity="0.95"
+          stroke="var(--ui-grid-bar)"
+          stroke-opacity="0.9"
           stroke-width="1.2"
         />
 
@@ -730,11 +742,13 @@ defmodule MenschWeb.HomeLive do
 
         <text
           :for={{x, bar_number} <- @model.bar_xs}
-          x={x + 2}
-          y="13"
-          fill="var(--ui-timeline-bar-label)"
-          fill-opacity="0.85"
-          font-size="10"
+          x={x}
+          y="10"
+          fill="#d1d5db"
+          fill-opacity="0.95"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          font-size="8"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
         >
           B{bar_number}
