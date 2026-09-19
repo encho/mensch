@@ -10,11 +10,6 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
-    machine =
-      %DynamicVoicing{
-        params: %DynamicVoicingParams{direction: :up, number_of_inversions: 20}
-      }
-
     %{
       id: "sample-7-dynamic-voicing",
       folder: "Dynamic Voicing",
@@ -28,7 +23,18 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
             duration_mbeats: 4000
           },
-          machine: machine
+          machine: %DynamicVoicing{
+            params: %DynamicVoicingParams{
+              direction: :up,
+              number_of_inversions: 20,
+              pressure_lfo_curve: :sine,
+              pressure_lfo_scale: 0.05,
+              pressure_lfo_cycles_per_bar: 10.0,
+              pressure_lfo_shift_mbeats: 0.0,
+              pressure_lfo_time_base: :absolute,
+              pressure_lfo_mode: :additive
+            }
+          }
         },
         %{
           chord_spec: %ChordSpec{root: :f, modifier: :dom7, octave: 3, inversion: 0},
@@ -36,7 +42,18 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             start_beat: %BeatPosition{bar: 1, beat: 0, mbeat: 0},
             duration_mbeats: 4000
           },
-          machine: machine
+          machine: %DynamicVoicing{
+            params: %DynamicVoicingParams{
+              direction: :up,
+              number_of_inversions: 20,
+              pressure_lfo_curve: :sine,
+              pressure_lfo_scale: 0.05,
+              pressure_lfo_cycles_per_bar: 10.0,
+              pressure_lfo_shift_mbeats: 0.0,
+              pressure_lfo_time_base: :absolute,
+              pressure_lfo_mode: :additive
+            }
+          }
         },
         %{
           chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 3, inversion: 0},
@@ -44,7 +61,18 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             start_beat: %BeatPosition{bar: 2, beat: 0, mbeat: 0},
             duration_mbeats: 4000
           },
-          machine: machine
+          machine: %DynamicVoicing{
+            params: %DynamicVoicingParams{
+              direction: :up,
+              number_of_inversions: 20,
+              pressure_lfo_curve: :sine,
+              pressure_lfo_scale: 0.05,
+              pressure_lfo_cycles_per_bar: 10.0,
+              pressure_lfo_shift_mbeats: 0.0,
+              pressure_lfo_time_base: :absolute,
+              pressure_lfo_mode: :additive
+            }
+          }
         },
         %{
           chord_spec: %ChordSpec{root: :g, modifier: :min7, octave: 3, inversion: 0},
@@ -52,7 +80,18 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
             duration_mbeats: 4000
           },
-          machine: machine
+          machine: %DynamicVoicing{
+            params: %DynamicVoicingParams{
+              direction: :up,
+              number_of_inversions: 20,
+              pressure_lfo_curve: :sine,
+              pressure_lfo_scale: 0.05,
+              pressure_lfo_cycles_per_bar: 10.0,
+              pressure_lfo_shift_mbeats: 0.0,
+              pressure_lfo_time_base: :absolute,
+              pressure_lfo_mode: :additive
+            }
+          }
         }
       ]
     }
