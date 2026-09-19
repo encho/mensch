@@ -52,7 +52,7 @@ defmodule MenschWeb.Layouts do
   def app(assigns) do
     ~H"""
     <header class="border-b border-white/15 px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-3 py-4">
+      <div class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 py-4">
         <a href="/" class="flex items-center gap-1.5">
           <img src={~p"/images/logo.svg"} width="20" />
           <span class="text-base font-bold text-white">mensch</span>
@@ -125,7 +125,7 @@ defmodule MenschWeb.Layouts do
     </header>
 
     <main class="px-4 py-8 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-6xl space-y-4">
+      <div class="w-full space-y-4">
         {render_slot(@inner_block)}
       </div>
     </main>

@@ -400,9 +400,9 @@ defmodule MenschWeb.HomeLive do
         </div>
       </:navbar_center>
 
-      <div class="mx-auto max-w-6xl">
-        <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside class="space-y-3 lg:sticky lg:top-6 lg:self-start">
+      <div class="w-full">
+        <div class="grid gap-6 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
+          <aside class="max-w-[320px] space-y-3 lg:sticky lg:top-6 lg:self-start">
             <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-400">
               <.icon name="hero-queue-list" class="size-4" /> Sample Library
             </div>
@@ -441,7 +441,7 @@ defmodule MenschWeb.HomeLive do
             </div>
           </aside>
 
-          <div id="render-section" class="space-y-4">
+          <div id="render-section" class="min-w-0 space-y-4">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div class="space-y-1">
                 <div class="font-mono text-xl text-zinc-100 md:text-2xl">
