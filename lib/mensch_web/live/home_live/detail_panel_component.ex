@@ -93,7 +93,36 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
       <div id="debug-frames" class="ui-radius-table border border-zinc-700/60">
         <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
           <span>All frames</span>
-          <span class="text-[10px] uppercase tracking-wide text-zinc-500">Filtered by active chords</span>
+          <div class="flex items-center gap-3">
+            <span class="text-[10px] uppercase tracking-wide text-zinc-500">Filtered by active chords</span>
+            <form phx-change="set_debug_rows_filters" class="flex items-center gap-2 normal-case">
+              <label for="debug-on-filter" class="text-[10px] uppercase tracking-wide text-zinc-500">
+                on
+              </label>
+              <select
+                id="debug-on-filter"
+                name="on_filter"
+                class="ui-radius-btn border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] text-zinc-300"
+              >
+                <option value="no_filter" selected={@debug_on_filter == :no_filter}>NoFilter</option>
+                <option value="true" selected={@debug_on_filter == true}>True</option>
+                <option value="false" selected={@debug_on_filter == false}>False</option>
+              </select>
+
+              <label for="debug-off-filter" class="text-[10px] uppercase tracking-wide text-zinc-500">
+                off
+              </label>
+              <select
+                id="debug-off-filter"
+                name="off_filter"
+                class="ui-radius-btn border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] text-zinc-300"
+              >
+                <option value="no_filter" selected={@debug_off_filter == :no_filter}>NoFilter</option>
+                <option value="true" selected={@debug_off_filter == true}>True</option>
+                <option value="false" selected={@debug_off_filter == false}>False</option>
+              </select>
+            </form>
+          </div>
         </div>
         <div class="max-h-48 overflow-y-auto">
           <table class="w-full text-left font-mono text-[11px]">

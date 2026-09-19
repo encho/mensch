@@ -12,7 +12,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %DynamicVoicing{
-        params: %DynamicVoicingParams{direction: :up, number_of_inversions: 8}
+        params: %DynamicVoicingParams{direction: :up, number_of_inversions: 4}
       }
 
     %{

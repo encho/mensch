@@ -100,6 +100,8 @@ defmodule MenschWeb.HomeLive do
       |> assign(:show_samples_modal, false)
       |> assign(:selected_sample_entry_index, nil)
       |> assign(:selected_note_key, nil)
+      |> assign(:debug_on_filter, :no_filter)
+      |> assign(:debug_off_filter, :no_filter)
       |> assign(:manual_stop, false)
       |> assign_detail_content()
 
@@ -256,6 +258,17 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
+  end
+
+  def handle_event("set_debug_rows_filters", params, socket) do
+    on_filter = normalize_bool_filter(Map.get(params, "on_filter"))
+    off_filter = normalize_bool_filter(Map.get(params, "off_filter"))
+
+    {:noreply,
+     socket
+     |> assign(:debug_on_filter, on_filter)
+     |> assign(:debug_off_filter, off_filter)
+     |> assign_detail_content()}
   end
 
   @impl true
@@ -556,6 +569,8 @@ defmodule MenschWeb.HomeLive do
             bend_chart={@bend_chart}
             chart_grid={@chart_grid}
             debug_rows={@debug_rows}
+            debug_on_filter={@debug_on_filter}
+            debug_off_filter={@debug_off_filter}
           />
 
           <.live_component
@@ -853,7 +868,7 @@ defmodule MenschWeb.HomeLive do
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
   # across the whole chord performance.
-  defp debug_rows(frames, sample_entries, active_chord_indices) do
+  defp debug_rows(frames, sample_entries, active_chord_indices, on_filter, off_filter) do
     chord_labels_by_entry =
       sample_entries
       |> Enum.with_index()
@@ -867,7 +882,9 @@ defmodule MenschWeb.HomeLive do
     Enum.flat_map(frames, fn frame ->
       frame.notes
       |> Enum.filter(fn note ->
-        MapSet.member?(active_set, Map.get(note, :sample_entry_index, -1))
+        MapSet.member?(active_set, Map.get(note, :sample_entry_index, -1)) and
+          bool_filter_match?(note.note_on, on_filter) and
+          bool_filter_match?(note.note_off, off_filter)
       end)
       |> Enum.map(fn note ->
         note
@@ -883,6 +900,16 @@ defmodule MenschWeb.HomeLive do
        when is_list(sample_entries) and is_integer(selected_index) do
     Enum.at(sample_entries, selected_index)
   end
+
+  defp normalize_bool_filter("true"), do: true
+  defp normalize_bool_filter("false"), do: false
+  defp normalize_bool_filter("no_filter"), do: :no_filter
+  defp normalize_bool_filter(_), do: :no_filter
+
+  defp bool_filter_match?(_value, :no_filter), do: true
+  defp bool_filter_match?(true, true), do: true
+  defp bool_filter_match?(false, false), do: true
+  defp bool_filter_match?(_value, _filter), do: false
 
   defp all_chord_indices(sample_entries) when is_list(sample_entries) do
     sample_entries
@@ -1856,7 +1883,9 @@ defmodule MenschWeb.HomeLive do
           debug_rows(
             scoped_frames,
             socket.assigns.sample_entries,
-            socket.assigns.active_chord_indices
+            socket.assigns.active_chord_indices,
+            socket.assigns.debug_on_filter,
+            socket.assigns.debug_off_filter
           )
         )
         |> assign(
