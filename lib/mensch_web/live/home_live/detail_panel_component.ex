@@ -91,14 +91,33 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
       </div>
 
       <div id="debug-frames" class="border border-zinc-700/60">
-        <div class="border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
-          All frames
+        <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
+          <span>All frames</span>
+          <form phx-change="set_chord_filter" class="flex items-center gap-2 normal-case">
+            <label for="chord-filter" class="text-[10px] uppercase tracking-wide text-zinc-500">
+              Chord id
+            </label>
+            <select
+              id="chord-filter"
+              name="chord_filter"
+              class="border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[10px] text-zinc-200"
+            >
+              <option
+                :for={option <- @chord_filter_options}
+                value={option.value}
+                selected={option.value == @selected_chord_filter}
+              >
+                {option.label}
+              </option>
+            </select>
+          </form>
         </div>
         <div class="max-h-48 overflow-y-auto">
           <table class="w-full text-left font-mono text-[11px]">
             <thead class="sticky top-0 bg-zinc-950">
               <tr class="border-b border-zinc-700/60 text-zinc-400">
                 <th class="px-3 py-1.5 font-normal">ms</th>
+                <th class="px-3 py-1.5 font-normal">chord id</th>
                 <th class="px-3 py-1.5 font-normal">chord</th>
                 <th class="px-3 py-1.5 font-normal">note</th>
                 <th class="px-3 py-1.5 font-normal">ch</th>
@@ -117,6 +136,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 class="border-b border-zinc-800/70 text-zinc-300 last:border-0"
               >
                 <td class="px-3 py-1.5">{row.at_ms}</td>
+                <td class="px-3 py-1.5">{if is_integer(row.chord_id), do: row.chord_id, else: "-"}</td>
                 <td class="px-3 py-1.5 text-zinc-200">{row.chord_label}</td>
                 <td class="px-3 py-1.5 text-zinc-100">
                   {Map.get(row, :note_label, "#{row.note_name}#{row.octave}")}

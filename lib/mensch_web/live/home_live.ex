@@ -87,6 +87,8 @@ defmodule MenschWeb.HomeLive do
       |> assign(:sample_folders, build_sample_folders(samples))
       |> assign(:active_sample_index, active_sample_index)
       |> assign(:sample_entries, sample_entries)
+      |> assign(:chord_filter_options, chord_filter_options(sample_entries))
+      |> assign(:selected_chord_filter, nil)
       |> assign(:sample_context, sample_context)
       |> assign(
         :sample_timeline_static,
@@ -140,6 +142,8 @@ defmodule MenschWeb.HomeLive do
              socket
              |> assign(:active_sample_index, index)
              |> assign(:sample_entries, sample_entries)
+             |> assign(:chord_filter_options, chord_filter_options(sample_entries))
+             |> assign(:selected_chord_filter, nil)
              |> assign(:sample_context, sample_context)
              |> assign(
                :sample_timeline_static,
@@ -184,6 +188,25 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("clear_note_focus", _params, socket) do
     {:noreply, socket |> assign(:selected_note_key, nil) |> assign_detail_content()}
+  end
+
+  def handle_event("set_chord_filter", %{"chord_filter" => value}, socket) do
+    selected_chord_filter =
+      case value do
+        "all" ->
+          nil
+
+        other ->
+          case Integer.parse(to_string(other)) do
+            {index, ""} when index >= 0 -> index
+            _ -> nil
+          end
+      end
+
+    {:noreply,
+     socket
+     |> assign(:selected_chord_filter, selected_chord_filter)
+     |> assign_detail_content()}
   end
 
   def handle_event("play", _params, %{assigns: %{render_data: nil}} = socket) do
@@ -509,6 +532,8 @@ defmodule MenschWeb.HomeLive do
               bend_chart={@bend_chart}
               chart_grid={@chart_grid}
               debug_rows={@debug_rows}
+              chord_filter_options={@chord_filter_options}
+              selected_chord_filter={selected_chord_filter_value(@selected_chord_filter)}
             />
           </div>
         </div>
@@ -684,7 +709,7 @@ defmodule MenschWeb.HomeLive do
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
   # across the whole chord performance.
-  defp debug_rows(frames, sample_entries) do
+  defp debug_rows(frames, sample_entries, selected_chord_filter) do
     chord_labels_by_entry =
       sample_entries
       |> Enum.with_index()
@@ -698,11 +723,32 @@ defmodule MenschWeb.HomeLive do
       Enum.map(frame.notes, fn note ->
         note
         |> Map.put(:at_ms, frame.at_ms)
+        |> Map.put(:chord_id, note.sample_entry_index)
         |> Map.put(:chord_label, Map.get(chord_labels_by_entry, note.sample_entry_index, "-"))
         |> Map.put(:note_label, format_note_label(note.note_name, note.octave, note_spelling))
       end)
     end)
+    |> maybe_filter_debug_rows_by_chord(selected_chord_filter)
   end
+
+  defp maybe_filter_debug_rows_by_chord(rows, nil), do: rows
+
+  defp maybe_filter_debug_rows_by_chord(rows, chord_filter) when is_integer(chord_filter) do
+    Enum.filter(rows, fn row -> row.chord_id == chord_filter end)
+  end
+
+  defp chord_filter_options(sample_entries) when is_list(sample_entries) do
+    [
+      %{value: "all", label: "All chords"}
+      | Enum.with_index(sample_entries)
+        |> Enum.map(fn {%{chord_spec: chord_spec}, index} ->
+          %{value: Integer.to_string(index), label: "#{index} · #{short_chord_label(chord_spec)}"}
+        end)
+    ]
+  end
+
+  defp selected_chord_filter_value(nil), do: "all"
+  defp selected_chord_filter_value(index) when is_integer(index), do: Integer.to_string(index)
 
   defp preferred_note_spelling(sample_entries) when is_list(sample_entries) do
     roots = Enum.map(sample_entries, fn entry -> entry.chord_spec.root end)
@@ -1436,7 +1482,10 @@ defmodule MenschWeb.HomeLive do
             detail_total_mbeats
           )
         )
-        |> assign(:debug_rows, debug_rows(frames, socket.assigns.sample_entries))
+        |> assign(
+          :debug_rows,
+          debug_rows(frames, socket.assigns.sample_entries, socket.assigns.selected_chord_filter)
+        )
         |> assign(
           :note_matrix,
           build_note_matrix(
