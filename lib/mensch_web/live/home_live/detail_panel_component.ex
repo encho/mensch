@@ -35,7 +35,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           </div>
           <div
             :for={x <- @note_matrix_grid.bar_pcts}
-            class="pointer-events-none absolute inset-y-0 z-0 w-px bg-[#2fd5c8]/35"
+            class="pointer-events-none absolute inset-y-0 z-0 w-[1.5px] bg-zinc-200/50"
             style={"left: #{x}%;"}
           >
           </div>
@@ -209,7 +209,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           y2="120"
           stroke="var(--ui-grid-bar)"
           stroke-opacity="0.45"
-          stroke-width="1.2"
+          stroke-width="1.6"
         />
         <polyline
           :for={series <- @chart}

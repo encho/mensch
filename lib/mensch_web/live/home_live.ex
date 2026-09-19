@@ -487,7 +487,7 @@ defmodule MenschWeb.HomeLive do
                     </div>
                   </td>
                   <td
-                    class="cursor-pointer px-1.5 py-1.5 align-top"
+                    class="cursor-pointer px-1.5 py-1.5 align-middle"
                     phx-click="open_sample_entry_details"
                     phx-value-index={index}
                   >
@@ -496,7 +496,7 @@ defmodule MenschWeb.HomeLive do
                     </div>
                   </td>
                   <td
-                    class="cursor-pointer px-1.5 py-1.5 align-top"
+                    class="cursor-pointer px-1.5 py-1.5 align-middle"
                     phx-click="open_sample_entry_details"
                     phx-value-index={index}
                   >
