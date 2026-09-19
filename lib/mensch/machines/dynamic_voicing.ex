@@ -39,6 +39,7 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @spec controls() :: %{
           direction: :up,
+          lfo_bend: Mensch.LfoParams.t(),
           lfo_pressure: Mensch.LfoParams.t(),
           lfo_slide: Mensch.LfoParams.t(),
           number_of_inversions: 4
@@ -50,7 +51,8 @@ defmodule Mensch.Machines.DynamicVoicing do
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
       lfo_pressure: params.lfo_pressure,
-      lfo_slide: params.lfo_slide
+      lfo_slide: params.lfo_slide,
+      lfo_bend: params.lfo_bend
     }
   end
 
@@ -73,6 +75,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     # assume strongly-typed values (curve/time base/mode) without branching.
     pressure_lfo = Lfo.normalize!(params.lfo_pressure, field_name: "dynamic_voicing lfo_pressure")
     slide_lfo = Lfo.normalize!(params.lfo_slide, field_name: "dynamic_voicing lfo_slide")
+    bend_lfo = Lfo.normalize!(params.lfo_bend, field_name: "dynamic_voicing lfo_bend")
 
     # Quantization step for this render: how many mbeats each frame advances.
     frame_mbeats = SampleContext.frame_units(sample_context)
@@ -116,7 +119,8 @@ defmodule Mensch.Machines.DynamicVoicing do
           sample_context,
           entry_start_mbeat_abs,
           pressure_lfo,
-          slide_lfo
+          slide_lfo,
+          bend_lfo
         )
       end)
 
@@ -410,7 +414,8 @@ defmodule Mensch.Machines.DynamicVoicing do
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
          %LfoParams{} = pressure_lfo,
-         %LfoParams{} = slide_lfo
+         %LfoParams{} = slide_lfo,
+         %LfoParams{} = bend_lfo
        ) do
     note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, absolute_end_mbeat)
 
@@ -424,7 +429,8 @@ defmodule Mensch.Machines.DynamicVoicing do
             sample_context,
             entry_start_mbeat_abs,
             pressure_lfo,
-            slide_lfo
+            slide_lfo,
+            bend_lfo
           )
       }
     end
@@ -463,7 +469,8 @@ defmodule Mensch.Machines.DynamicVoicing do
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
          %LfoParams{} = pressure_lfo,
-         %LfoParams{} = slide_lfo
+         %LfoParams{} = slide_lfo,
+         %LfoParams{} = bend_lfo
        ) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
@@ -474,7 +481,8 @@ defmodule Mensch.Machines.DynamicVoicing do
         pressure_lfo,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs
+        entry_start_mbeat_abs,
+        local_elapsed_mbeats
       )
 
     pressure = Lfo.apply_to_pressure(adsr_level, pressure_lfo_norm, pressure_lfo)
@@ -485,17 +493,29 @@ defmodule Mensch.Machines.DynamicVoicing do
         slide_lfo,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs
+        entry_start_mbeat_abs,
+        local_elapsed_mbeats
       )
 
     slide = Lfo.apply_additive_to_7bit(0, slide_lfo_norm, slide_lfo)
+
+    bend_lfo_norm =
+      Lfo.value_at_mbeat(
+        bend_lfo,
+        at_mbeat,
+        sample_context,
+        entry_start_mbeat_abs,
+        local_elapsed_mbeats
+      )
+
+    bend = Lfo.apply_additive_to_bend(0.0, bend_lfo_norm, bend_lfo)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
       pressure: pressure,
-      bend: 0.0,
+      bend: bend,
       slide: slide
     })
   end
@@ -533,6 +553,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     |> Map.merge(current)
     |> Map.update!(:lfo_pressure, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_pressure"))
     |> Map.update!(:lfo_slide, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_slide"))
+    |> Map.update!(:lfo_bend, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_bend"))
     |> then(&struct!(DynamicVoicingParams, &1))
   end
 
@@ -605,11 +626,15 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
     lfo_slide =
       Lfo.normalize!(Map.get(params, :lfo_slide), field_name: "dynamic_voicing lfo_slide")
 
+    lfo_bend =
+      Lfo.normalize!(Map.get(params, :lfo_bend), field_name: "dynamic_voicing lfo_bend")
+
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
       lfo_pressure: lfo_pressure,
-      lfo_slide: lfo_slide
+      lfo_slide: lfo_slide,
+      lfo_bend: lfo_bend
     }
   end
 

@@ -48,12 +48,27 @@ defmodule Mensch.Modulation.Lfo do
         entry_start_mbeat_abs
       )
       when is_integer(at_mbeat) and is_integer(entry_start_mbeat_abs) do
+    value_at_mbeat(lfo_params, at_mbeat, sample_context, entry_start_mbeat_abs, at_mbeat)
+  end
+
+  @spec value_at_mbeat(LfoParams.t(), integer(), SampleContext.t(), integer(), integer()) ::
+          float()
+  def value_at_mbeat(
+        %LfoParams{} = lfo_params,
+        at_mbeat,
+        %SampleContext{} = sample_context,
+        entry_start_mbeat_abs,
+        note_local_mbeat
+      )
+      when is_integer(at_mbeat) and is_integer(entry_start_mbeat_abs) and
+             is_integer(note_local_mbeat) do
     mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
 
     timeline_mbeat =
       case lfo_params.time_base do
-        :absolute -> entry_start_mbeat_abs + at_mbeat
-        :entry_local -> at_mbeat
+        :sample -> entry_start_mbeat_abs + at_mbeat
+        :chord -> at_mbeat
+        :note -> note_local_mbeat
       end
 
     shifted_mbeat = timeline_mbeat + lfo_params.shift_mbeats
@@ -80,6 +95,12 @@ defmodule Mensch.Modulation.Lfo do
   def apply_additive_to_7bit(baseline_7bit, lfo_unipolar, %LfoParams{scale: scale}) do
     normalized = baseline_7bit / 127 + lfo_unipolar * scale
     clamp_7bit(normalized * 127)
+  end
+
+  @spec apply_additive_to_bend(float(), float(), LfoParams.t()) :: float()
+  def apply_additive_to_bend(baseline_bend, lfo_value, %LfoParams{scale: scale}) do
+    (baseline_bend + lfo_value * scale)
+    |> clamp_bend()
   end
 
   defp waveform_value(:sine, cycle_phase), do: :math.sin(2 * :math.pi() * cycle_phase)
@@ -147,12 +168,13 @@ defmodule Mensch.Modulation.Lfo do
           "#{field_name}.polarity must be :bipolar or :unipolar, got: #{inspect(other)}"
   end
 
-  defp normalize_time_base!(time_base, _field_name) when time_base in [:absolute, :entry_local],
-    do: time_base
+  defp normalize_time_base!(time_base, _field_name)
+         when time_base in [:sample, :chord, :note],
+       do: time_base
 
   defp normalize_time_base!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.time_base must be :absolute or :entry_local, got: #{inspect(other)}"
+      "#{field_name}.time_base must be :sample, :chord, or :note, got: #{inspect(other)}"
   end
 
   defp normalize_mode!(mode, _field_name) when mode in [:additive, :multiplicative], do: mode
@@ -163,4 +185,5 @@ defmodule Mensch.Modulation.Lfo do
   end
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
+  defp clamp_bend(value), do: value |> max(-1.0) |> min(1.0)
 end

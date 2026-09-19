@@ -167,7 +167,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 1.0,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :additive
         }
       })
@@ -189,7 +189,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 1.0,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :multiplicative
         }
       })
@@ -214,7 +214,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 0.25,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :additive
         }
       })
@@ -226,7 +226,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 0.25,
           cycles_per_bar: 2.0,
           shift_mbeats: 0.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :additive
         }
       })
@@ -250,7 +250,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 0.5,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :additive
         }
       })
@@ -262,7 +262,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 0.5,
           cycles_per_bar: 1.0,
           shift_mbeats: 1000.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :additive
         }
       })
@@ -276,7 +276,7 @@ defmodule Mensch.DynamicVoicingTest do
     refute shifted[3000] == unshifted[3000]
   end
 
-  test "pressure LFO absolute and entry-local time base differ for non-zero start" do
+  test "pressure LFO sample and chord time base differ for non-zero start" do
     baseline_machine = baseline_lfo_machine()
 
     absolute_machine =
@@ -286,34 +286,34 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 0.5,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :absolute,
+          time_base: :sample,
           mode: :additive
         }
       })
 
-    entry_local_machine =
+    chord_machine =
       lfo_machine(%{
         lfo_pressure: %{
           curve: :saw_up,
           scale: 0.5,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :entry_local,
+          time_base: :chord,
           mode: :additive
         }
       })
 
     baseline = pressures_by_at_mbeat(baseline_machine, 1000)
     absolute_with_start_offset = pressures_by_at_mbeat(absolute_machine, 1000)
-    entry_local_with_start_offset = pressures_by_at_mbeat(entry_local_machine, 1000)
+    chord_with_start_offset = pressures_by_at_mbeat(chord_machine, 1000)
 
     assert absolute_with_start_offset[3000] ==
              expected_lfo_pressure(baseline[3000], 0.0, :additive, 0.5)
 
-    assert entry_local_with_start_offset[3000] ==
+    assert chord_with_start_offset[3000] ==
              expected_lfo_pressure(baseline[3000], 0.75, :additive, 0.5)
 
-    refute absolute_with_start_offset[3000] == entry_local_with_start_offset[3000]
+    refute absolute_with_start_offset[3000] == chord_with_start_offset[3000]
   end
 
   test "slide stays at baseline zero when lfo_slide is omitted" do
@@ -363,7 +363,7 @@ defmodule Mensch.DynamicVoicingTest do
             cycles_per_bar: 1.0,
             shift_mbeats: 0.0,
             polarity: :unipolar,
-            time_base: :entry_local,
+            time_base: :chord,
             mode: :additive
           }
         }
@@ -404,6 +404,94 @@ defmodule Mensch.DynamicVoicingTest do
     assert slides_by_mbeat[3000] == 0
   end
 
+  test "bend stays at baseline zero when lfo_bend is omitted" do
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{
+          direction: :up,
+          number_of_inversions: 1,
+          lfo_pressure: %{scale: 0.0}
+        }
+      }
+
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 500})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    bends =
+      rendered.frames
+      |> Enum.flat_map(fn frame ->
+        frame.notes
+        |> Enum.filter(&(&1.midi_note == 60))
+        |> Enum.map(& &1.bend)
+      end)
+
+    assert bends != []
+    assert Enum.all?(bends, &(&1 == 0.0))
+  end
+
+  test "bend lfo applies additive bipolar modulation" do
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{
+          direction: :up,
+          number_of_inversions: 1,
+          lfo_pressure: %{scale: 0.0},
+          lfo_bend: %{
+            curve: :square,
+            scale: 0.5,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            polarity: :bipolar,
+            time_base: :chord,
+            mode: :additive
+          }
+        }
+      }
+
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 500})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    bends_by_mbeat =
+      rendered.frames
+      |> Enum.reduce(%{}, fn frame, acc ->
+        bend =
+          frame.notes
+          |> Enum.filter(&(&1.midi_note == 60))
+          |> Enum.sort_by(& &1.note_instance_id)
+          |> case do
+            [note | _] -> note.bend
+            [] -> nil
+          end
+
+        if bend == nil do
+          acc
+        else
+          Map.put(acc, frame.at_mbeat, bend)
+        end
+      end)
+
+    assert bends_by_mbeat[1000] == 0.5
+    assert bends_by_mbeat[3000] == -0.5
+  end
+
   defp baseline_lfo_machine do
     lfo_machine(%{lfo_pressure: %{scale: 0.0}})
   end
@@ -418,7 +506,7 @@ defmodule Mensch.DynamicVoicingTest do
           scale: 0.0,
           cycles_per_bar: 1.0,
           shift_mbeats: 0.0,
-          time_base: :absolute,
+          time_base: :sample,
           mode: :additive
         }
       }

@@ -1,11 +1,19 @@
 defmodule Mensch.LfoParams do
   @moduledoc """
   Shared LFO settings for modulation sources.
+
+  Time-base behavior:
+
+  - :sample: phase follows the full sample timeline, so all entries and notes
+    share one global LFO clock.
+  - :chord: phase restarts at each sample entry start and is shared by
+    all notes inside that entry.
+  - :note: phase restarts at each individual note start.
   """
 
   @type curve :: :sine | :triangle | :saw_up | :saw_down | :square
   @type polarity :: :bipolar | :unipolar
-  @type time_base :: :absolute | :entry_local
+  @type time_base :: :sample | :chord | :note
   @type mode :: :additive | :multiplicative
 
   @type t :: %__MODULE__{
@@ -23,7 +31,7 @@ defmodule Mensch.LfoParams do
             cycles_per_bar: 1.0,
             shift_mbeats: 0.0,
             polarity: :bipolar,
-            time_base: :absolute,
+            time_base: :sample,
             mode: :additive
 
   @spec default() :: t()

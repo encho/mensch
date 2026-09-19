@@ -15,6 +15,8 @@ defmodule Mensch.Machines.DynamicVoicingParams do
   * `lfo_pressure`: Pressure LFO settings.
   * `lfo_slide`: Slide (CC74) LFO settings. Applied additively to the
     baseline slide value using a unipolar waveform (never below 0).
+  * `lfo_bend`: Bend LFO settings. Applied additively to the baseline bend
+    value (0.0). Supports bipolar polarity for signed modulation.
   """
 
   alias Mensch.LfoParams
@@ -25,7 +27,8 @@ defmodule Mensch.Machines.DynamicVoicingParams do
           direction: direction(),
           number_of_inversions: pos_integer(),
           lfo_pressure: LfoParams.t(),
-          lfo_slide: LfoParams.t()
+          lfo_slide: LfoParams.t(),
+          lfo_bend: LfoParams.t()
         }
 
   @enforce_keys [:direction, :number_of_inversions]
@@ -33,7 +36,8 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     :direction,
     :number_of_inversions,
     lfo_pressure: %LfoParams{},
-    lfo_slide: %LfoParams{}
+    lfo_slide: %LfoParams{},
+    lfo_bend: %LfoParams{}
   ]
 
   @doc "Default parameters for the dynamic voicing machine."
@@ -43,7 +47,8 @@ defmodule Mensch.Machines.DynamicVoicingParams do
       direction: :up,
       number_of_inversions: 4,
       lfo_pressure: LfoParams.default(),
-      lfo_slide: LfoParams.default()
+      lfo_slide: LfoParams.default(),
+      lfo_bend: LfoParams.default()
     }
   end
 end

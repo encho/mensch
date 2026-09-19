@@ -15,7 +15,7 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
     cycles_per_bar: 6.0,
     shift_mbeats: 0.0,
     polarity: :unipolar,
-    time_base: :absolute,
+    time_base: :note,
     mode: :additive
   }
 
@@ -24,7 +24,17 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
     scale: 0.3,
     cycles_per_bar: 20.0,
     shift_mbeats: 0.0,
-    time_base: :absolute,
+    time_base: :note,
+    mode: :additive
+  }
+
+  @lfo_bend %LfoParams{
+    curve: :sine,
+    scale: 0.001,
+    cycles_per_bar: 3.0,
+    shift_mbeats: 0.0,
+    polarity: :bipolar,
+    time_base: :note,
     mode: :additive
   }
 
@@ -48,7 +58,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
               direction: :up,
               number_of_inversions: 10,
               lfo_slide: @lfo_slide,
-              lfo_pressure: @lfo_pressure
+              lfo_pressure: @lfo_pressure,
+              lfo_bend: @lfo_bend
             }
           }
         },
@@ -63,7 +74,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
               direction: :up,
               number_of_inversions: 10,
               lfo_slide: @lfo_slide,
-              lfo_pressure: @lfo_pressure
+              lfo_pressure: @lfo_pressure,
+              lfo_bend: @lfo_bend
             }
           }
         },
@@ -78,7 +90,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
               direction: :up,
               number_of_inversions: 10,
               lfo_slide: @lfo_slide,
-              lfo_pressure: @lfo_pressure
+              lfo_pressure: @lfo_pressure,
+              lfo_bend: @lfo_bend
             }
           }
         },
@@ -93,7 +106,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
               direction: :up,
               number_of_inversions: 10,
               lfo_slide: @lfo_slide,
-              lfo_pressure: @lfo_pressure
+              lfo_pressure: @lfo_pressure,
+              lfo_bend: @lfo_bend
             }
           }
         }

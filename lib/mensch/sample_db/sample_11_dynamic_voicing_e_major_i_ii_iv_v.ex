@@ -35,7 +35,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
                 scale: 0.25,
                 cycles_per_bar: 10.0,
                 shift_mbeats: 0.0,
-                time_base: :absolute,
+                time_base: :sample,
                 mode: :additive
               }
             }
@@ -56,7 +56,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
                 scale: 0.25,
                 cycles_per_bar: 10.0,
                 shift_mbeats: 0.0,
-                time_base: :absolute,
+                time_base: :sample,
                 mode: :additive
               }
             }
@@ -77,7 +77,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
                 scale: 0.25,
                 cycles_per_bar: 10.0,
                 shift_mbeats: 0.0,
-                time_base: :absolute,
+                time_base: :sample,
                 mode: :additive
               }
             }
@@ -98,7 +98,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
                 scale: 0.25,
                 cycles_per_bar: 10.0,
                 shift_mbeats: 0.0,
-                time_base: :absolute,
+                time_base: :sample,
                 mode: :additive
               }
             }

@@ -9,6 +9,26 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
+  @lfo_slide %LfoParams{
+    curve: :sine,
+    scale: 1,
+    cycles_per_bar: 6.0,
+    shift_mbeats: 0.0,
+    polarity: :unipolar,
+    time_base: :note,
+    mode: :additive
+  }
+
+  @lfo_bend %LfoParams{
+    curve: :sine,
+    scale: 0.001,
+    cycles_per_bar: 3.0,
+    shift_mbeats: 0.0,
+    polarity: :bipolar,
+    time_base: :note,
+    mode: :additive
+  }
+
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
@@ -16,12 +36,14 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 4,
+          lfo_slide: @lfo_slide,
+          lfo_bend: @lfo_bend,
           lfo_pressure: %LfoParams{
             curve: :sine,
             scale: 0.3,
             cycles_per_bar: 10.0,
             shift_mbeats: 0.0,
-            time_base: :absolute,
+            time_base: :sample,
             mode: :additive
           }
         }
