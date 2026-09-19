@@ -56,6 +56,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     requested_voicing_count = normalize_number_of_inversions!(params.number_of_inversions)
 
     frame_mbeats = SampleContext.frame_units(sample_context)
+    entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
 
     chord_duration_mbeats =
       timeline_context
@@ -70,7 +71,7 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     planned_notes =
       build_dynamic_note_plan(voicings, slot_boundaries)
-      |> assign_dynamic_adsr(sample_context, frame_mbeats)
+      |> assign_dynamic_adsr(sample_context, frame_mbeats, entry_start_mbeat_abs)
 
     max_note_end_mbeats =
       case planned_notes do
@@ -267,16 +268,33 @@ defmodule Mensch.Machines.DynamicVoicing do
     {note_plan_item, plan.duration_mbeats}
   end
 
-  defp assign_dynamic_adsr(note_plan, %SampleContext{} = sample_context, frame_mbeats) do
+  defp assign_dynamic_adsr(
+         note_plan,
+         %SampleContext{} = sample_context,
+         frame_mbeats,
+         entry_start_mbeat_abs
+       ) do
     Enum.map(note_plan, fn {plan_note, duration_mbeats} ->
-      adsr = dynamic_adsr(duration_mbeats, sample_context, frame_mbeats)
+      attack_mbeats =
+        if boundary_start_note?(plan_note, entry_start_mbeat_abs) do
+          frame_mbeats
+        else
+          frame_mbeats * 2
+        end
+
+      adsr = dynamic_adsr(duration_mbeats, sample_context, frame_mbeats, attack_mbeats)
 
       NotePlanItem.with_adsr(plan_note, adsr)
     end)
   end
 
-  defp dynamic_adsr(duration_mbeats, %SampleContext{} = sample_context, frame_mbeats) do
-    attack_mbeats = min(frame_mbeats * 2, duration_mbeats)
+  defp dynamic_adsr(
+         duration_mbeats,
+         %SampleContext{} = sample_context,
+         frame_mbeats,
+         attack_mbeats
+       ) do
+    attack_mbeats = min(attack_mbeats, duration_mbeats)
     remaining_after_attack = max(duration_mbeats - attack_mbeats, 0)
     decay_mbeats = min(frame_mbeats * 2, remaining_after_attack)
 
@@ -316,6 +334,17 @@ defmodule Mensch.Machines.DynamicVoicing do
         |> Enum.sort_by(&{&1.note_instance_id, &1.midi_note})
 
       %{at_mbeat: at_mbeat, notes: frame_notes}
+    end
+  end
+
+  defp boundary_start_note?(plan_note, entry_start_mbeat_abs) do
+    entry_start_mbeat_abs + plan_note.delay_mbeats > 0
+  end
+
+  defp entry_start_mbeat_abs(opts) do
+    case Keyword.get(opts, :entry_start_mbeat_abs, 0) do
+      value when is_integer(value) and value >= 0 -> value
+      other -> raise ArgumentError, "invalid :entry_start_mbeat_abs: #{inspect(other)}"
     end
   end
 

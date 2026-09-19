@@ -601,7 +601,7 @@ defmodule MenschWeb.HomeLive do
     playback_ref = make_ref()
     Process.send_after(self(), {:refresh_player, playback_ref}, @refresh_interval_ms)
     playing_duration_ms = Map.get(render_data, :duration_ms)
-    done_after_ms = playing_duration_ms + Map.get(render_data, :granularity_ms, 0)
+    done_after_ms = playing_duration_ms
     Process.send_after(self(), {:playback_done, playback_ref}, done_after_ms)
     play_started_at = System.monotonic_time(:millisecond)
 
