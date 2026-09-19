@@ -12,7 +12,16 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %DynamicVoicing{
-        params: %DynamicVoicingParams{direction: :up, number_of_inversions: 4}
+        params: %DynamicVoicingParams{
+          direction: :up,
+          number_of_inversions: 4,
+          pressure_lfo_curve: :sine,
+          pressure_lfo_scale: 0.05,
+          pressure_lfo_cycles_per_bar: 10.0,
+          pressure_lfo_shift_mbeats: 0.0,
+          pressure_lfo_time_base: :absolute,
+          pressure_lfo_mode: :additive
+        }
       }
 
     %{

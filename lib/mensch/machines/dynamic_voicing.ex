@@ -40,7 +40,13 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     %{
       direction: params.direction,
-      number_of_inversions: params.number_of_inversions
+      number_of_inversions: params.number_of_inversions,
+      pressure_lfo_curve: params.pressure_lfo_curve,
+      pressure_lfo_scale: params.pressure_lfo_scale,
+      pressure_lfo_cycles_per_bar: params.pressure_lfo_cycles_per_bar,
+      pressure_lfo_shift_mbeats: params.pressure_lfo_shift_mbeats,
+      pressure_lfo_time_base: params.pressure_lfo_time_base,
+      pressure_lfo_mode: params.pressure_lfo_mode
     }
   end
 
@@ -50,10 +56,21 @@ defmodule Mensch.Machines.DynamicVoicing do
         %TimelineContext{} = timeline_context,
         opts \\ []
       ) do
-    %DynamicVoicingParams{} = params = machine_params!(opts)
+    %DynamicVoicingParams{} = params = machine_params!(opts) |> hydrate_params()
 
     direction = normalize_direction!(params.direction)
     requested_voicing_count = normalize_number_of_inversions!(params.number_of_inversions)
+    pressure_lfo_curve = normalize_pressure_lfo_curve!(params.pressure_lfo_curve)
+    pressure_lfo_scale = normalize_pressure_lfo_scale!(params.pressure_lfo_scale)
+
+    pressure_lfo_cycles_per_bar =
+      normalize_pressure_lfo_cycles_per_bar!(params.pressure_lfo_cycles_per_bar)
+
+    pressure_lfo_shift_mbeats =
+      normalize_pressure_lfo_shift_mbeats!(params.pressure_lfo_shift_mbeats)
+
+    pressure_lfo_time_base = normalize_pressure_lfo_time_base!(params.pressure_lfo_time_base)
+    pressure_lfo_mode = normalize_pressure_lfo_mode!(params.pressure_lfo_mode)
 
     # Quantization step for this render: how many mbeats each frame advances.
     frame_mbeats = SampleContext.frame_units(sample_context)
@@ -85,7 +102,19 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     note_frame_streams =
       Enum.map(planned_notes, fn planned_note ->
-        render_note_frame_stream(planned_note, chord_duration_mbeats, frame_mbeats)
+        render_note_frame_stream(
+          planned_note,
+          chord_duration_mbeats,
+          frame_mbeats,
+          sample_context,
+          entry_start_mbeat_abs,
+          pressure_lfo_curve,
+          pressure_lfo_scale,
+          pressure_lfo_cycles_per_bar,
+          pressure_lfo_shift_mbeats,
+          pressure_lfo_time_base,
+          pressure_lfo_mode
+        )
       end)
 
     %MachineFrameSequence{
@@ -312,13 +341,37 @@ defmodule Mensch.Machines.DynamicVoicing do
     })
   end
 
-  defp render_note_frame_stream(note, absolute_end_mbeat, frame_mbeats) do
+  defp render_note_frame_stream(
+         note,
+         absolute_end_mbeat,
+         frame_mbeats,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs,
+         pressure_lfo_curve,
+         pressure_lfo_scale,
+         pressure_lfo_cycles_per_bar,
+         pressure_lfo_shift_mbeats,
+         pressure_lfo_time_base,
+         pressure_lfo_mode
+       ) do
     note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, absolute_end_mbeat)
 
     for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
-        note: note_frame(note, at_mbeat)
+        note:
+          note_frame(
+            note,
+            at_mbeat,
+            sample_context,
+            entry_start_mbeat_abs,
+            pressure_lfo_curve,
+            pressure_lfo_scale,
+            pressure_lfo_cycles_per_bar,
+            pressure_lfo_shift_mbeats,
+            pressure_lfo_time_base,
+            pressure_lfo_mode
+          )
       }
     end
   end
@@ -350,20 +403,90 @@ defmodule Mensch.Machines.DynamicVoicing do
     end
   end
 
-  defp note_frame(note, at_mbeat) do
+  defp note_frame(
+         note,
+         at_mbeat,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs,
+         pressure_lfo_curve,
+         pressure_lfo_scale,
+         pressure_lfo_cycles_per_bar,
+         pressure_lfo_shift_mbeats,
+         pressure_lfo_time_base,
+         pressure_lfo_mode
+       ) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
+    adsr_level = ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats)
+
+    pressure_lfo_norm =
+      pressure_lfo_value(
+        at_mbeat,
+        sample_context,
+        entry_start_mbeat_abs,
+        pressure_lfo_curve,
+        pressure_lfo_cycles_per_bar,
+        pressure_lfo_shift_mbeats,
+        pressure_lfo_time_base
+      )
+
+    pressure =
+      pressure_with_lfo(
+        adsr_level,
+        pressure_lfo_norm,
+        pressure_lfo_scale,
+        pressure_lfo_mode
+      )
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
-      pressure:
-        ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats) |> then(&(&1 * 127)) |> clamp_7bit(),
+      pressure: pressure,
       bend: 0.0,
       slide: 0
     })
   end
+
+  defp pressure_with_lfo(adsr_level, lfo_norm, scale, :additive) do
+    normalized = adsr_level + lfo_norm * adsr_level * scale
+    clamp_7bit(normalized * 127)
+  end
+
+  defp pressure_with_lfo(adsr_level, lfo_norm, scale, :multiplicative) do
+    normalized = adsr_level * (1 + lfo_norm * adsr_level * scale)
+    clamp_7bit(normalized * 127)
+  end
+
+  defp pressure_lfo_value(
+         at_mbeat,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs,
+         curve,
+         cycles_per_bar,
+         shift_mbeats,
+         time_base
+       ) do
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+
+    timeline_mbeat =
+      case time_base do
+        :absolute -> entry_start_mbeat_abs + at_mbeat
+        :entry_local -> at_mbeat
+      end
+
+    shifted_mbeat = timeline_mbeat + shift_mbeats
+    phase = shifted_mbeat / mbeats_per_bar * cycles_per_bar
+    cycle_phase = phase - :math.floor(phase)
+
+    lfo_waveform_value(curve, cycle_phase)
+  end
+
+  defp lfo_waveform_value(:sine, cycle_phase), do: :math.sin(2 * :math.pi() * cycle_phase)
+  defp lfo_waveform_value(:triangle, cycle_phase), do: 1.0 - 4.0 * abs(cycle_phase - 0.5)
+  defp lfo_waveform_value(:saw_up, cycle_phase), do: cycle_phase
+  defp lfo_waveform_value(:saw_down, cycle_phase), do: -cycle_phase
+  defp lfo_waveform_value(:square, cycle_phase), do: if(cycle_phase < 0.5, do: 1.0, else: -1.0)
 
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do
     total_frames = max(div(chord_duration_mbeats, frame_mbeats), 1)
@@ -384,6 +507,17 @@ defmodule Mensch.Machines.DynamicVoicing do
     end
   end
 
+  # Some in-memory/persisted samples may carry legacy structs that predate
+  # newly added fields. Merge onto defaults so missing keys are safely hydrated.
+  defp hydrate_params(%DynamicVoicingParams{} = params) do
+    defaults = default_params() |> Map.from_struct()
+    current = params |> Map.from_struct()
+
+    defaults
+    |> Map.merge(current)
+    |> then(&struct!(DynamicVoicingParams, &1))
+  end
+
   defp normalize_direction!(:up), do: :up
   defp normalize_direction!(:down), do: :down
 
@@ -397,6 +531,60 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp normalize_number_of_inversions!(other) do
     raise ArgumentError,
           "dynamic_voicing number_of_inversions must be >= 1, got: #{inspect(other)}"
+  end
+
+  defp normalize_pressure_lfo_curve!(curve)
+       when curve in [:sine, :triangle, :saw_up, :saw_down, :square],
+       do: curve
+
+  defp normalize_pressure_lfo_curve!(:sin), do: :sine
+  defp normalize_pressure_lfo_curve!(:saw), do: :saw_up
+
+  defp normalize_pressure_lfo_curve!(other) do
+    raise ArgumentError,
+          "dynamic_voicing pressure_lfo_curve must be one of :sine, :triangle, :saw_up, :saw_down, :square, got: #{inspect(other)}"
+  end
+
+  defp normalize_pressure_lfo_scale!(value) when is_integer(value), do: value * 1.0
+  defp normalize_pressure_lfo_scale!(value) when is_float(value), do: value
+
+  defp normalize_pressure_lfo_scale!(other) do
+    raise ArgumentError,
+          "dynamic_voicing pressure_lfo_scale must be a number, got: #{inspect(other)}"
+  end
+
+  defp normalize_pressure_lfo_cycles_per_bar!(value) when is_integer(value) and value > 0,
+    do: value * 1.0
+
+  defp normalize_pressure_lfo_cycles_per_bar!(value) when is_float(value) and value > 0,
+    do: value
+
+  defp normalize_pressure_lfo_cycles_per_bar!(other) do
+    raise ArgumentError,
+          "dynamic_voicing pressure_lfo_cycles_per_bar must be > 0, got: #{inspect(other)}"
+  end
+
+  defp normalize_pressure_lfo_shift_mbeats!(value) when is_integer(value), do: value * 1.0
+  defp normalize_pressure_lfo_shift_mbeats!(value) when is_float(value), do: value
+
+  defp normalize_pressure_lfo_shift_mbeats!(other) do
+    raise ArgumentError,
+          "dynamic_voicing pressure_lfo_shift_mbeats must be a number, got: #{inspect(other)}"
+  end
+
+  defp normalize_pressure_lfo_time_base!(time_base) when time_base in [:absolute, :entry_local],
+    do: time_base
+
+  defp normalize_pressure_lfo_time_base!(other) do
+    raise ArgumentError,
+          "dynamic_voicing pressure_lfo_time_base must be :absolute or :entry_local, got: #{inspect(other)}"
+  end
+
+  defp normalize_pressure_lfo_mode!(mode) when mode in [:additive, :multiplicative], do: mode
+
+  defp normalize_pressure_lfo_mode!(other) do
+    raise ArgumentError,
+          "dynamic_voicing pressure_lfo_mode must be :additive or :multiplicative, got: #{inspect(other)}"
   end
 
   defp snap_mbeats(mbeats, mbeats_per_frame),
@@ -422,7 +610,13 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
   def controls(%DynamicVoicing{params: params}) do
     %{
       direction: params.direction,
-      number_of_inversions: params.number_of_inversions
+      number_of_inversions: params.number_of_inversions,
+      pressure_lfo_curve: Map.get(params, :pressure_lfo_curve, :sine),
+      pressure_lfo_scale: Map.get(params, :pressure_lfo_scale, 0.0),
+      pressure_lfo_cycles_per_bar: Map.get(params, :pressure_lfo_cycles_per_bar, 1.0),
+      pressure_lfo_shift_mbeats: Map.get(params, :pressure_lfo_shift_mbeats, 0.0),
+      pressure_lfo_time_base: Map.get(params, :pressure_lfo_time_base, :absolute),
+      pressure_lfo_mode: Map.get(params, :pressure_lfo_mode, :additive)
     }
   end
 
