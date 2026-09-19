@@ -14,7 +14,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
               :if={not is_nil(@selected_note_key)}
               type="button"
               phx-click="clear_note_focus"
-              class="border border-zinc-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+              class="border border-zinc-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
             >
               Clear
             </button>
@@ -35,7 +35,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           </div>
           <div
             :for={x <- @note_matrix_grid.bar_pcts}
-            class="pointer-events-none absolute inset-y-0 z-0 w-px bg-amber-400/35"
+            class="pointer-events-none absolute inset-y-0 z-0 w-px bg-[#2fd5c8]/35"
             style={"left: #{x}%;"}
           >
           </div>
@@ -175,7 +175,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           y1="0"
           x2={x}
           y2="120"
-          stroke="#5B6472"
+          stroke="var(--ui-grid-subbeat)"
           stroke-opacity="0.32"
           stroke-width="1"
         />
@@ -185,7 +185,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           y1="0"
           x2={x}
           y2="120"
-          stroke="#7A8596"
+          stroke="var(--ui-grid-beat)"
           stroke-opacity="0.38"
           stroke-width="1"
         />
@@ -195,7 +195,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           y1="0"
           x2={x}
           y2="120"
-          stroke="#FFB55A"
+          stroke="var(--ui-grid-bar)"
           stroke-opacity="0.45"
           stroke-width="1.2"
         />

@@ -20,8 +20,8 @@ defmodule MenschWeb.HomeLive do
   alias MenschWeb.HomeLive.SampleEntryDetailsModalComponent
 
   @refresh_interval_ms 33
-  @chart_colors ["#FF9F1A", "#C96A00", "#2D8C82", "#4E6E8E", "#B3862C", "#8C5A2B"]
-  @inactive_note_color "rgba(122, 133, 150, 0.32)"
+  @chart_colors ["#FF7A1A", "#2FD5C8", "#75B8FF", "#B188FF", "#9BF25A", "#FF5D8F"]
+  @inactive_note_color "rgba(109, 122, 140, 0.28)"
   @sharp_note_display %{
     c: "C",
     c_sharp: "C♯",
@@ -336,6 +336,70 @@ defmodule MenschWeb.HomeLive do
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
+      <:navbar_center>
+        <div class="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            id="toggle-loop-full-sample"
+            phx-click="toggle_loop_full_sample"
+            aria-label="Toggle loop"
+            title={if @loop_full_sample, do: "Loop on", else: "Loop off"}
+            aria-pressed={@loop_full_sample}
+            class={[
+              "flex size-9 items-center justify-center border transition-colors duration-150",
+              (@loop_full_sample &&
+                 "border-[#ff9e57] bg-[#ff7a1a]/20 text-[#ffd8be]") ||
+                "border-zinc-600 bg-transparent text-zinc-300 hover:border-[#ff7a1a] hover:text-[#ffd8be]"
+            ]}
+          >
+            <.icon
+              name="hero-arrow-path"
+              class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
+            />
+          </button>
+          <button
+            type="button"
+            id="play-full-sample"
+            aria-label="Play full sample"
+            title="Play"
+            phx-click="play_full_sample"
+            class={[
+              "flex size-9 items-center justify-center border transition-colors duration-150",
+              (@player_status == :playing &&
+                 "border-[#b9ff8a] bg-[#9bf25a]/20 text-[#dfffc7]") ||
+                "border-[#9bf25a]/60 bg-transparent text-[#bff58f] hover:border-[#9bf25a] hover:text-[#dfffc7]"
+            ]}
+          >
+            <.icon name="hero-play-solid" class="size-4" />
+          </button>
+          <button
+            type="button"
+            id="stop-full-sample"
+            aria-label="Stop full sample"
+            title="Stop"
+            phx-click="stop"
+            class={[
+              "flex size-9 items-center justify-center border transition-colors duration-150",
+              (@player_status != :playing &&
+                 "border-white bg-white/15 text-white") ||
+                "border-white/60 bg-transparent text-white/90 hover:border-white hover:text-white"
+            ]}
+          >
+            <.icon name="hero-stop-solid" class="size-4" />
+          </button>
+          <button
+            type="button"
+            id="panic-all-notes"
+            aria-label="Panic stop all notes"
+            title="Panic Stop"
+            phx-click="panic_all_notes"
+            class="flex size-9 items-center justify-center border border-[#ff5d8f]/65 bg-transparent text-[#ff84aa] transition-colors duration-150 hover:border-[#ff5d8f] hover:text-[#ffc0d4]"
+          >
+            <.icon name="hero-exclamation-triangle" class="size-4" />
+          </button>
+        </div>
+      </:navbar_center>
+
       <div class="mx-auto max-w-6xl">
         <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           <aside class="space-y-3 lg:sticky lg:top-6 lg:self-start">
@@ -356,8 +420,8 @@ defmodule MenschWeb.HomeLive do
                   class={[
                     "w-full space-y-1 border px-3 py-2 text-left transition-colors duration-150",
                     (@active_sample_index == index &&
-                       "border-amber-400 bg-amber-500/10") ||
-                      "border-zinc-700/80 bg-zinc-950/55 hover:border-amber-400/80"
+                       "border-[#2fd5c8] bg-[#2fd5c8]/10") ||
+                      "border-zinc-700/80 bg-zinc-950/55 hover:border-[#2fd5c8]/80"
                   ]}
                 >
                   <div class="font-mono text-[12px] text-zinc-100">
@@ -396,14 +460,14 @@ defmodule MenschWeb.HomeLive do
                 <.link
                   id="download-bitwig-mpe-midi"
                   href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
-                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
                 >
                   <.icon name="hero-arrow-down-tray" class="size-4" /> Bitwig MIDI
                 </.link>
                 <.link
                   id="download-mpe-report"
                   href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
-                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
                 >
                   <.icon name="hero-document-text" class="size-4" /> Event Report
                 </.link>
@@ -411,7 +475,7 @@ defmodule MenschWeb.HomeLive do
             </div>
 
             <div class="overflow-x-auto border border-zinc-700/60">
-              <div class="flex items-center justify-end border-b border-zinc-700/60 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-300/90">
+              <div class="flex items-center justify-end border-b border-zinc-700/60 px-2 py-1 text-[10px] uppercase tracking-wide text-[#8fe9e0]">
                 <.icon name="hero-cursor-arrow-rays" class="mr-1 size-3.5" />
                 Click any row to view details
               </div>
@@ -430,7 +494,7 @@ defmodule MenschWeb.HomeLive do
                     :for={{entry, index} <- Enum.with_index(@sample_entries)}
                     phx-click="open_sample_entry_details"
                     phx-value-index={index}
-                    class="group cursor-pointer text-zinc-200 transition-colors duration-150 hover:bg-amber-500/10"
+                    class="group cursor-pointer text-zinc-200 transition-colors duration-150 hover:bg-[#ff7a1a]/10"
                   >
                     <td class="px-2 py-1.5 text-zinc-100">
                       <div class="flex items-center gap-2">
@@ -458,7 +522,7 @@ defmodule MenschWeb.HomeLive do
                       </div>
                     </td>
                     <td class="px-2 py-1.5 text-right">
-                      <span class="inline-flex items-center gap-1 text-zinc-400 transition-colors duration-150 group-hover:text-amber-200">
+                      <span class="inline-flex items-center gap-1 text-zinc-400 transition-colors duration-150 group-hover:text-[#a6f6ef]">
                         <.icon name="hero-eye" class="size-3.5" /> View
                       </span>
                     </td>
@@ -467,84 +531,22 @@ defmodule MenschWeb.HomeLive do
               </table>
             </div>
 
-            <div class="flex items-center justify-center gap-2">
-              <button
-                type="button"
-                id="toggle-loop-full-sample"
-                phx-click="toggle_loop_full_sample"
-                aria-label="Toggle loop"
-                title={if @loop_full_sample, do: "Loop on", else: "Loop off"}
-                aria-pressed={@loop_full_sample}
-                class={[
-                  "flex size-9 items-center justify-center border transition-colors duration-150",
-                  (@loop_full_sample &&
-                     "border-amber-300 bg-amber-500/20 text-amber-100") ||
-                    "border-zinc-600 bg-transparent text-zinc-300 hover:border-amber-400 hover:text-amber-200"
-                ]}
-              >
-                <.icon
-                  name="hero-arrow-path"
-                  class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
-                />
-              </button>
-              <button
-                type="button"
-                id="play-full-sample"
-                aria-label="Play full sample"
-                title="Play"
-                phx-click="play_full_sample"
-                class={[
-                  "flex size-9 items-center justify-center border transition-colors duration-150",
-                  (@player_status == :playing &&
-                     "border-emerald-300 bg-emerald-500/20 text-emerald-100") ||
-                    "border-emerald-500/60 bg-transparent text-emerald-300 hover:border-emerald-400 hover:text-emerald-200"
-                ]}
-              >
-                <.icon name="hero-play-solid" class="size-4" />
-              </button>
-              <button
-                type="button"
-                id="stop-full-sample"
-                aria-label="Stop full sample"
-                title="Stop"
-                phx-click="stop"
-                class={[
-                  "flex size-9 items-center justify-center border transition-colors duration-150",
-                  (@player_status != :playing &&
-                     "border-white bg-white/15 text-white") ||
-                    "border-white/60 bg-transparent text-white/90 hover:border-white hover:text-white"
-                ]}
-              >
-                <.icon name="hero-stop-solid" class="size-4" />
-              </button>
-              <button
-                type="button"
-                id="panic-all-notes"
-                aria-label="Panic stop all notes"
-                title="Panic Stop"
-                phx-click="panic_all_notes"
-                class="flex size-9 items-center justify-center border border-red-500/60 bg-transparent text-red-300 transition-colors duration-150 hover:border-red-400 hover:text-red-200"
-              >
-                <.icon name="hero-exclamation-triangle" class="size-4" />
-              </button>
-            </div>
-
             <.sample_timeline model={@sample_timeline} />
 
-            <div class="flex items-center justify-end">
+            <div class="flex items-center justify-center">
               <button
                 type="button"
                 id="toggle-detail-panel"
                 phx-click="toggle_detail_panel"
+                aria-label="Toggle detail charts"
                 aria-pressed={@show_detail_panel}
-                class={[
-                  "flex h-9 items-center border px-3 text-[11px] uppercase tracking-wide transition-colors duration-150",
-                  (@show_detail_panel &&
-                     "border-amber-500 text-amber-200 ring-1 ring-amber-500/50 bg-amber-500/10") ||
-                    "border-zinc-600 text-zinc-300 hover:border-amber-400 hover:text-amber-200"
-                ]}
+                class="inline-flex items-center gap-1.5 px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500 transition-colors duration-150 hover:text-zinc-300"
               >
-                {if @show_detail_panel, do: "Hide Detail Charts", else: "Show Detail Charts"}
+                <.icon
+                  name={if @show_detail_panel, do: "hero-chevron-up", else: "hero-chevron-down"}
+                  class="size-3.5"
+                />
+                <span>Details</span>
               </button>
             </div>
 
@@ -605,7 +607,7 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2={@model.svg_height}
-          stroke="#5B6472"
+          stroke="var(--ui-grid-subbeat)"
           stroke-opacity="0.3"
           stroke-width="1"
         />
@@ -615,7 +617,7 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2={@model.svg_height}
-          stroke="#7A8596"
+          stroke="var(--ui-grid-beat)"
           stroke-opacity="0.35"
           stroke-width="1"
         />
@@ -625,7 +627,7 @@ defmodule MenschWeb.HomeLive do
           y1="0"
           x2={x}
           y2={@model.svg_height}
-          stroke="#FFB55A"
+          stroke="var(--ui-grid-bar)"
           stroke-opacity="0.4"
           stroke-width="1.2"
         />
@@ -636,7 +638,7 @@ defmodule MenschWeb.HomeLive do
           y={lane.y}
           width={@model.svg_width}
           height={lane.height}
-          fill="#1A202B"
+          fill="var(--ui-timeline-lane)"
           fill-opacity={lane.opacity}
         />
 
@@ -655,7 +657,7 @@ defmodule MenschWeb.HomeLive do
           :for={entry <- @model.entries}
           x={entry.x + 6}
           y={entry.text_y}
-          fill="#D1D8E2"
+          fill="var(--ui-timeline-label)"
           fill-opacity="0.9"
           font-size="10"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
@@ -667,7 +669,7 @@ defmodule MenschWeb.HomeLive do
           :for={{x, bar_number} <- @model.bar_xs}
           x={x + 2}
           y="13"
-          fill="#FFCA87"
+          fill="var(--ui-timeline-bar-label)"
           fill-opacity="0.85"
           font-size="10"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
@@ -681,7 +683,7 @@ defmodule MenschWeb.HomeLive do
           x2={@model.playhead_x}
           y1="0"
           y2={@model.svg_height}
-          stroke="#FFC16B"
+          stroke="var(--ui-playhead)"
           stroke-opacity="0.9"
           stroke-width="1.5"
         />

@@ -43,16 +43,21 @@ defmodule MenschWeb.Layouts do
     default: nil,
     doc: "current global tempo (beats per minute), shared by every chord"
 
+  slot :navbar_center,
+    required: false,
+    doc: "optional centered navbar content, e.g. page transport controls"
+
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
     <header class="border-b border-white/15 px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto flex max-w-6xl items-center justify-between py-4">
+      <div class="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-3 py-4">
         <a href="/" class="flex items-center gap-1.5">
           <img src={~p"/images/logo.svg"} width="20" />
           <span class="text-base font-bold text-white">mensch</span>
         </a>
+        <div class="flex items-center justify-center">{render_slot(@navbar_center)}</div>
         <div class="flex items-center gap-3">
           <form
             :if={@bpm}

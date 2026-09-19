@@ -34,7 +34,7 @@ defmodule MenschWeb.HomeLive.SampleEntryDetailsModalComponent do
           <button
             type="button"
             phx-click="close_sample_entry_details"
-            class="border border-zinc-600 px-2 py-1 text-xs uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-amber-400 hover:text-amber-200"
+            class="border border-zinc-600 px-2 py-1 text-xs uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
           >
             Close
           </button>

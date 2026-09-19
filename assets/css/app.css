@@ -69,4 +69,20 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
+/* Accent palette tuned for dark, hardware-style music UI surfaces. */
+:root {
+   --ui-accent-primary: #ff7a1a;
+   --ui-accent-secondary: #2fd5c8;
+   --ui-accent-tertiary: #75b8ff;
+   --ui-accent-success: #9bf25a;
+   --ui-accent-danger: #ff5d8f;
+   --ui-grid-subbeat: #4f5a69;
+   --ui-grid-beat: #6e7b8d;
+   --ui-grid-bar: #2fd5c8;
+   --ui-timeline-lane: #141b25;
+   --ui-timeline-label: #d4dbe8;
+   --ui-timeline-bar-label: #8fe9e0;
+   --ui-playhead: #ff7a1a;
+}
+
 /* This file is for your main application CSS */
