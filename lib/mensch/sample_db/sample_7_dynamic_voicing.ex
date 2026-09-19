@@ -18,7 +18,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
     %{
       id: "sample-7-dynamic-voicing",
       folder: "Dynamic Voicing",
-      name: "DynamicVoicing · Bb Major Jazz Cycle",
+      name: "Bb Major Jazz Cycle",
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

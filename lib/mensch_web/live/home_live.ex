@@ -21,11 +21,44 @@ defmodule MenschWeb.HomeLive do
   @refresh_interval_ms 33
   @chart_colors ["#FF9F1A", "#C96A00", "#2D8C82", "#4E6E8E", "#B3862C", "#8C5A2B"]
   @inactive_note_color "rgba(122, 133, 150, 0.32)"
+  @sharp_note_display %{
+    c: "C",
+    c_sharp: "C♯",
+    d: "D",
+    d_sharp: "D♯",
+    e: "E",
+    f: "F",
+    f_sharp: "F♯",
+    g: "G",
+    g_sharp: "G♯",
+    a: "A",
+    a_sharp: "A♯",
+    b: "B"
+  }
+  @flat_note_display %{
+    c: "C",
+    c_sharp: "D♭",
+    d: "D",
+    d_sharp: "E♭",
+    e: "E",
+    f: "F",
+    f_sharp: "G♭",
+    g: "G",
+    g_sharp: "A♭",
+    a: "A",
+    a_sharp: "B♭",
+    b: "B"
+  }
 
   @impl true
   def mount(_params, _session, socket) do
     samples = SampleDb.default_samples()
-    active_sample_index = 0
+
+    active_sample_index =
+      Enum.find_index(samples, fn sample ->
+        Map.get(sample, :folder) == "Dynamic Voicing"
+      end) || 0
+
     active_sample = Enum.at(samples, active_sample_index, %{})
     sample_entries = Map.get(active_sample, :sample_entries, [])
 
@@ -651,10 +684,47 @@ defmodule MenschWeb.HomeLive do
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
   # across the whole chord performance.
-  defp debug_rows(frames) do
+  defp debug_rows(frames, sample_entries) do
+    chord_labels_by_entry =
+      sample_entries
+      |> Enum.with_index()
+      |> Map.new(fn {%{chord_spec: chord_spec}, index} ->
+        {index, short_chord_label(chord_spec)}
+      end)
+
+    note_spelling = preferred_note_spelling(sample_entries)
+
     Enum.flat_map(frames, fn frame ->
-      Enum.map(frame.notes, &Map.put(&1, :at_ms, frame.at_ms))
+      Enum.map(frame.notes, fn note ->
+        note
+        |> Map.put(:at_ms, frame.at_ms)
+        |> Map.put(:chord_label, Map.get(chord_labels_by_entry, note.sample_entry_index, "-"))
+        |> Map.put(:note_label, format_note_label(note.note_name, note.octave, note_spelling))
+      end)
     end)
+  end
+
+  defp preferred_note_spelling(sample_entries) when is_list(sample_entries) do
+    roots = Enum.map(sample_entries, fn entry -> entry.chord_spec.root end)
+
+    has_flat_class_root? = Enum.any?(roots, &(&1 in [:a_sharp, :d_sharp, :g_sharp]))
+    has_sharp_class_root? = Enum.any?(roots, &(&1 in [:c_sharp, :f_sharp]))
+
+    if has_flat_class_root? and not has_sharp_class_root? do
+      :flat
+    else
+      :sharp
+    end
+  end
+
+  defp format_note_label(note_name, octave, spelling)
+       when is_atom(note_name) and is_integer(octave) do
+    map = if spelling == :flat, do: @flat_note_display, else: @sharp_note_display
+
+    case Map.fetch(map, note_name) do
+      {:ok, pitch} -> "#{pitch}#{octave}"
+      :error -> "#{note_name}#{octave}"
+    end
   end
 
   defp active_sample_name(samples, active_sample_index)
@@ -693,7 +763,7 @@ defmodule MenschWeb.HomeLive do
         Map.get(sample, :folder, "Unfiled")
       end)
 
-    preferred_order = ["Arp Machine", "Simple Chord", "Legacy"]
+    preferred_order = ["Dynamic Voicing", "Arp Machine", "Simple Chord", "Legacy"]
 
     folder_names =
       preferred_order ++
@@ -1366,7 +1436,7 @@ defmodule MenschWeb.HomeLive do
             detail_total_mbeats
           )
         )
-        |> assign(:debug_rows, debug_rows(frames))
+        |> assign(:debug_rows, debug_rows(frames, socket.assigns.sample_entries))
         |> assign(
           :note_matrix,
           build_note_matrix(

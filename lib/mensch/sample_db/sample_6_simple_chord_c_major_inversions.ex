@@ -15,7 +15,7 @@ defmodule Mensch.SampleDb.Sample6SimpleChordCMajorInversions do
     %{
       id: "sample-6-simple-chord-c-major-inversions",
       folder: "Simple Chord",
-      name: "SimpleChord · C Maj7 Inversions · 2 Beats",
+      name: "C Maj7 Inversions · 2 Beats",
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

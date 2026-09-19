@@ -99,6 +99,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
             <thead class="sticky top-0 bg-zinc-950">
               <tr class="border-b border-zinc-700/60 text-zinc-400">
                 <th class="px-3 py-1.5 font-normal">ms</th>
+                <th class="px-3 py-1.5 font-normal">chord</th>
                 <th class="px-3 py-1.5 font-normal">note</th>
                 <th class="px-3 py-1.5 font-normal">ch</th>
                 <th class="px-3 py-1.5 font-normal">phase</th>
@@ -116,7 +117,10 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 class="border-b border-zinc-800/70 text-zinc-300 last:border-0"
               >
                 <td class="px-3 py-1.5">{row.at_ms}</td>
-                <td class="px-3 py-1.5 text-zinc-100">{row.note_name}{row.octave}</td>
+                <td class="px-3 py-1.5 text-zinc-200">{row.chord_label}</td>
+                <td class="px-3 py-1.5 text-zinc-100">
+                  {Map.get(row, :note_label, "#{row.note_name}#{row.octave}")}
+                </td>
                 <td class="px-3 py-1.5">{row.channel}</td>
                 <td class="px-3 py-1.5">{row.phase}</td>
                 <td class="px-3 py-1.5">{row.note_on}</td>
