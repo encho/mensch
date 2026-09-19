@@ -124,7 +124,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
             </form>
           </div>
         </div>
-        <div class="max-h-48 overflow-y-auto">
+        <div class="max-h-144 overflow-y-auto">
           <table class="w-full text-left font-mono text-[11px]">
             <thead class="sticky top-0 bg-zinc-950">
               <tr class="border-b border-zinc-700/60 text-zinc-400">
