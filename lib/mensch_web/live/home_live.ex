@@ -17,6 +17,7 @@ defmodule MenschWeb.HomeLive do
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
   alias MenschWeb.HomeLive.DetailPanelComponent
+  alias MenschWeb.HomeLive.SampleEntryDetailsModalComponent
 
   @refresh_interval_ms 33
   @chart_colors ["#FF9F1A", "#C96A00", "#2D8C82", "#4E6E8E", "#B3862C", "#8C5A2B"]
@@ -97,6 +98,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
       |> assign(:show_detail_panel, true)
+      |> assign(:selected_sample_entry_index, nil)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
       |> assign_detail_content()
@@ -151,6 +153,7 @@ defmodule MenschWeb.HomeLive do
              )
              |> assign(:render_data, render_data)
              |> assign(:render_scope, :full_sample)
+             |> assign(:selected_sample_entry_index, nil)
              |> assign(:player_status, Player.status())
              |> clear_playback_state(true)
              |> assign(:selected_note_key, nil)
@@ -188,6 +191,20 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("clear_note_focus", _params, socket) do
     {:noreply, socket |> assign(:selected_note_key, nil) |> assign_detail_content()}
+  end
+
+  def handle_event("open_sample_entry_details", %{"index" => index_str}, socket) do
+    selected_sample_entry_index =
+      case Integer.parse(index_str) do
+        {index, ""} when index >= 0 and index < length(socket.assigns.sample_entries) -> index
+        _ -> nil
+      end
+
+    {:noreply, assign(socket, :selected_sample_entry_index, selected_sample_entry_index)}
+  end
+
+  def handle_event("close_sample_entry_details", _params, socket) do
+    {:noreply, assign(socket, :selected_sample_entry_index, nil)}
   end
 
   def handle_event("set_chord_filter", %{"chord_filter" => value}, socket) do
@@ -394,6 +411,10 @@ defmodule MenschWeb.HomeLive do
             </div>
 
             <div class="overflow-x-auto border border-zinc-700/60">
+              <div class="flex items-center justify-end border-b border-zinc-700/60 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-300/90">
+                <.icon name="hero-cursor-arrow-rays" class="mr-1 size-3.5" />
+                Click any row to view details
+              </div>
               <table class="w-full min-w-[980px] text-left font-mono text-[11px]">
                 <thead>
                   <tr class="border-b border-zinc-700/70 text-zinc-400">
@@ -401,10 +422,16 @@ defmodule MenschWeb.HomeLive do
                     <th class="px-2 py-1.5 font-normal">Machine</th>
                     <th class="px-2 py-1.5 font-normal">Start</th>
                     <th class="px-2 py-1.5 font-normal">Duration</th>
+                    <th class="px-2 py-1.5 font-normal text-right">Details</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr :for={{entry, index} <- Enum.with_index(@sample_entries)} class="text-zinc-200">
+                  <tr
+                    :for={{entry, index} <- Enum.with_index(@sample_entries)}
+                    phx-click="open_sample_entry_details"
+                    phx-value-index={index}
+                    class="group cursor-pointer text-zinc-200 transition-colors duration-150 hover:bg-amber-500/10"
+                  >
                     <td class="px-2 py-1.5 text-zinc-100">
                       <div class="flex items-center gap-2">
                         <span
@@ -429,6 +456,11 @@ defmodule MenschWeb.HomeLive do
                       <div class="leading-tight text-zinc-100">
                         {duration_label_primary(@sample_context, entry.timeline_context)}
                       </div>
+                    </td>
+                    <td class="px-2 py-1.5 text-right">
+                      <span class="inline-flex items-center gap-1 text-zinc-400 transition-colors duration-150 group-hover:text-amber-200">
+                        <.icon name="hero-eye" class="size-3.5" /> View
+                      </span>
                     </td>
                   </tr>
                 </tbody>
@@ -534,6 +566,15 @@ defmodule MenschWeb.HomeLive do
               debug_rows={@debug_rows}
               chord_filter_options={@chord_filter_options}
               selected_chord_filter={selected_chord_filter_value(@selected_chord_filter)}
+            />
+
+            <.live_component
+              :if={not is_nil(@selected_sample_entry_index)}
+              module={SampleEntryDetailsModalComponent}
+              id="sample-entry-details-modal"
+              sample_entry={selected_sample_entry(@sample_entries, @selected_sample_entry_index)}
+              sample_entry_index={@selected_sample_entry_index}
+              sample_context={@sample_context}
             />
           </div>
         </div>
@@ -749,6 +790,11 @@ defmodule MenschWeb.HomeLive do
 
   defp selected_chord_filter_value(nil), do: "all"
   defp selected_chord_filter_value(index) when is_integer(index), do: Integer.to_string(index)
+
+  defp selected_sample_entry(sample_entries, selected_index)
+       when is_list(sample_entries) and is_integer(selected_index) do
+    Enum.at(sample_entries, selected_index)
+  end
 
   defp preferred_note_spelling(sample_entries) when is_list(sample_entries) do
     roots = Enum.map(sample_entries, fn entry -> entry.chord_spec.root end)
