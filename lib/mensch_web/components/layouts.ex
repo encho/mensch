@@ -52,55 +52,19 @@ defmodule MenschWeb.Layouts do
   def app(assigns) do
     ~H"""
     <header class="border-b border-white/15 px-4 sm:px-6 lg:px-8">
-      <div class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 py-4">
+      <div class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 py-3">
         <div class="flex items-center gap-3">
           <a href="/" class="flex items-center gap-1.5">
             <img src={~p"/images/logo.svg"} width="20" />
             <span class="text-base font-bold text-white">mensch</span>
           </a>
-
-          <div :if={@midi_status} class="relative">
-            <button
-              type="button"
-              id="midi-status-button"
-              phx-click={JS.toggle(to: "#midi-popup", display: "flex")}
-              class="flex items-center gap-2 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 hover:text-white"
-            >
-              <span class={["inline-block size-2.5 rounded-full", midi_status_dot_class(@midi_status)]} />
-              Osmose
-            </button>
-
-            <div
-              id="midi-popup"
-              phx-click-away={JS.hide(to: "#midi-popup")}
-              class="absolute left-0 top-full z-10 mt-3 hidden w-64 flex-col gap-3 border border-white/15 bg-black p-4"
-            >
-              <div class="flex items-center gap-2">
-                <span class={[
-                  "inline-block size-2 rounded-full",
-                  midi_status_dot_class(@midi_status)
-                ]} />
-                <span class="font-mono text-sm text-white">
-                  {midi_status_label(@midi_status)}
-                </span>
-              </div>
-              <button
-                type="button"
-                id="reconnect-midi"
-                phx-click="reconnect_midi"
-                class="border border-white/40 py-1.5 text-xs font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black"
-              >
-                Reconnect
-              </button>
-            </div>
-          </div>
         </div>
         <div class="flex items-center justify-center">{render_slot(@navbar_center)}</div>
         <div class="flex items-center gap-3">
           <form
             :if={@bpm}
             phx-change="set_bpm"
-            class="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 focus-within:border-white/50"
+            class="ui-radius-btn flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 focus-within:border-white/50"
             title="Global tempo"
           >
             <label for="global-bpm" class="text-white/40">BPM</label>
@@ -113,16 +77,58 @@ defmodule MenschWeb.Layouts do
               class="w-10 appearance-none border-0 bg-transparent p-0 text-right font-mono text-white [appearance:textfield] focus:outline-none focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </form>
-          <button
-            :if={@show_samples_button}
-            type="button"
-            id="open-samples-modal"
-            phx-click="open_samples_modal"
-            aria-label="Open sample library"
-            class="flex size-9 items-center justify-center border border-white/20 text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
-          >
-            <.icon name="hero-bars-3" class="size-4" />
-          </button>
+          <div class="ui-gap-control flex items-center">
+            <div :if={@midi_status} class="relative">
+              <button
+                type="button"
+                id="midi-status-button"
+                phx-click={JS.toggle(to: "#midi-popup", display: "flex")}
+                title="Osmose connection"
+                aria-label="Osmose connection"
+                class="ui-radius-btn relative flex size-9 items-center justify-center border border-white/20 text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
+              >
+                <.icon name="hero-musical-note" class="size-4" />
+                <span class={[
+                  "absolute right-1 top-1 inline-block size-2 rounded-full ring-1 ring-black/60",
+                  midi_status_dot_class(@midi_status)
+                ]} />
+              </button>
+
+              <div
+                id="midi-popup"
+                phx-click-away={JS.hide(to: "#midi-popup")}
+                class="absolute right-0 top-full z-10 mt-3 hidden w-64 flex-col gap-3 border border-white/15 bg-black p-4"
+              >
+                <div class="flex items-center gap-2">
+                  <span class={[
+                    "inline-block size-2 rounded-full",
+                    midi_status_dot_class(@midi_status)
+                  ]} />
+                  <span class="font-mono text-sm text-white">
+                    {midi_status_label(@midi_status)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="reconnect-midi"
+                  phx-click="reconnect_midi"
+                  class="ui-radius-btn border border-white/40 py-1.5 text-xs font-bold uppercase tracking-widest text-white transition-colors duration-150 hover:bg-white hover:text-black"
+                >
+                  Reconnect
+                </button>
+              </div>
+            </div>
+            <button
+              :if={@show_samples_button}
+              type="button"
+              id="open-samples-modal"
+              phx-click="open_samples_modal"
+              aria-label="Open sample library"
+              class="ui-radius-btn flex size-9 items-center justify-center border border-white/20 text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
+            >
+              <.icon name="hero-bars-3" class="size-4" />
+            </button>
+          </div>
         </div>
       </div>
     </header>

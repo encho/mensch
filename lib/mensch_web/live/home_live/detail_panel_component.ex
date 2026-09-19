@@ -14,7 +14,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
               :if={not is_nil(@selected_note_key)}
               type="button"
               phx-click="clear_note_focus"
-              class="border border-zinc-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
+              class="ui-radius-btn border border-zinc-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
             >
               Clear
             </button>
@@ -90,7 +90,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
         )} frames
       </div>
 
-      <div id="debug-frames" class="border border-zinc-700/60">
+      <div id="debug-frames" class="ui-radius-table border border-zinc-700/60">
         <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
           <span>All frames</span>
           <span class="text-[10px] uppercase tracking-wide text-zinc-500">Filtered by active chords</span>

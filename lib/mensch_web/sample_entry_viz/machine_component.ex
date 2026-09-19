@@ -16,7 +16,7 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
       )
 
     ~H"""
-    <section class="border border-zinc-800 bg-zinc-900/50 p-3">
+    <section class="ui-radius-card border border-zinc-800 bg-zinc-900/50 p-3">
       <div class="mb-2 text-[11px] uppercase tracking-wide text-zinc-400">Machine</div>
       <div class="mb-2 font-mono text-[11px] text-zinc-100">{@machine_name}</div>
 

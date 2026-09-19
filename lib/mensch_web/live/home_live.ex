@@ -332,70 +332,6 @@ defmodule MenschWeb.HomeLive do
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} show_samples_button={true}>
-      <:navbar_center>
-        <div class="flex items-center justify-center gap-2">
-          <button
-            type="button"
-            id="toggle-loop-full-sample"
-            phx-click="toggle_loop_full_sample"
-            aria-label="Toggle loop"
-            title={if @loop_full_sample, do: "Loop on", else: "Loop off"}
-            aria-pressed={@loop_full_sample}
-            class={[
-              "flex size-9 items-center justify-center border transition-colors duration-150",
-              (@loop_full_sample &&
-                 "border-[#ff9e57] bg-[#ff7a1a]/20 text-[#ffd8be]") ||
-                "border-zinc-600 bg-transparent text-zinc-300 hover:border-[#ff7a1a] hover:text-[#ffd8be]"
-            ]}
-          >
-            <.icon
-              name="hero-arrow-path"
-              class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
-            />
-          </button>
-          <button
-            type="button"
-            id="play-full-sample"
-            aria-label="Play full sample"
-            title="Play"
-            phx-click="play_full_sample"
-            class={[
-              "flex size-9 items-center justify-center border transition-colors duration-150",
-              (@player_status == :playing &&
-                 "border-[#b9ff8a] bg-[#9bf25a]/20 text-[#dfffc7]") ||
-                "border-[#9bf25a]/60 bg-transparent text-[#bff58f] hover:border-[#9bf25a] hover:text-[#dfffc7]"
-            ]}
-          >
-            <.icon name="hero-play-solid" class="size-4" />
-          </button>
-          <button
-            type="button"
-            id="stop-full-sample"
-            aria-label="Stop full sample"
-            title="Stop"
-            phx-click="stop"
-            class={[
-              "flex size-9 items-center justify-center border transition-colors duration-150",
-              (@player_status != :playing &&
-                 "border-white bg-white/15 text-white") ||
-                "border-white/60 bg-transparent text-white/90 hover:border-white hover:text-white"
-            ]}
-          >
-            <.icon name="hero-stop-solid" class="size-4" />
-          </button>
-          <button
-            type="button"
-            id="panic-all-notes"
-            aria-label="Panic stop all notes"
-            title="Panic Stop"
-            phx-click="panic_all_notes"
-            class="flex size-9 items-center justify-center border border-[#ff5d8f]/65 bg-transparent text-[#ff84aa] transition-colors duration-150 hover:border-[#ff5d8f] hover:text-[#ffc0d4]"
-          >
-            <.icon name="hero-exclamation-triangle" class="size-4" />
-          </button>
-        </div>
-      </:navbar_center>
-
       <div class="w-full">
         <div id="render-section" class="min-w-0 space-y-4">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -412,29 +348,93 @@ defmodule MenschWeb.HomeLive do
               </div>
             </div>
 
-            <div class="flex items-center justify-end gap-2">
-              <.link
-                id="download-bitwig-mpe-midi"
-                href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
-                class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
-              >
-                <.icon name="hero-arrow-down-tray" class="size-4" /> Bitwig MIDI
-              </.link>
-              <.link
-                id="download-mpe-report"
-                href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
-                class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
-              >
-                <.icon name="hero-document-text" class="size-4" /> Event Report
-              </.link>
+            <div class="ui-gap-control flex items-center justify-end">
+              <div class="ui-radius-btn inline-flex h-9 items-center overflow-hidden border border-zinc-600/80">
+                <button
+                  type="button"
+                  id="toggle-loop-full-sample"
+                  phx-click="toggle_loop_full_sample"
+                  aria-label="Toggle loop"
+                  title={if @loop_full_sample, do: "Loop on", else: "Loop off"}
+                  aria-pressed={@loop_full_sample}
+                  class={[
+                    "flex h-9 w-9 items-center justify-center transition-colors duration-150",
+                    (@loop_full_sample &&
+                       "bg-[#ff7a1a]/20 text-[#ffd8be]") ||
+                      "bg-transparent text-zinc-300 hover:bg-[#ff7a1a]/12 hover:text-[#ffd8be]"
+                  ]}
+                >
+                  <.icon
+                    name="hero-arrow-path"
+                    class={["size-4", @loop_full_sample && "motion-safe:animate-spin"]}
+                  />
+                </button>
+                <button
+                  type="button"
+                  id="play-full-sample"
+                  aria-label="Play full sample"
+                  title="Play"
+                  phx-click="play_full_sample"
+                  class={[
+                    "flex h-9 w-9 items-center justify-center border-l border-zinc-600/80 transition-colors duration-150",
+                    (@player_status == :playing &&
+                       "bg-[#9bf25a]/20 text-[#dfffc7]") ||
+                      "bg-transparent text-[#bff58f] hover:bg-[#9bf25a]/12 hover:text-[#dfffc7]"
+                  ]}
+                >
+                  <.icon name="hero-play-solid" class="size-4" />
+                </button>
+                <button
+                  type="button"
+                  id="stop-full-sample"
+                  aria-label="Stop full sample"
+                  title="Stop"
+                  phx-click="stop"
+                  class={[
+                    "flex h-9 w-9 items-center justify-center border-l border-zinc-600/80 transition-colors duration-150",
+                    (@player_status != :playing &&
+                       "bg-white/15 text-white") ||
+                      "bg-transparent text-white/90 hover:bg-white/10 hover:text-white"
+                  ]}
+                >
+                  <.icon name="hero-stop-solid" class="size-4" />
+                </button>
+                <button
+                  type="button"
+                  id="panic-all-notes"
+                  aria-label="Panic stop all notes"
+                  title="Panic Stop"
+                  phx-click="panic_all_notes"
+                  class="flex h-9 w-9 items-center justify-center border-l border-zinc-600/80 bg-transparent text-[#ff84aa] transition-colors duration-150 hover:bg-[#ff5d8f]/12 hover:text-[#ffc0d4]"
+                >
+                  <.icon name="hero-exclamation-triangle" class="size-4" />
+                </button>
+              </div>
+
+              <div class="ui-radius-btn inline-flex h-9 items-center overflow-hidden border border-zinc-600/80">
+                <.link
+                  id="download-bitwig-mpe-midi"
+                  href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
+                  aria-label="Download Bitwig MIDI"
+                  title="Bitwig MIDI"
+                  class="flex h-9 w-9 items-center justify-center text-zinc-300 transition-colors duration-150 hover:bg-[#2fd5c8]/12 hover:text-[#a6f6ef]"
+                >
+                  <.icon name="hero-arrow-down-tray" class="size-4" />
+                </.link>
+                <.link
+                  id="download-mpe-report"
+                  href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
+                  aria-label="Download event report"
+                  title="Event Report"
+                  class="flex h-9 w-9 items-center justify-center border-l border-zinc-600/80 text-zinc-300 transition-colors duration-150 hover:bg-[#2fd5c8]/12 hover:text-[#a6f6ef]"
+                >
+                  <.icon name="hero-document-text" class="size-4" />
+                </.link>
+              </div>
             </div>
           </div>
 
-          <div class="overflow-x-auto border border-zinc-700/60">
-            <div class="flex items-center justify-end border-b border-zinc-700/60 px-2 py-1 text-[10px] uppercase tracking-wide text-[#8fe9e0]">
-              <.icon name="hero-cursor-arrow-rays" class="mr-1 size-3.5" />
-              Click any row to view details
-            </div>
+          <div class="ui-radius-table overflow-x-auto border border-zinc-700/60">
             <table class="w-full min-w-[760px] text-left font-mono text-[10px] sm:text-[11px]">
               <thead>
                 <tr class="border-b border-zinc-700/70 text-zinc-400">
@@ -448,7 +448,7 @@ defmodule MenschWeb.HomeLive do
               <tbody>
                 <tr
                   :for={{entry, index} <- Enum.with_index(@sample_entries)}
-                  class="group text-zinc-200 transition-colors duration-150 hover:bg-[#ff7a1a]/10"
+                  class="group text-zinc-200 transition-colors duration-150 hover:bg-[#2fd5c8]/12"
                 >
                   <td
                     class="cursor-pointer px-1.5 py-1.5 text-zinc-100"
@@ -523,7 +523,7 @@ defmodule MenschWeb.HomeLive do
 
           <.sample_timeline model={@sample_timeline} />
 
-          <div class="flex items-center justify-center">
+          <div class="-mb-2 flex items-center justify-center">
             <button
               type="button"
               id="toggle-detail-panel"
@@ -580,7 +580,7 @@ defmodule MenschWeb.HomeLive do
             class="absolute inset-0"
           ></button>
 
-          <div class="relative w-full max-w-md border border-zinc-700/70 bg-zinc-950/95 p-4 shadow-2xl">
+          <div class="ui-radius-modal relative w-full max-w-md border border-zinc-700/70 bg-zinc-950/95 p-4 shadow-2xl">
             <div class="mb-3 flex items-center justify-between">
               <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-300">
                 <.icon name="hero-queue-list" class="size-4" /> Sample Library
@@ -588,7 +588,7 @@ defmodule MenschWeb.HomeLive do
               <button
                 type="button"
                 phx-click="close_samples_modal"
-                class="flex size-8 items-center justify-center border border-zinc-700 text-zinc-300 transition-colors duration-150 hover:border-zinc-500 hover:text-white"
+                class="ui-radius-btn flex size-8 items-center justify-center border border-zinc-700 text-zinc-300 transition-colors duration-150 hover:border-zinc-500 hover:text-white"
               >
                 <.icon name="hero-x-mark" class="size-4" />
               </button>
@@ -605,7 +605,7 @@ defmodule MenschWeb.HomeLive do
                   phx-click="activate_sample"
                   phx-value-index={index}
                   class={[
-                    "w-full space-y-1 border px-3 py-2 text-left transition-colors duration-150",
+                    "ui-radius-btn w-full space-y-1 border px-3 py-2 text-left transition-colors duration-150",
                     (@active_sample_index == index &&
                        "border-[#2fd5c8] bg-[#2fd5c8]/10") ||
                       "border-zinc-700/80 bg-zinc-950/55 hover:border-[#2fd5c8]/80"

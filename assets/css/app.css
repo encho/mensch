@@ -76,6 +76,11 @@
    --ui-accent-tertiary: #75b8ff;
    --ui-accent-success: #9bf25a;
    --ui-accent-danger: #ff5d8f;
+   --ui-control-gap: 0.5rem;
+   --ui-radius-button: 0.2rem;
+   --ui-radius-modal: 0.42rem;
+   --ui-radius-card: 0.34rem;
+   --ui-radius-table: 0.3rem;
    --ui-grid-subbeat: #4f5a69;
    --ui-grid-beat: #6e7b8d;
    --ui-grid-bar: #2fd5c8;
@@ -83,6 +88,26 @@
    --ui-timeline-label: #d4dbe8;
    --ui-timeline-bar-label: #8fe9e0;
    --ui-playhead: #ff7a1a;
+}
+
+.ui-radius-btn {
+   border-radius: var(--ui-radius-button);
+}
+
+.ui-radius-modal {
+   border-radius: var(--ui-radius-modal);
+}
+
+.ui-radius-card {
+   border-radius: var(--ui-radius-card);
+}
+
+.ui-radius-table {
+   border-radius: var(--ui-radius-table);
+}
+
+.ui-gap-control {
+   gap: var(--ui-control-gap);
 }
 
 /* This file is for your main application CSS */

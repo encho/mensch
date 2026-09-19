@@ -13,7 +13,7 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
       )
 
     ~H"""
-    <section class="border border-zinc-800 bg-zinc-900/50 p-3">
+    <section class="ui-radius-card border border-zinc-800 bg-zinc-900/50 p-3">
       <div class="mb-2 text-[11px] uppercase tracking-wide text-zinc-400">ChordSpec</div>
 
       <dl class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-zinc-200">
