@@ -87,7 +87,7 @@
    --ui-timeline-lane: #141b25;
    --ui-timeline-label: #d4dbe8;
    --ui-timeline-bar-label: #8fe9e0;
-   --ui-playhead: var(--ui-accent-secondary);
+   --ui-playhead: #d1d5db;
 }
 
 .ui-radius-btn {

@@ -25,8 +25,8 @@ defmodule Mensch.SampleDb do
   @default_frame_mbeats 50
 
   @samples [
-    Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample6SimpleChordCMajorInversions.sample(@default_frame_mbeats),
+    Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample7DynamicVoicing.sample(@default_frame_mbeats),
     Sample9DynamicVoicingCMajor.sample(@default_frame_mbeats),
     Sample8DynamicVoicingOneBar.sample(@default_frame_mbeats),

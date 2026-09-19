@@ -109,6 +109,25 @@ defmodule MenschWeb.HomeLive do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    sample_param = Map.get(params, "sample")
+
+    socket =
+      case sample_index_from_param(socket.assigns.samples, sample_param) do
+        nil ->
+          socket
+
+        index when index == socket.assigns.active_sample_index ->
+          socket
+
+        index ->
+          assign_active_sample(socket, index)
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("play_full_sample", _params, socket) do
     {:noreply,
      socket
@@ -139,28 +158,8 @@ defmodule MenschWeb.HomeLive do
     case Integer.parse(index_str) do
       {index, ""} ->
         case Enum.at(socket.assigns.samples, index) do
-          %{sample_entries: sample_entries, sample_context: sample_context} ->
-            Player.stop()
-            render_data = PerformanceAssembler.generate_sample(sample_entries, sample_context)
-
-            {:noreply,
-             socket
-             |> assign(:active_sample_index, index)
-             |> assign(:sample_entries, sample_entries)
-             |> assign(:active_chord_indices, all_chord_indices(sample_entries))
-             |> assign(:sample_context, sample_context)
-             |> assign(
-               :sample_timeline_static,
-               sample_timeline_static_model(sample_entries, sample_context)
-             )
-             |> assign(:render_data, render_data)
-             |> assign(:render_scope, :full_sample)
-             |> assign(:selected_sample_entry_index, nil)
-             |> assign(:show_samples_modal, false)
-             |> assign(:player_status, Player.status())
-             |> clear_playback_state(true)
-             |> assign(:selected_note_key, nil)
-             |> assign_detail_content()}
+          %{id: sample_id} when is_binary(sample_id) and sample_id != "" ->
+            {:noreply, push_patch(socket, to: ~p"/?sample=#{sample_id}")}
 
           _ ->
             {:noreply, socket}
@@ -514,9 +513,9 @@ defmodule MenschWeb.HomeLive do
                       class={[
                         "inline-flex size-5 items-center justify-center rounded-sm border transition-colors duration-150",
                         chord_active?(@active_chord_indices, index) &&
-                          "border-[#2fd5c8] bg-[#2fd5c8]/20 text-[#a6f6ef]",
+                          "border-zinc-200 bg-zinc-100/15 text-zinc-100",
                         !chord_active?(@active_chord_indices, index) &&
-                          "border-zinc-600 text-zinc-400 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
+                          "border-zinc-600 text-zinc-400 hover:border-zinc-300 hover:text-zinc-200"
                       ]}
                     >
                       <.icon
@@ -851,6 +850,42 @@ defmodule MenschWeb.HomeLive do
     |> assign(:playhead_pct, nil)
     |> assign(:playback_ref, nil)
     |> assign(:manual_stop, manual_stop)
+  end
+
+  defp sample_index_from_param(samples, sample_id)
+       when is_list(samples) and is_binary(sample_id) do
+    Enum.find_index(samples, fn sample -> Map.get(sample, :id) == sample_id end)
+  end
+
+  defp sample_index_from_param(_samples, _sample_id), do: nil
+
+  defp assign_active_sample(socket, index) when is_integer(index) do
+    case Enum.at(socket.assigns.samples, index) do
+      %{sample_entries: sample_entries, sample_context: sample_context} ->
+        Player.stop()
+        render_data = PerformanceAssembler.generate_sample(sample_entries, sample_context)
+
+        socket
+        |> assign(:active_sample_index, index)
+        |> assign(:sample_entries, sample_entries)
+        |> assign(:active_chord_indices, all_chord_indices(sample_entries))
+        |> assign(:sample_context, sample_context)
+        |> assign(
+          :sample_timeline_static,
+          sample_timeline_static_model(sample_entries, sample_context)
+        )
+        |> assign(:render_data, render_data)
+        |> assign(:render_scope, :full_sample)
+        |> assign(:selected_sample_entry_index, nil)
+        |> assign(:show_samples_modal, false)
+        |> assign(:player_status, Player.status())
+        |> clear_playback_state(true)
+        |> assign(:selected_note_key, nil)
+        |> assign_detail_content()
+
+      _ ->
+        socket
+    end
   end
 
   defp playhead_pct(:playing, play_started_at, duration_ms)
