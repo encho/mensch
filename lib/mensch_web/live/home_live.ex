@@ -11,6 +11,8 @@ defmodule MenschWeb.HomeLive do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.Machines.DynamicVoicing
+  alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.Player
   alias Mensch.PerformanceAssembler
   alias Mensch.SampleDb
@@ -66,7 +68,8 @@ defmodule MenschWeb.HomeLive do
     sample_context =
       Map.get(active_sample, :sample_context, SampleDb.default_sample_context())
 
-    render_data = PerformanceAssembler.generate_sample(sample_entries, sample_context)
+    {render_data, sample_warning} =
+      render_data_and_warning(sample_entries, sample_context)
 
     socket =
       socket
@@ -75,7 +78,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)
       |> assign(:playing_duration_ms, nil)
-      |> assign(:playhead_pct, nil)
+      |> assign(:timeline_current_bar, nil)
       |> assign(:playback_ref, nil)
       |> assign(:pressure_chart, [])
       |> assign(:slide_chart, [])
@@ -90,6 +93,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:sample_entries, sample_entries)
       |> assign(:active_chord_indices, all_chord_indices(sample_entries))
       |> assign(:sample_context, sample_context)
+      |> assign(:sample_warning, sample_warning)
       |> assign(
         :sample_timeline_static,
         sample_timeline_static_model(sample_entries, sample_context)
@@ -244,17 +248,6 @@ defmodule MenschWeb.HomeLive do
     {:noreply, socket}
   end
 
-  def handle_event("panic_all_notes", _params, socket) do
-    Player.panic()
-
-    socket =
-      socket
-      |> assign(:player_status, Player.status())
-      |> clear_playback_state(true)
-
-    {:noreply, socket}
-  end
-
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
   end
@@ -279,17 +272,20 @@ defmodule MenschWeb.HomeLive do
 
       cond do
         status == :playing ->
-          socket =
-            socket
-            |> assign(:player_status, status)
-            |> assign(
-              :playhead_pct,
+          timeline_current_bar =
+            timeline_current_bar_for_playback(
+              socket,
               playhead_pct(
                 status,
                 socket.assigns.play_started_at,
                 socket.assigns.playing_duration_ms
               )
             )
+
+          socket =
+            socket
+            |> assign(:player_status, status)
+            |> assign(:timeline_current_bar, timeline_current_bar)
 
           Process.send_after(self(), {:refresh_player, refresh_ref}, @refresh_interval_ms)
           {:noreply, socket}
@@ -334,10 +330,10 @@ defmodule MenschWeb.HomeLive do
       assign(
         assigns,
         :sample_timeline,
-        sample_timeline_with_playhead(
+        sample_timeline_with_current_bar(
           assigns.sample_timeline_static,
           assigns.render_scope,
-          assigns.playhead_pct,
+          assigns.timeline_current_bar,
           assigns.active_chord_indices
         )
       )
@@ -411,16 +407,6 @@ defmodule MenschWeb.HomeLive do
                 >
                   <.icon name="hero-stop-solid" class="size-4" />
                 </button>
-                <button
-                  type="button"
-                  id="panic-all-notes"
-                  aria-label="Panic stop all notes"
-                  title="Panic Stop"
-                  phx-click="panic_all_notes"
-                  class="flex h-9 w-9 items-center justify-center border-l border-zinc-600/80 bg-transparent text-[#ff84aa] transition-colors duration-150 hover:bg-[#ff5d8f]/12 hover:text-[#ffc0d4]"
-                >
-                  <.icon name="hero-exclamation-triangle" class="size-4" />
-                </button>
               </div>
 
               <div class="ui-radius-btn inline-flex h-9 items-center overflow-hidden border border-zinc-600/80">
@@ -444,6 +430,14 @@ defmodule MenschWeb.HomeLive do
                 </.link>
               </div>
             </div>
+          </div>
+
+          <div
+            :if={is_binary(@sample_warning)}
+            class="ui-radius-btn flex w-full items-start gap-2 border border-amber-300/60 bg-amber-500/12 px-3 py-2 font-mono text-[11px] text-amber-100"
+          >
+            <.icon name="hero-exclamation-triangle" class="mt-0.5 size-4 shrink-0 text-amber-200" />
+            <span>{@sample_warning}</span>
           </div>
 
           <div class="ui-radius-table overflow-x-auto border border-zinc-700/60">
@@ -695,11 +689,11 @@ defmodule MenschWeb.HomeLive do
         />
 
         <circle
-          :for={{x, _bar_number} <- @model.bar_xs}
+          :for={{x, bar_number} <- @model.bar_xs}
           cx={x}
           cy="10"
           r="6.5"
-          fill="#000000"
+          fill={if active_bar_marker?(bar_number, @model.current_bar), do: "#FFFFFF", else: "#000000"}
           fill-opacity="0.95"
           stroke="var(--ui-grid-bar)"
           stroke-opacity="0.9"
@@ -743,7 +737,7 @@ defmodule MenschWeb.HomeLive do
           :for={{x, bar_number} <- @model.bar_xs}
           x={x}
           y="10"
-          fill="#d1d5db"
+          fill={if active_bar_marker?(bar_number, @model.current_bar), do: "#000000", else: "#d1d5db"}
           fill-opacity="0.95"
           text-anchor="middle"
           dominant-baseline="middle"
@@ -753,15 +747,14 @@ defmodule MenschWeb.HomeLive do
           B{bar_number}
         </text>
 
-        <line
-          :if={not is_nil(@model.playhead_x)}
-          x1={@model.playhead_x}
-          x2={@model.playhead_x}
-          y1="0"
-          y2={@model.svg_height}
-          stroke="var(--ui-playhead)"
-          stroke-opacity="0.9"
-          stroke-width="1.5"
+        <rect
+          :for={region <- @model.current_bar_regions}
+          x={region.x}
+          y="0"
+          width={region.width}
+          height={@model.svg_height}
+          fill="var(--ui-playhead)"
+          fill-opacity="0.1"
         />
       </svg>
 
@@ -787,16 +780,33 @@ defmodule MenschWeb.HomeLive do
     |> assign(:play_started_at, play_started_at)
     |> assign(:playing_duration_ms, playing_duration_ms)
     |> assign(:playback_ref, playback_ref)
-    |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, playing_duration_ms))
+    |> assign(
+      :timeline_current_bar,
+      timeline_current_bar_for_playback(
+        socket,
+        playhead_pct(:playing, play_started_at, playing_duration_ms)
+      )
+    )
   end
 
   defp start_active_playback(socket) do
     case active_playback_render_data(socket) do
-      nil ->
+      {:empty, _message, _entries} ->
         socket
 
-      render_data ->
-        start_playback(socket, render_data)
+      {:ok, render_data, entries} ->
+        socket
+        |> assign(
+          :sample_warning,
+          cycle_frame_balance_warning(entries, socket.assigns.sample_context)
+        )
+        |> start_playback(render_data)
+
+      {:error, message, _entries} ->
+        socket
+        |> assign(:sample_warning, message)
+        |> assign(:player_status, Player.status())
+        |> clear_playback_state(true)
     end
   end
 
@@ -809,8 +819,14 @@ defmodule MenschWeb.HomeLive do
       )
 
     case active_entries do
-      [] -> nil
-      entries -> PerformanceAssembler.generate_sample(entries, socket.assigns.sample_context)
+      [] ->
+        {:empty, nil, active_entries}
+
+      entries ->
+        case generate_sample_safe(entries, socket.assigns.sample_context) do
+          {:ok, render_data} -> {:ok, render_data, entries}
+          {:error, message} -> {:error, message, entries}
+        end
     end
   end
 
@@ -847,7 +863,7 @@ defmodule MenschWeb.HomeLive do
     socket
     |> assign(:play_started_at, nil)
     |> assign(:playing_duration_ms, nil)
-    |> assign(:playhead_pct, nil)
+    |> assign(:timeline_current_bar, nil)
     |> assign(:playback_ref, nil)
     |> assign(:manual_stop, manual_stop)
   end
@@ -863,13 +879,16 @@ defmodule MenschWeb.HomeLive do
     case Enum.at(socket.assigns.samples, index) do
       %{sample_entries: sample_entries, sample_context: sample_context} ->
         Player.stop()
-        render_data = PerformanceAssembler.generate_sample(sample_entries, sample_context)
+
+        {render_data, sample_warning} =
+          render_data_and_warning(sample_entries, sample_context)
 
         socket
         |> assign(:active_sample_index, index)
         |> assign(:sample_entries, sample_entries)
         |> assign(:active_chord_indices, all_chord_indices(sample_entries))
         |> assign(:sample_context, sample_context)
+        |> assign(:sample_warning, sample_warning)
         |> assign(
           :sample_timeline_static,
           sample_timeline_static_model(sample_entries, sample_context)
@@ -887,6 +906,86 @@ defmodule MenschWeb.HomeLive do
         socket
     end
   end
+
+  defp generate_sample_safe(sample_entries, %SampleContext{} = sample_context) do
+    try do
+      {:ok, PerformanceAssembler.generate_sample(sample_entries, sample_context)}
+    rescue
+      error in [ArgumentError, RuntimeError] -> {:error, Exception.message(error)}
+    end
+  end
+
+  defp render_data_and_warning(sample_entries, %SampleContext{} = sample_context) do
+    case generate_sample_safe(sample_entries, sample_context) do
+      {:ok, data} ->
+        {data, cycle_frame_balance_warning(sample_entries, sample_context)}
+
+      {:error, message} ->
+        {nil, message}
+    end
+  end
+
+  defp cycle_frame_balance_warning(sample_entries, %SampleContext{} = sample_context)
+       when is_list(sample_entries) do
+    current_frame_mbeats = SampleContext.frame_mbeats(sample_context)
+
+    sample_entries
+    |> Enum.with_index()
+    |> Enum.find_value(fn {entry, entry_index} ->
+      cycle_frame_warning_for_entry(entry, entry_index, current_frame_mbeats)
+    end)
+  end
+
+  defp cycle_frame_warning_for_entry(
+         %{
+           machine: %DynamicVoicing{params: params},
+           timeline_context: %TimelineContext{} = timeline
+         },
+         entry_index,
+         current_frame_mbeats
+       )
+       when is_struct(params, DynamicVoicingParams) do
+    with {:ok, {_cycle_mode, cycle_count}} <- normalize_cycle_direction(params.direction),
+         {:ok, inversion_count} <- normalize_cycle_inversion_count(params.number_of_inversions) do
+      duration_mbeats = TimelineContext.duration_mbeats(timeline)
+      snapped_duration_mbeats = snap_mbeats(duration_mbeats, current_frame_mbeats)
+      total_frames = max(div(snapped_duration_mbeats, current_frame_mbeats), 1)
+      step_span = inversion_count - 1
+      requested_voicings = step_span * 2 * cycle_count + 1
+
+      cond do
+        requested_voicings > total_frames ->
+          nil
+
+        rem(total_frames, requested_voicings) == 0 ->
+          nil
+
+        true ->
+          remainder = rem(total_frames, requested_voicings)
+
+          "Cycle timing warning (entry #{entry_index + 1}): #{requested_voicings} voicings are spread over #{total_frames} frames at frame_mbeats=#{current_frame_mbeats} (remainder #{remainder}), so slot lengths are uneven and may look asymmetric."
+      end
+    else
+      _ ->
+        nil
+    end
+  end
+
+  defp cycle_frame_warning_for_entry(_entry, _entry_index, _current_frame_mbeats), do: nil
+
+  defp normalize_cycle_direction({mode, cycle_count})
+       when mode in [:cycle_up, :cycle_down] and is_integer(cycle_count) and cycle_count >= 1,
+       do: {:ok, {mode, cycle_count}}
+
+  defp normalize_cycle_direction(_other), do: :error
+
+  defp normalize_cycle_inversion_count(inversion_count)
+       when is_integer(inversion_count) and inversion_count >= 2,
+       do: {:ok, inversion_count}
+
+  defp normalize_cycle_inversion_count(_other), do: :error
+
+  defp snap_mbeats(mbeats, frame_mbeats), do: round(mbeats / frame_mbeats) * frame_mbeats
 
   defp playhead_pct(:playing, play_started_at, duration_ms)
        when is_integer(duration_ms) and duration_ms > 0 and not is_nil(play_started_at) do
@@ -1198,6 +1297,27 @@ defmodule MenschWeb.HomeLive do
     "#{musical_label} · #{duration_ms}ms"
   end
 
+  defp timeline_current_bar_for_playback(socket, playhead_pct) do
+    case socket.assigns.sample_timeline_static do
+      %{
+        source_entries: source_entries,
+        total_mbeats: total_mbeats,
+        mbeats_per_bar: mbeats_per_bar
+      } ->
+        timeline_current_bar_index(
+          playhead_pct,
+          socket.assigns.render_scope,
+          source_entries,
+          total_mbeats,
+          mbeats_per_bar,
+          socket.assigns.active_chord_indices
+        )
+
+      _ ->
+        nil
+    end
+  end
+
   defp sample_timeline_static_model(sample_entries, %SampleContext{} = sample_context) do
     svg_width = 1000
     lane_height = 22
@@ -1283,31 +1403,40 @@ defmodule MenschWeb.HomeLive do
       bar_xs:
         timeline_xs(total_mbeats, mbeats_per_bar)
         |> Enum.with_index(1),
+      mbeats_per_bar: mbeats_per_bar,
       row_count: row_count,
       bar_count: bar_count,
       beat_count: beat_count,
-      total_mbeats: total_mbeats
+      total_mbeats: total_mbeats,
+      current_bar_regions: [],
+      current_bar: nil
     }
   end
 
-  defp sample_timeline_with_playhead(nil, _render_scope, _playhead_pct, _active_chord_indices),
-    do: nil
+  defp sample_timeline_with_current_bar(
+         nil,
+         _render_scope,
+         _timeline_current_bar,
+         _active_chord_indices
+       ),
+       do: nil
 
-  defp sample_timeline_with_playhead(
+  defp sample_timeline_with_current_bar(
          %{
            source_entries: source_entries,
-           total_mbeats: total_mbeats
+           total_mbeats: total_mbeats,
+           mbeats_per_bar: mbeats_per_bar
          } = model,
          render_scope,
-         playhead_pct,
+         timeline_current_bar,
          active_chord_indices
        ) do
-    playhead_x =
-      timeline_playhead_x(
-        playhead_pct,
-        render_scope,
-        source_entries,
+    current_bar_regions =
+      timeline_current_bar_region(
+        timeline_current_bar,
         total_mbeats,
+        mbeats_per_bar,
+        render_scope,
         active_chord_indices
       )
 
@@ -1344,7 +1473,8 @@ defmodule MenschWeb.HomeLive do
 
     model
     |> Map.put(:entries, styled_entries)
-    |> Map.put(:playhead_x, playhead_x)
+    |> Map.put(:current_bar_regions, current_bar_regions)
+    |> Map.put(:current_bar, timeline_current_bar)
   end
 
   defp timeline_entry_state(true, _in_window), do: :active
@@ -1359,14 +1489,22 @@ defmodule MenschWeb.HomeLive do
   defp timeline_entry_text_fill(:inactive_in_window), do: "#7D8898"
   defp timeline_entry_text_fill(:inactive_outside_window), do: "#626D7D"
 
-  defp timeline_playhead_x(nil, _render_scope, _entries, _total_mbeats, _active_chord_indices),
-    do: nil
+  defp timeline_current_bar_index(
+         nil,
+         _render_scope,
+         _entries,
+         _total_mbeats,
+         _mbeats_per_bar,
+         _active_chord_indices
+       ),
+       do: nil
 
-  defp timeline_playhead_x(
+  defp timeline_current_bar_index(
          playhead_pct,
          :full_sample,
          entries,
          total_mbeats,
+         mbeats_per_bar,
          active_chord_indices
        )
        when is_number(playhead_pct) do
@@ -1379,7 +1517,7 @@ defmodule MenschWeb.HomeLive do
 
     case active_entries do
       [] ->
-        mbeat_to_svg_x(total_mbeats * (clamped_pct / 100), total_mbeats)
+        bar_index_from_mbeat(total_mbeats * (clamped_pct / 100), total_mbeats, mbeats_per_bar)
 
       _ ->
         total_active_mbeats =
@@ -1405,37 +1543,82 @@ defmodule MenschWeb.HomeLive do
           end)
           |> elem(1)
 
-        mbeat_to_svg_x(absolute_playhead_mbeat, total_mbeats)
+        bar_index_from_mbeat(absolute_playhead_mbeat, total_mbeats, mbeats_per_bar)
     end
   end
 
-  defp timeline_playhead_x(
+  defp timeline_current_bar_index(
          playhead_pct,
          {:entry, index},
          entries,
          total_mbeats,
+         mbeats_per_bar,
          _active_chord_indices
        )
        when is_number(playhead_pct) and is_integer(index) do
     case Enum.at(entries, index) do
       %{start_mbeat: start_mbeat, end_mbeat: end_mbeat} ->
-        start_x = mbeat_to_svg_x(start_mbeat, total_mbeats)
-        end_x = mbeat_to_svg_x(end_mbeat, total_mbeats)
-        Float.round(start_x + (end_x - start_x) * (playhead_pct / 100), 2)
+        absolute_playhead_mbeat =
+          start_mbeat + max(end_mbeat - start_mbeat, 0) * (max(min(playhead_pct, 100), 0) / 100)
+
+        bar_index_from_mbeat(absolute_playhead_mbeat, total_mbeats, mbeats_per_bar)
 
       _ ->
         nil
     end
   end
 
-  defp timeline_playhead_x(
+  defp timeline_current_bar_index(
          _playhead_pct,
          _render_scope,
          _entries,
          _total_mbeats,
+         _mbeats_per_bar,
          _active_chord_indices
        ),
        do: nil
+
+  defp timeline_current_bar_region(
+         timeline_current_bar,
+         total_mbeats,
+         mbeats_per_bar,
+         _render_scope,
+         _active_chord_indices
+       )
+       when is_integer(timeline_current_bar) and timeline_current_bar >= 0 do
+    bar_start_mbeat = timeline_current_bar * mbeats_per_bar
+    bar_end_mbeat = min(bar_start_mbeat + mbeats_per_bar, total_mbeats)
+    x = mbeat_to_svg_x(bar_start_mbeat, total_mbeats)
+    width = max(mbeat_to_svg_x(bar_end_mbeat, total_mbeats) - x, 1)
+
+    [%{x: x, width: width}]
+  end
+
+  defp timeline_current_bar_region(
+         _timeline_current_bar,
+         _total_mbeats,
+         _mbeats_per_bar,
+         _render_scope,
+         _active_chord_indices
+       ),
+       do: []
+
+  defp bar_index_from_mbeat(playhead_mbeat, total_mbeats, mbeats_per_bar)
+       when is_number(playhead_mbeat) do
+    clamped_mbeat = max(min(playhead_mbeat, total_mbeats), 0)
+    bar_count = max(div(total_mbeats + mbeats_per_bar - 1, mbeats_per_bar), 1)
+
+    clamped_mbeat
+    |> floor()
+    |> div(mbeats_per_bar)
+    |> min(bar_count - 1)
+  end
+
+  defp active_bar_marker?(bar_number, current_bar)
+       when is_integer(bar_number) and is_integer(current_bar) and current_bar >= 0,
+       do: bar_number == current_bar + 1
+
+  defp active_bar_marker?(_bar_number, _current_bar), do: false
 
   defp timeline_color(index) do
     Enum.at(@chart_colors, rem(index, length(@chart_colors)))

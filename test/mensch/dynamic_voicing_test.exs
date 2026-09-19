@@ -91,6 +91,72 @@ defmodule Mensch.DynamicVoicingTest do
     assert Enum.count(Map.values(off_events), &(&1 == 3000)) == 3
   end
 
+  test "cycle_up direction bounces to top and back for one cycle" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 1000})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 5000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{direction: {:cycle_up, 1}, number_of_inversions: 3}
+      }
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    boundary_note_ons = transition_note_ons_by_mbeat(rendered.frames)
+
+    assert boundary_note_ons == %{1000 => 72, 2000 => 76, 3000 => 64, 4000 => 60}
+  end
+
+  test "cycle_down direction bounces for configured cycle count" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 1000})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 5000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{direction: {:cycle_down, 2}, number_of_inversions: 2}
+      }
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    boundary_note_ons = transition_note_ons_by_mbeat(rendered.frames)
+
+    assert boundary_note_ons == %{1000 => 55, 2000 => 67, 3000 => 55, 4000 => 67}
+  end
+
+  test "cycle modes fail validation when requested voicings exceed frame budget" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{direction: {:cycle_up, 2}, number_of_inversions: 24}
+      }
+
+    assert_raise ArgumentError, ~r/requested .* voicings but only .* frame slots/, fn ->
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+    end
+  end
+
   test "pressure LFO additive mode applies adsr-scaled modulation" do
     baseline_machine = baseline_lfo_machine()
 
@@ -298,6 +364,21 @@ defmodule Mensch.DynamicVoicingTest do
     |> round()
     |> min(127)
     |> max(0)
+  end
+
+  defp transition_note_ons_by_mbeat(frames) do
+    frames
+    |> Enum.reduce(%{}, fn frame, acc ->
+      note_ons = Enum.filter(frame.notes, & &1.note_on)
+
+      case note_ons do
+        [note] when frame.at_mbeat > 0 ->
+          Map.put(acc, frame.at_mbeat, note.midi_note)
+
+        _ ->
+          acc
+      end
+    end)
   end
 
   defp pressures_by_at_mbeat(machine, start_mbeat \\ 0) do

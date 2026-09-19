@@ -55,7 +55,12 @@ defmodule Mensch.Machines.DynamicVoicing do
     %DynamicVoicingParams{} = params = machine_params!(opts) |> hydrate_params()
 
     direction = normalize_direction!(params.direction)
-    requested_voicing_count = normalize_number_of_inversions!(params.number_of_inversions)
+
+    inversion_count =
+      params.number_of_inversions
+      |> normalize_number_of_inversions!()
+      |> validate_inversion_count_for_direction!(direction)
+
     pressure_lfo = normalize_lfo_pressure!(params.lfo_pressure)
 
     # Quantization step for this render: how many mbeats each frame advances.
@@ -69,9 +74,14 @@ defmodule Mensch.Machines.DynamicVoicing do
       |> snap_mbeats(frame_mbeats)
 
     voicing_count =
-      effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats)
+      effective_voicing_count(
+        requested_voicing_count(direction, inversion_count),
+        chord_duration_mbeats,
+        frame_mbeats
+      )
 
-    voicings = build_voicing_sequence(chord_spec, direction, voicing_count)
+    voicings = build_voicing_sequence(chord_spec, direction, inversion_count, voicing_count)
+
     slot_boundaries = build_slot_boundaries(chord_duration_mbeats, voicing_count, frame_mbeats)
 
     planned_notes =
@@ -108,18 +118,77 @@ defmodule Mensch.Machines.DynamicVoicing do
     }
   end
 
-  defp build_voicing_sequence(%ChordSpec{} = chord_spec, direction, voicing_count) do
+  defp build_voicing_sequence(
+         %ChordSpec{} = chord_spec,
+         direction,
+         inversion_count,
+         voicing_count
+       ) do
     first_voicing = ChordSpec.to_midi_notes(chord_spec) |> Enum.sort()
+
+    cycle_step_span = cycle_step_span(direction, inversion_count)
 
     if voicing_count == 1 do
       [first_voicing]
     else
       1..(voicing_count - 1)
-      |> Enum.reduce([first_voicing], fn _step, [current | _] = acc ->
-        [next_voicing(current, direction) | acc]
+      |> Enum.reduce([first_voicing], fn step, [current | _] = acc ->
+        transition_direction = direction_for_step(direction, cycle_step_span, step - 1)
+        [next_voicing(current, transition_direction) | acc]
       end)
       |> Enum.reverse()
     end
+  end
+
+  defp direction_for_step(:up, _inversion_distance, _step_index), do: :up
+  defp direction_for_step(:down, _inversion_distance, _step_index), do: :down
+
+  defp direction_for_step({mode, _cycle_count}, step_span, step_index)
+       when mode in [:cycle_up, :cycle_down] and is_integer(step_span) and
+              step_span >= 1 and is_integer(step_index) and step_index >= 0 do
+    base_direction = if mode == :cycle_up, do: :up, else: :down
+    phase = div(step_index, step_span)
+
+    if rem(phase, 2) == 0 do
+      base_direction
+    else
+      opposite_direction(base_direction)
+    end
+  end
+
+  defp opposite_direction(:up), do: :down
+  defp opposite_direction(:down), do: :up
+
+  defp requested_voicing_count(:up, inversion_count), do: inversion_count
+  defp requested_voicing_count(:down, inversion_count), do: inversion_count
+
+  defp requested_voicing_count({:cycle_up, cycle_count}, inversion_count),
+    do:
+      cycle_requested_voicing_count(
+        cycle_step_span({:cycle_up, cycle_count}, inversion_count),
+        cycle_count
+      )
+
+  defp requested_voicing_count({:cycle_down, cycle_count}, inversion_count),
+    do:
+      cycle_requested_voicing_count(
+        cycle_step_span({:cycle_down, cycle_count}, inversion_count),
+        cycle_count
+      )
+
+  defp cycle_step_span(:up, inversion_count), do: inversion_count
+  defp cycle_step_span(:down, inversion_count), do: inversion_count
+
+  defp cycle_step_span({:cycle_up, _cycle_count}, inversion_count) when inversion_count >= 2,
+    do: inversion_count - 1
+
+  defp cycle_step_span({:cycle_down, _cycle_count}, inversion_count) when inversion_count >= 2,
+    do: inversion_count - 1
+
+  defp cycle_requested_voicing_count(inversion_distance, cycle_count)
+       when is_integer(inversion_distance) and inversion_distance >= 1 and is_integer(cycle_count) and
+              cycle_count >= 1 do
+    inversion_distance * 2 * cycle_count + 1
   end
 
   defp next_voicing([lowest | rest], :up) do
@@ -456,7 +525,13 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do
     total_frames = max(div(chord_duration_mbeats, frame_mbeats), 1)
-    min(requested_voicing_count, total_frames)
+
+    if requested_voicing_count > total_frames do
+      raise ArgumentError,
+            "dynamic_voicing requested #{requested_voicing_count} voicings but only #{total_frames} frame slots are available for this chord duration/frame size"
+    end
+
+    requested_voicing_count
   end
 
   defp machine_params!(opts) do
@@ -566,9 +641,17 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp normalize_direction!(:up), do: :up
   defp normalize_direction!(:down), do: :down
 
+  defp normalize_direction!({:cycle_up, cycle_count})
+       when is_integer(cycle_count) and cycle_count >= 1,
+       do: {:cycle_up, cycle_count}
+
+  defp normalize_direction!({:cycle_down, cycle_count})
+       when is_integer(cycle_count) and cycle_count >= 1,
+       do: {:cycle_down, cycle_count}
+
   defp normalize_direction!(other) do
     raise ArgumentError,
-          "dynamic_voicing direction must be :up or :down, got: #{inspect(other)}"
+          "dynamic_voicing direction must be :up, :down, {:cycle_up, n}, or {:cycle_down, n} with n >= 1, got: #{inspect(other)}"
   end
 
   defp normalize_number_of_inversions!(value) when is_integer(value) and value >= 1, do: value
@@ -577,6 +660,26 @@ defmodule Mensch.Machines.DynamicVoicing do
     raise ArgumentError,
           "dynamic_voicing number_of_inversions must be >= 1, got: #{inspect(other)}"
   end
+
+  defp validate_inversion_count_for_direction!(inversion_count, {:cycle_up, _cycle_count})
+       when inversion_count >= 2,
+       do: inversion_count
+
+  defp validate_inversion_count_for_direction!(inversion_count, {:cycle_down, _cycle_count})
+       when inversion_count >= 2,
+       do: inversion_count
+
+  defp validate_inversion_count_for_direction!(inversion_count, {:cycle_up, _cycle_count}) do
+    raise ArgumentError,
+          "dynamic_voicing number_of_inversions must be >= 2 for cycle directions (it counts total voicing states per leg), got: #{inspect(inversion_count)}"
+  end
+
+  defp validate_inversion_count_for_direction!(inversion_count, {:cycle_down, _cycle_count}) do
+    raise ArgumentError,
+          "dynamic_voicing number_of_inversions must be >= 2 for cycle directions (it counts total voicing states per leg), got: #{inspect(inversion_count)}"
+  end
+
+  defp validate_inversion_count_for_direction!(inversion_count, _direction), do: inversion_count
 
   defp normalize_pressure_lfo_curve!(curve)
        when curve in [:sine, :triangle, :saw_up, :saw_down, :square],

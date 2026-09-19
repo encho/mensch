@@ -4,15 +4,20 @@ defmodule Mensch.Machines.DynamicVoicingParams do
 
   Parameter reference:
 
-  * `direction`: Inversion motion direction (`:up` or `:down`).
-  * `number_of_inversions`: Total number of voicings to play, including the
-    first/base voicing. Must be >= 1.
+  * `direction`: Inversion motion direction (`:up`, `:down`, `{:cycle_up, n}`,
+    or `{:cycle_down, n}` where `n` is the number of full bounce cycles).
+  * `number_of_inversions`: For `:up`/`:down`, total number of voicings to
+    play, including the first/base voicing. For cycle modes, total voicing
+    states in each up/down leg including both endpoints (start and turnaround),
+    so `4` means four visible states per leg. Must be >= 2 in cycle modes.
+    If requested voicings do not fit the chord duration frame budget,
+    validation fails with an error.
   * `lfo_pressure`: Pressure LFO settings.
   """
 
   alias Mensch.LfoParams
 
-  @type direction :: :up | :down
+  @type direction :: :up | :down | {:cycle_up, pos_integer()} | {:cycle_down, pos_integer()}
 
   @type t :: %__MODULE__{
           direction: direction(),

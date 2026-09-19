@@ -74,7 +74,7 @@ defmodule Mensch.Player do
   end
 
   def handle_call(:stop, _from, state) do
-    {:reply, :ok, stop_all(state)}
+    {:reply, :ok, panic_all(state)}
   end
 
   def handle_call(:panic, _from, state) do
