@@ -20,6 +20,7 @@ defmodule Mensch.SampleDb do
   alias Mensch.SampleDb.Sample6SimpleChordCMajorInversions
   alias Mensch.SampleDb.Sample7DynamicVoicing
   alias Mensch.SampleDb.Sample8DynamicVoicingOneBar
+  alias Mensch.SampleDb.Sample9DynamicVoicingCMajor
 
   @default_frame_mbeats 50
 
@@ -27,6 +28,7 @@ defmodule Mensch.SampleDb do
     Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample6SimpleChordCMajorInversions.sample(@default_frame_mbeats),
     Sample7DynamicVoicing.sample(@default_frame_mbeats),
+    Sample9DynamicVoicingCMajor.sample(@default_frame_mbeats),
     Sample8DynamicVoicingOneBar.sample(@default_frame_mbeats),
     Sample0SimpleChordTraversal.sample(@default_frame_mbeats),
     Sample0bSimpleChordTraversalUp.sample(@default_frame_mbeats),
