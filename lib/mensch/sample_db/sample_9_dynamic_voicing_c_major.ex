@@ -9,6 +9,25 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
+  @lfo_slide %LfoParams{
+    curve: :sine,
+    scale: 1,
+    cycles_per_bar: 6.0,
+    shift_mbeats: 0.0,
+    polarity: :unipolar,
+    time_base: :absolute,
+    mode: :additive
+  }
+
+  @lfo_pressure %LfoParams{
+    curve: :sine,
+    scale: 0.3,
+    cycles_per_bar: 20.0,
+    shift_mbeats: 0.0,
+    time_base: :absolute,
+    mode: :additive
+  }
+
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     %{
@@ -28,23 +47,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
-              lfo_slide: %LfoParams{
-                curve: :sine,
-                scale: 0.1,
-                cycles_per_bar: 2.0,
-                shift_mbeats: 0.0,
-                polarity: :unipolar,
-                time_base: :absolute,
-                mode: :additive
-              }
-              # lfo_pressure: %LfoParams{
-              #   curve: :sine,
-              #   scale: 0.25,
-              #   cycles_per_bar: 10.0,
-              #   shift_mbeats: 0.0,
-              #   time_base: :absolute,
-              #   mode: :additive
-              # }
+              lfo_slide: @lfo_slide,
+              lfo_pressure: @lfo_pressure
             }
           }
         },
@@ -58,23 +62,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
-              lfo_slide: %LfoParams{
-                curve: :sine,
-                scale: 0.1,
-                cycles_per_bar: 2.0,
-                shift_mbeats: 0.0,
-                polarity: :unipolar,
-                time_base: :absolute,
-                mode: :additive
-              },
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :absolute,
-                mode: :additive
-              }
+              lfo_slide: @lfo_slide,
+              lfo_pressure: @lfo_pressure
             }
           }
         },
@@ -88,23 +77,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
-              lfo_slide: %LfoParams{
-                curve: :sine,
-                scale: 0.1,
-                cycles_per_bar: 2.0,
-                shift_mbeats: 0.0,
-                polarity: :unipolar,
-                time_base: :absolute,
-                mode: :additive
-              },
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :absolute,
-                mode: :additive
-              }
+              lfo_slide: @lfo_slide,
+              lfo_pressure: @lfo_pressure
             }
           }
         },
@@ -118,23 +92,8 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
-              lfo_slide: %LfoParams{
-                curve: :sine,
-                scale: 0.1,
-                cycles_per_bar: 2.0,
-                shift_mbeats: 0.0,
-                polarity: :unipolar,
-                time_base: :absolute,
-                mode: :additive
-              },
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :absolute,
-                mode: :additive
-              }
+              lfo_slide: @lfo_slide,
+              lfo_pressure: @lfo_pressure
             }
           }
         }
