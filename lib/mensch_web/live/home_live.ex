@@ -454,7 +454,7 @@ defmodule MenschWeb.HomeLive do
               <tbody>
                 <tr
                   :for={{entry, index} <- Enum.with_index(@sample_entries)}
-                  class="group text-zinc-200 transition-colors duration-150 hover:bg-[#2fd5c8]/12"
+                  class="group text-zinc-200 transition-colors duration-150 hover:bg-white/8"
                 >
                   <td
                     class="cursor-pointer px-1.5 py-1.5 text-zinc-100"
