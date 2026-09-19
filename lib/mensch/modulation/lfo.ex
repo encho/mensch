@@ -19,6 +19,7 @@ defmodule Mensch.Modulation.Lfo do
       scale: normalize_scale!(lfo_params.scale, field_name),
       cycles_per_bar: normalize_cycles_per_bar!(lfo_params.cycles_per_bar, field_name),
       shift_mbeats: normalize_shift_mbeats!(lfo_params.shift_mbeats, field_name),
+      polarity: normalize_polarity!(lfo_params.polarity, field_name),
       time_base: normalize_time_base!(lfo_params.time_base, field_name),
       mode: normalize_mode!(lfo_params.mode, field_name)
     }
@@ -59,7 +60,9 @@ defmodule Mensch.Modulation.Lfo do
     phase = shifted_mbeat / mbeats_per_bar * lfo_params.cycles_per_bar
     cycle_phase = phase - :math.floor(phase)
 
-    waveform_value(lfo_params.curve, cycle_phase)
+    lfo_params.curve
+    |> waveform_value(cycle_phase)
+    |> apply_polarity(lfo_params)
   end
 
   @spec apply_to_pressure(float(), float(), LfoParams.t()) :: integer()
@@ -73,11 +76,29 @@ defmodule Mensch.Modulation.Lfo do
     clamp_7bit(normalized * 127)
   end
 
+  @spec apply_additive_to_7bit(non_neg_integer(), float(), LfoParams.t()) :: integer()
+  def apply_additive_to_7bit(baseline_7bit, lfo_unipolar, %LfoParams{scale: scale}) do
+    normalized = baseline_7bit / 127 + lfo_unipolar * scale
+    clamp_7bit(normalized * 127)
+  end
+
   defp waveform_value(:sine, cycle_phase), do: :math.sin(2 * :math.pi() * cycle_phase)
   defp waveform_value(:triangle, cycle_phase), do: 1.0 - 4.0 * abs(cycle_phase - 0.5)
   defp waveform_value(:saw_up, cycle_phase), do: cycle_phase
   defp waveform_value(:saw_down, cycle_phase), do: -cycle_phase
   defp waveform_value(:square, cycle_phase), do: if(cycle_phase < 0.5, do: 1.0, else: -1.0)
+
+  defp apply_polarity(value, %LfoParams{polarity: :bipolar}), do: value
+
+  defp apply_polarity(value, %LfoParams{polarity: :unipolar}) do
+    value
+    |> waveform_to_unipolar()
+    |> clamp_0_1()
+  end
+
+  defp waveform_to_unipolar(value), do: (value + 1.0) / 2.0
+
+  defp clamp_0_1(value), do: value |> max(0.0) |> min(1.0)
 
   defp normalize_curve!(curve, _field_name)
        when curve in [:sine, :triangle, :saw_up, :saw_down, :square],
@@ -116,6 +137,14 @@ defmodule Mensch.Modulation.Lfo do
   defp normalize_shift_mbeats!(other, field_name) do
     raise ArgumentError,
           "#{field_name}.shift_mbeats must be a number, got: #{inspect(other)}"
+  end
+
+  defp normalize_polarity!(polarity, _field_name) when polarity in [:bipolar, :unipolar],
+    do: polarity
+
+  defp normalize_polarity!(other, field_name) do
+    raise ArgumentError,
+          "#{field_name}.polarity must be :bipolar or :unipolar, got: #{inspect(other)}"
   end
 
   defp normalize_time_base!(time_base, _field_name) when time_base in [:absolute, :entry_local],

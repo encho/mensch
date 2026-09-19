@@ -13,6 +13,8 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     If requested voicings do not fit the chord duration frame budget,
     validation fails with an error.
   * `lfo_pressure`: Pressure LFO settings.
+  * `lfo_slide`: Slide (CC74) LFO settings. Applied additively to the
+    baseline slide value using a unipolar waveform (never below 0).
   """
 
   alias Mensch.LfoParams
@@ -22,14 +24,16 @@ defmodule Mensch.Machines.DynamicVoicingParams do
   @type t :: %__MODULE__{
           direction: direction(),
           number_of_inversions: pos_integer(),
-          lfo_pressure: LfoParams.t()
+          lfo_pressure: LfoParams.t(),
+          lfo_slide: LfoParams.t()
         }
 
   @enforce_keys [:direction, :number_of_inversions]
   defstruct [
     :direction,
     :number_of_inversions,
-    lfo_pressure: %LfoParams{}
+    lfo_pressure: %LfoParams{},
+    lfo_slide: %LfoParams{}
   ]
 
   @doc "Default parameters for the dynamic voicing machine."
@@ -38,7 +42,8 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     %__MODULE__{
       direction: :up,
       number_of_inversions: 4,
-      lfo_pressure: LfoParams.default()
+      lfo_pressure: LfoParams.default(),
+      lfo_slide: LfoParams.default()
     }
   end
 end

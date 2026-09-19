@@ -40,6 +40,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   @spec controls() :: %{
           direction: :up,
           lfo_pressure: Mensch.LfoParams.t(),
+          lfo_slide: Mensch.LfoParams.t(),
           number_of_inversions: 4
         }
   def controls do
@@ -48,7 +49,8 @@ defmodule Mensch.Machines.DynamicVoicing do
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
-      lfo_pressure: params.lfo_pressure
+      lfo_pressure: params.lfo_pressure,
+      lfo_slide: params.lfo_slide
     }
   end
 
@@ -70,6 +72,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     # Validate and canonicalize LFO settings up front so frame rendering can
     # assume strongly-typed values (curve/time base/mode) without branching.
     pressure_lfo = Lfo.normalize!(params.lfo_pressure, field_name: "dynamic_voicing lfo_pressure")
+    slide_lfo = Lfo.normalize!(params.lfo_slide, field_name: "dynamic_voicing lfo_slide")
 
     # Quantization step for this render: how many mbeats each frame advances.
     frame_mbeats = SampleContext.frame_units(sample_context)
@@ -112,7 +115,8 @@ defmodule Mensch.Machines.DynamicVoicing do
           frame_mbeats,
           sample_context,
           entry_start_mbeat_abs,
-          pressure_lfo
+          pressure_lfo,
+          slide_lfo
         )
       end)
 
@@ -405,7 +409,8 @@ defmodule Mensch.Machines.DynamicVoicing do
          frame_mbeats,
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
-         %LfoParams{} = pressure_lfo
+         %LfoParams{} = pressure_lfo,
+         %LfoParams{} = slide_lfo
        ) do
     note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, absolute_end_mbeat)
 
@@ -418,7 +423,8 @@ defmodule Mensch.Machines.DynamicVoicing do
             at_mbeat,
             sample_context,
             entry_start_mbeat_abs,
-            pressure_lfo
+            pressure_lfo,
+            slide_lfo
           )
       }
     end
@@ -456,7 +462,8 @@ defmodule Mensch.Machines.DynamicVoicing do
          at_mbeat,
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
-         %LfoParams{} = pressure_lfo
+         %LfoParams{} = pressure_lfo,
+         %LfoParams{} = slide_lfo
        ) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
@@ -472,13 +479,24 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     pressure = Lfo.apply_to_pressure(adsr_level, pressure_lfo_norm, pressure_lfo)
 
+    # Slide modulation is additive over baseline 0; polarity is configured in lfo_slide.
+    slide_lfo_norm =
+      Lfo.value_at_mbeat(
+        slide_lfo,
+        at_mbeat,
+        sample_context,
+        entry_start_mbeat_abs
+      )
+
+    slide = Lfo.apply_additive_to_7bit(0, slide_lfo_norm, slide_lfo)
+
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
       pressure: pressure,
       bend: 0.0,
-      slide: 0
+      slide: slide
     })
   end
 
@@ -514,6 +532,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     defaults
     |> Map.merge(current)
     |> Map.update!(:lfo_pressure, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_pressure"))
+    |> Map.update!(:lfo_slide, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_slide"))
     |> then(&struct!(DynamicVoicingParams, &1))
   end
 
@@ -583,10 +602,14 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
     lfo_pressure =
       Lfo.normalize!(Map.get(params, :lfo_pressure), field_name: "dynamic_voicing lfo_pressure")
 
+    lfo_slide =
+      Lfo.normalize!(Map.get(params, :lfo_slide), field_name: "dynamic_voicing lfo_slide")
+
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
-      lfo_pressure: lfo_pressure
+      lfo_pressure: lfo_pressure,
+      lfo_slide: lfo_slide
     }
   end
 

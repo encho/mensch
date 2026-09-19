@@ -316,6 +316,94 @@ defmodule Mensch.DynamicVoicingTest do
     refute absolute_with_start_offset[3000] == entry_local_with_start_offset[3000]
   end
 
+  test "slide stays at baseline zero when lfo_slide is omitted" do
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{
+          direction: :up,
+          number_of_inversions: 1,
+          lfo_pressure: %{scale: 0.0}
+        }
+      }
+
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 500})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    slides =
+      rendered.frames
+      |> Enum.flat_map(fn frame ->
+        frame.notes
+        |> Enum.filter(&(&1.midi_note == 60))
+        |> Enum.map(& &1.slide)
+      end)
+
+    assert slides != []
+    assert Enum.all?(slides, &(&1 == 0))
+  end
+
+  test "slide lfo applies additive unipolar modulation" do
+    machine =
+      %DynamicVoicing{
+        params: %DynamicVoicingParams{
+          direction: :up,
+          number_of_inversions: 1,
+          lfo_pressure: %{scale: 0.0},
+          lfo_slide: %{
+            curve: :square,
+            scale: 0.5,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            polarity: :unipolar,
+            time_base: :entry_local,
+            mode: :additive
+          }
+        }
+      }
+
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 500})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    slides_by_mbeat =
+      rendered.frames
+      |> Enum.reduce(%{}, fn frame, acc ->
+        slide =
+          frame.notes
+          |> Enum.filter(&(&1.midi_note == 60))
+          |> Enum.sort_by(& &1.note_instance_id)
+          |> case do
+            [note | _] -> note.slide
+            [] -> nil
+          end
+
+        if slide == nil do
+          acc
+        else
+          Map.put(acc, frame.at_mbeat, slide)
+        end
+      end)
+
+    assert slides_by_mbeat[1000] == 64
+    assert slides_by_mbeat[3000] == 0
+  end
+
   defp baseline_lfo_machine do
     lfo_machine(%{lfo_pressure: %{scale: 0.0}})
   end

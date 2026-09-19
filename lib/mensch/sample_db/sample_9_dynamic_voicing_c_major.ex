@@ -28,14 +28,23 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
-              lfo_pressure: %LfoParams{
+              lfo_slide: %LfoParams{
                 curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
+                scale: 0.1,
+                cycles_per_bar: 2.0,
                 shift_mbeats: 0.0,
+                polarity: :unipolar,
                 time_base: :absolute,
                 mode: :additive
               }
+              # lfo_pressure: %LfoParams{
+              #   curve: :sine,
+              #   scale: 0.25,
+              #   cycles_per_bar: 10.0,
+              #   shift_mbeats: 0.0,
+              #   time_base: :absolute,
+              #   mode: :additive
+              # }
             }
           }
         },
@@ -49,6 +58,15 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              lfo_slide: %LfoParams{
+                curve: :sine,
+                scale: 0.1,
+                cycles_per_bar: 2.0,
+                shift_mbeats: 0.0,
+                polarity: :unipolar,
+                time_base: :absolute,
+                mode: :additive
+              },
               lfo_pressure: %LfoParams{
                 curve: :sine,
                 scale: 0.25,
@@ -70,6 +88,15 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              lfo_slide: %LfoParams{
+                curve: :sine,
+                scale: 0.1,
+                cycles_per_bar: 2.0,
+                shift_mbeats: 0.0,
+                polarity: :unipolar,
+                time_base: :absolute,
+                mode: :additive
+              },
               lfo_pressure: %LfoParams{
                 curve: :sine,
                 scale: 0.25,
@@ -91,6 +118,15 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              lfo_slide: %LfoParams{
+                curve: :sine,
+                scale: 0.1,
+                cycles_per_bar: 2.0,
+                shift_mbeats: 0.0,
+                polarity: :unipolar,
+                time_base: :absolute,
+                mode: :additive
+              },
               lfo_pressure: %LfoParams{
                 curve: :sine,
                 scale: 0.25,
