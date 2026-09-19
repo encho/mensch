@@ -88,8 +88,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:sample_folders, build_sample_folders(samples))
       |> assign(:active_sample_index, active_sample_index)
       |> assign(:sample_entries, sample_entries)
-      |> assign(:chord_filter_options, chord_filter_options(sample_entries))
-      |> assign(:selected_chord_filter, nil)
+      |> assign(:active_chord_indices, all_chord_indices(sample_entries))
       |> assign(:sample_context, sample_context)
       |> assign(
         :sample_timeline_static,
@@ -98,6 +97,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
       |> assign(:show_detail_panel, true)
+      |> assign(:show_samples_modal, false)
       |> assign(:selected_sample_entry_index, nil)
       |> assign(:selected_note_key, nil)
       |> assign(:manual_stop, false)
@@ -108,20 +108,13 @@ defmodule MenschWeb.HomeLive do
 
   @impl true
   def handle_event("play_full_sample", _params, socket) do
-    render_data =
-      PerformanceAssembler.generate_sample(
-        socket.assigns.sample_entries,
-        socket.assigns.sample_context
-      )
-
     {:noreply,
      socket
-     |> assign(:render_data, render_data)
      |> assign(:render_scope, :full_sample)
      |> assign(:selected_note_key, nil)
      |> assign_detail_content()
      |> assign(:manual_stop, false)
-     |> start_playback(render_data)}
+     |> start_active_playback()}
   end
 
   def handle_event("toggle_loop_full_sample", _params, socket) do
@@ -130,6 +123,14 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("toggle_detail_panel", _params, socket) do
     {:noreply, update(socket, :show_detail_panel, &(!&1))}
+  end
+
+  def handle_event("open_samples_modal", _params, socket) do
+    {:noreply, assign(socket, :show_samples_modal, true)}
+  end
+
+  def handle_event("close_samples_modal", _params, socket) do
+    {:noreply, assign(socket, :show_samples_modal, false)}
   end
 
   def handle_event("activate_sample", %{"index" => index_str}, socket) do
@@ -144,8 +145,7 @@ defmodule MenschWeb.HomeLive do
              socket
              |> assign(:active_sample_index, index)
              |> assign(:sample_entries, sample_entries)
-             |> assign(:chord_filter_options, chord_filter_options(sample_entries))
-             |> assign(:selected_chord_filter, nil)
+             |> assign(:active_chord_indices, all_chord_indices(sample_entries))
              |> assign(:sample_context, sample_context)
              |> assign(
                :sample_timeline_static,
@@ -154,6 +154,7 @@ defmodule MenschWeb.HomeLive do
              |> assign(:render_data, render_data)
              |> assign(:render_scope, :full_sample)
              |> assign(:selected_sample_entry_index, nil)
+             |> assign(:show_samples_modal, false)
              |> assign(:player_status, Player.status())
              |> clear_playback_state(true)
              |> assign(:selected_note_key, nil)
@@ -193,6 +194,22 @@ defmodule MenschWeb.HomeLive do
     {:noreply, socket |> assign(:selected_note_key, nil) |> assign_detail_content()}
   end
 
+  def handle_event("toggle_active_chord", %{"index" => index_str}, socket) do
+    next_active_indices =
+      case Integer.parse(index_str) do
+        {index, ""} when index >= 0 and index < length(socket.assigns.sample_entries) ->
+          toggle_chord_index(socket.assigns.active_chord_indices, index)
+
+        _ ->
+          socket.assigns.active_chord_indices
+      end
+
+    {:noreply,
+     socket
+     |> assign(:active_chord_indices, next_active_indices)
+     |> assign_detail_content()}
+  end
+
   def handle_event("open_sample_entry_details", %{"index" => index_str}, socket) do
     selected_sample_entry_index =
       case Integer.parse(index_str) do
@@ -207,32 +224,12 @@ defmodule MenschWeb.HomeLive do
     {:noreply, assign(socket, :selected_sample_entry_index, nil)}
   end
 
-  def handle_event("set_chord_filter", %{"chord_filter" => value}, socket) do
-    selected_chord_filter =
-      case value do
-        "all" ->
-          nil
-
-        other ->
-          case Integer.parse(to_string(other)) do
-            {index, ""} when index >= 0 -> index
-            _ -> nil
-          end
-      end
-
-    {:noreply,
-     socket
-     |> assign(:selected_chord_filter, selected_chord_filter)
-     |> assign_detail_content()}
-  end
-
   def handle_event("play", _params, %{assigns: %{render_data: nil}} = socket) do
     {:noreply, socket}
   end
 
   def handle_event("play", _params, socket) do
-    {:noreply,
-     socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
+    {:noreply, socket |> assign(:manual_stop, false) |> start_active_playback()}
   end
 
   def handle_event("stop", _params, socket) do
@@ -286,8 +283,7 @@ defmodule MenschWeb.HomeLive do
           {:noreply, socket}
 
         loop_full_sample?(socket) ->
-          {:noreply,
-           socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
+          {:noreply, socket |> assign(:manual_stop, false) |> start_active_playback()}
 
         true ->
           {:noreply,
@@ -309,8 +305,7 @@ defmodule MenschWeb.HomeLive do
           {:noreply, socket}
 
         loop_full_sample?(socket) ->
-          {:noreply,
-           socket |> assign(:manual_stop, false) |> start_playback(socket.assigns.render_data)}
+          {:noreply, socket |> assign(:manual_stop, false) |> start_active_playback()}
 
         true ->
           {:noreply,
@@ -330,12 +325,13 @@ defmodule MenschWeb.HomeLive do
         sample_timeline_with_playhead(
           assigns.sample_timeline_static,
           assigns.render_scope,
-          assigns.playhead_pct
+          assigns.playhead_pct,
+          assigns.active_chord_indices
         )
       )
 
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status}>
+    <Layouts.app flash={@flash} midi_status={@midi_status} show_samples_button={true}>
       <:navbar_center>
         <div class="flex items-center justify-center gap-2">
           <button
@@ -401,13 +397,204 @@ defmodule MenschWeb.HomeLive do
       </:navbar_center>
 
       <div class="w-full">
-        <div class="grid gap-6 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
-          <aside class="max-w-[320px] space-y-3 lg:sticky lg:top-6 lg:self-start">
-            <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-400">
-              <.icon name="hero-queue-list" class="size-4" /> Sample Library
+        <div id="render-section" class="min-w-0 space-y-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div class="space-y-1">
+              <div class="font-mono text-xl text-zinc-100 md:text-2xl">
+                {active_sample_name(@samples, @active_sample_index)}
+              </div>
+
+              <div class="font-mono text-[11px] text-zinc-300">
+                {sample_context_label(@sample_context)} · {sample_duration_label(
+                  @sample_entries,
+                  @sample_context
+                )}
+              </div>
             </div>
 
-            <div class="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+            <div class="flex items-center justify-end gap-2">
+              <.link
+                id="download-bitwig-mpe-midi"
+                href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
+                class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
+              >
+                <.icon name="hero-arrow-down-tray" class="size-4" /> Bitwig MIDI
+              </.link>
+              <.link
+                id="download-mpe-report"
+                href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
+                class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
+              >
+                <.icon name="hero-document-text" class="size-4" /> Event Report
+              </.link>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto border border-zinc-700/60">
+            <div class="flex items-center justify-end border-b border-zinc-700/60 px-2 py-1 text-[10px] uppercase tracking-wide text-[#8fe9e0]">
+              <.icon name="hero-cursor-arrow-rays" class="mr-1 size-3.5" />
+              Click any row to view details
+            </div>
+            <table class="w-full min-w-[760px] text-left font-mono text-[10px] sm:text-[11px]">
+              <thead>
+                <tr class="border-b border-zinc-700/70 text-zinc-400">
+                  <th class="px-1.5 py-1.5 font-normal">ChordSpec</th>
+                  <th class="px-1.5 py-1.5 font-normal">Machine</th>
+                  <th class="px-1.5 py-1.5 font-normal">Start</th>
+                  <th class="px-1.5 py-1.5 font-normal">Duration</th>
+                  <th class="px-1.5 py-1.5 font-normal text-center">Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  :for={{entry, index} <- Enum.with_index(@sample_entries)}
+                  class="group text-zinc-200 transition-colors duration-150 hover:bg-[#ff7a1a]/10"
+                >
+                  <td
+                    class="cursor-pointer px-1.5 py-1.5 text-zinc-100"
+                    phx-click="open_sample_entry_details"
+                    phx-value-index={index}
+                  >
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="inline-block size-2.5 rounded-full"
+                        style={entry_color_dot_style(index)}
+                      ></span>
+                      <span>{table_chord_label(entry.chord_spec)}</span>
+                    </div>
+                  </td>
+                  <td
+                    class="cursor-pointer px-1.5 py-1.5"
+                    phx-click="open_sample_entry_details"
+                    phx-value-index={index}
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <.icon name={machine_icon_name(entry.machine)} class="size-3.5 text-zinc-400" />
+                      <span>{machine_label(entry.machine)}</span>
+                    </div>
+                  </td>
+                  <td
+                    class="cursor-pointer px-1.5 py-1.5 align-top"
+                    phx-click="open_sample_entry_details"
+                    phx-value-index={index}
+                  >
+                    <div class="leading-tight text-zinc-100">
+                      {table_start_label(@sample_context, entry.timeline_context.start_beat)}
+                    </div>
+                  </td>
+                  <td
+                    class="cursor-pointer px-1.5 py-1.5 align-top"
+                    phx-click="open_sample_entry_details"
+                    phx-value-index={index}
+                  >
+                    <div class="leading-tight text-zinc-100">
+                      {table_duration_label(@sample_context, entry.timeline_context)}
+                    </div>
+                  </td>
+                  <td class="px-1.5 py-1.5 text-center">
+                    <button
+                      type="button"
+                      phx-click="toggle_active_chord"
+                      phx-value-index={index}
+                      aria-label={"Toggle chord #{index}"}
+                      aria-pressed={chord_active?(@active_chord_indices, index)}
+                      class={[
+                        "inline-flex size-5 items-center justify-center rounded-sm border transition-colors duration-150",
+                        chord_active?(@active_chord_indices, index) &&
+                          "border-[#2fd5c8] bg-[#2fd5c8]/20 text-[#a6f6ef]",
+                        !chord_active?(@active_chord_indices, index) &&
+                          "border-zinc-600 text-zinc-400 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
+                      ]}
+                    >
+                      <.icon
+                        name={
+                          if chord_active?(@active_chord_indices, index),
+                            do: "hero-check",
+                            else: "hero-minus"
+                        }
+                        class="size-3"
+                      />
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <.sample_timeline model={@sample_timeline} />
+
+          <div class="flex items-center justify-center">
+            <button
+              type="button"
+              id="toggle-detail-panel"
+              phx-click="toggle_detail_panel"
+              aria-label="Toggle detail charts"
+              aria-pressed={@show_detail_panel}
+              class="inline-flex items-center gap-1.5 px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500 transition-colors duration-150 hover:text-zinc-300"
+            >
+              <.icon
+                name={if @show_detail_panel, do: "hero-chevron-up", else: "hero-chevron-down"}
+                class="size-3.5"
+              />
+              <span>Details</span>
+            </button>
+          </div>
+
+          <.live_component
+            :if={@render_data && @show_detail_panel}
+            module={DetailPanelComponent}
+            id="detail-panel"
+            render_data={@render_data}
+            selected_note_key={@selected_note_key}
+            selected_note_label={selected_note_label(@selected_note_key)}
+            note_matrix={@note_matrix}
+            note_matrix_grid={@note_matrix_grid}
+            timeline_start_label={local_timeline_start_label()}
+            timeline_end_label={local_timeline_end_label(@sample_context, @render_data.duration_ms)}
+            pressure_chart={@pressure_chart}
+            slide_chart={@slide_chart}
+            bend_chart={@bend_chart}
+            chart_grid={@chart_grid}
+            debug_rows={@debug_rows}
+          />
+
+          <.live_component
+            :if={not is_nil(@selected_sample_entry_index)}
+            module={SampleEntryDetailsModalComponent}
+            id="sample-entry-details-modal"
+            sample_entry={selected_sample_entry(@sample_entries, @selected_sample_entry_index)}
+            sample_entry_index={@selected_sample_entry_index}
+            sample_context={@sample_context}
+          />
+        </div>
+
+        <div
+          :if={@show_samples_modal}
+          id="samples-modal"
+          class="fixed inset-0 z-40 flex items-start justify-end bg-black/45 p-3 sm:p-4"
+        >
+          <button
+            type="button"
+            aria-label="Close sample library"
+            phx-click="close_samples_modal"
+            class="absolute inset-0"
+          ></button>
+
+          <div class="relative w-full max-w-md border border-zinc-700/70 bg-zinc-950/95 p-4 shadow-2xl">
+            <div class="mb-3 flex items-center justify-between">
+              <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-300">
+                <.icon name="hero-queue-list" class="size-4" /> Sample Library
+              </div>
+              <button
+                type="button"
+                phx-click="close_samples_modal"
+                class="flex size-8 items-center justify-center border border-zinc-700 text-zinc-300 transition-colors duration-150 hover:border-zinc-500 hover:text-white"
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
+
+            <div class="max-h-[78vh] space-y-4 overflow-y-auto pr-1">
               <div :for={folder <- @sample_folders} class="space-y-2">
                 <div class="text-[10px] uppercase tracking-wide text-zinc-500">{folder.name}</div>
 
@@ -439,145 +626,6 @@ defmodule MenschWeb.HomeLive do
                 </button>
               </div>
             </div>
-          </aside>
-
-          <div id="render-section" class="min-w-0 space-y-4">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div class="space-y-1">
-                <div class="font-mono text-xl text-zinc-100 md:text-2xl">
-                  {active_sample_name(@samples, @active_sample_index)}
-                </div>
-
-                <div class="font-mono text-[11px] text-zinc-300">
-                  {sample_context_label(@sample_context)} · {sample_duration_label(
-                    @sample_entries,
-                    @sample_context
-                  )}
-                </div>
-              </div>
-
-              <div class="flex items-center justify-end gap-2">
-                <.link
-                  id="download-bitwig-mpe-midi"
-                  href={~p"/exports/sample/#{@active_sample_index}/bitwig-mpe.mid"}
-                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
-                >
-                  <.icon name="hero-arrow-down-tray" class="size-4" /> Bitwig MIDI
-                </.link>
-                <.link
-                  id="download-mpe-report"
-                  href={~p"/exports/sample/#{@active_sample_index}/mpe-events.txt"}
-                  class="flex h-9 items-center gap-1.5 border border-zinc-600 px-3 text-[11px] uppercase tracking-wide text-zinc-300 transition-colors duration-150 hover:border-[#2fd5c8] hover:text-[#a6f6ef]"
-                >
-                  <.icon name="hero-document-text" class="size-4" /> Event Report
-                </.link>
-              </div>
-            </div>
-
-            <div class="overflow-x-auto border border-zinc-700/60">
-              <div class="flex items-center justify-end border-b border-zinc-700/60 px-2 py-1 text-[10px] uppercase tracking-wide text-[#8fe9e0]">
-                <.icon name="hero-cursor-arrow-rays" class="mr-1 size-3.5" />
-                Click any row to view details
-              </div>
-              <table class="w-full min-w-[980px] text-left font-mono text-[11px]">
-                <thead>
-                  <tr class="border-b border-zinc-700/70 text-zinc-400">
-                    <th class="px-2 py-1.5 font-normal">ChordSpec</th>
-                    <th class="px-2 py-1.5 font-normal">Machine</th>
-                    <th class="px-2 py-1.5 font-normal">Start</th>
-                    <th class="px-2 py-1.5 font-normal">Duration</th>
-                    <th class="px-2 py-1.5 font-normal text-right">Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    :for={{entry, index} <- Enum.with_index(@sample_entries)}
-                    phx-click="open_sample_entry_details"
-                    phx-value-index={index}
-                    class="group cursor-pointer text-zinc-200 transition-colors duration-150 hover:bg-[#ff7a1a]/10"
-                  >
-                    <td class="px-2 py-1.5 text-zinc-100">
-                      <div class="flex items-center gap-2">
-                        <span
-                          class="inline-block size-2.5 rounded-full"
-                          style={entry_color_dot_style(index)}
-                        ></span>
-                        <span>{chord_label(entry.chord_spec)}</span>
-                      </div>
-                    </td>
-                    <td class="px-2 py-1.5">
-                      <div class="flex items-center gap-1.5">
-                        <.icon name={machine_icon_name(entry.machine)} class="size-3.5 text-zinc-400" />
-                        <span>{machine_label(entry.machine)}</span>
-                      </div>
-                    </td>
-                    <td class="px-2 py-1.5 align-top">
-                      <div class="leading-tight text-zinc-100">
-                        {start_label_primary(@sample_context, entry.timeline_context.start_beat)}
-                      </div>
-                    </td>
-                    <td class="px-2 py-1.5 align-top">
-                      <div class="leading-tight text-zinc-100">
-                        {duration_label_primary(@sample_context, entry.timeline_context)}
-                      </div>
-                    </td>
-                    <td class="px-2 py-1.5 text-right">
-                      <span class="inline-flex items-center gap-1 text-zinc-400 transition-colors duration-150 group-hover:text-[#a6f6ef]">
-                        <.icon name="hero-eye" class="size-3.5" /> View
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <.sample_timeline model={@sample_timeline} />
-
-            <div class="flex items-center justify-center">
-              <button
-                type="button"
-                id="toggle-detail-panel"
-                phx-click="toggle_detail_panel"
-                aria-label="Toggle detail charts"
-                aria-pressed={@show_detail_panel}
-                class="inline-flex items-center gap-1.5 px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500 transition-colors duration-150 hover:text-zinc-300"
-              >
-                <.icon
-                  name={if @show_detail_panel, do: "hero-chevron-up", else: "hero-chevron-down"}
-                  class="size-3.5"
-                />
-                <span>Details</span>
-              </button>
-            </div>
-
-            <.live_component
-              :if={@render_data && @show_detail_panel}
-              module={DetailPanelComponent}
-              id="detail-panel"
-              render_data={@render_data}
-              selected_note_key={@selected_note_key}
-              selected_note_label={selected_note_label(@selected_note_key)}
-              note_matrix={@note_matrix}
-              note_matrix_grid={@note_matrix_grid}
-              timeline_start_label={local_timeline_start_label()}
-              timeline_end_label={local_timeline_end_label(@sample_context, @render_data.duration_ms)}
-              pressure_chart={@pressure_chart}
-              slide_chart={@slide_chart}
-              bend_chart={@bend_chart}
-              chart_grid={@chart_grid}
-              debug_rows={@debug_rows}
-              chord_filter_options={@chord_filter_options}
-              selected_chord_filter={selected_chord_filter_value(@selected_chord_filter)}
-            />
-
-            <.live_component
-              :if={not is_nil(@selected_sample_entry_index)}
-              module={SampleEntryDetailsModalComponent}
-              id="sample-entry-details-modal"
-              sample_entry={selected_sample_entry(@sample_entries, @selected_sample_entry_index)}
-              sample_entry_index={@selected_sample_entry_index}
-              sample_context={@sample_context}
-            />
           </div>
         </div>
       </div>
@@ -657,7 +705,7 @@ defmodule MenschWeb.HomeLive do
           :for={entry <- @model.entries}
           x={entry.x + 6}
           y={entry.text_y}
-          fill="var(--ui-timeline-label)"
+          fill={Map.get(entry, :text_fill, "var(--ui-timeline-label)")}
           fill-opacity="0.9"
           font-size="10"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
@@ -714,6 +762,59 @@ defmodule MenschWeb.HomeLive do
     |> assign(:playhead_pct, playhead_pct(:playing, play_started_at, playing_duration_ms))
   end
 
+  defp start_active_playback(socket) do
+    case active_playback_render_data(socket) do
+      nil ->
+        socket
+
+      render_data ->
+        start_playback(socket, render_data)
+    end
+  end
+
+  defp active_playback_render_data(socket) do
+    active_entries =
+      compact_active_entries(
+        socket.assigns.sample_entries,
+        socket.assigns.sample_context,
+        socket.assigns.active_chord_indices
+      )
+
+    case active_entries do
+      [] -> nil
+      entries -> PerformanceAssembler.generate_sample(entries, socket.assigns.sample_context)
+    end
+  end
+
+  defp compact_active_entries(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         active_chord_indices
+       )
+       when is_list(sample_entries) and is_list(active_chord_indices) do
+    active_set = MapSet.new(active_chord_indices)
+
+    sample_entries
+    |> Enum.with_index()
+    |> Enum.filter(fn {_entry, index} -> MapSet.member?(active_set, index) end)
+    |> Enum.sort_by(fn {_entry, index} -> index end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.reduce({0, []}, fn entry, {cursor_mbeat, acc} ->
+      timeline_context = Map.fetch!(entry, :timeline_context)
+      duration_mbeats = TimelineContext.duration_mbeats(timeline_context)
+
+      compact_timeline_context = %TimelineContext{
+        start_beat: SampleContext.mbeat_to_position(sample_context, cursor_mbeat),
+        duration_mbeats: duration_mbeats
+      }
+
+      compact_entry = Map.put(entry, :timeline_context, compact_timeline_context)
+      {cursor_mbeat + duration_mbeats, [compact_entry | acc]}
+    end)
+    |> elem(1)
+    |> Enum.reverse()
+  end
+
   defp clear_playback_state(socket, manual_stop) when is_boolean(manual_stop) do
     socket
     |> assign(:play_started_at, nil)
@@ -752,7 +853,7 @@ defmodule MenschWeb.HomeLive do
   # Flattens every frame (one row per note) for a raw, at-a-glance table
   # of exactly what the note-on/pressure/bend/slide sequence looks like
   # across the whole chord performance.
-  defp debug_rows(frames, sample_entries, selected_chord_filter) do
+  defp debug_rows(frames, sample_entries, active_chord_indices) do
     chord_labels_by_entry =
       sample_entries
       |> Enum.with_index()
@@ -761,9 +862,14 @@ defmodule MenschWeb.HomeLive do
       end)
 
     note_spelling = preferred_note_spelling(sample_entries)
+    active_set = MapSet.new(active_chord_indices)
 
     Enum.flat_map(frames, fn frame ->
-      Enum.map(frame.notes, fn note ->
+      frame.notes
+      |> Enum.filter(fn note ->
+        MapSet.member?(active_set, Map.get(note, :sample_entry_index, -1))
+      end)
+      |> Enum.map(fn note ->
         note
         |> Map.put(:at_ms, frame.at_ms)
         |> Map.put(:chord_id, note.sample_entry_index)
@@ -771,31 +877,73 @@ defmodule MenschWeb.HomeLive do
         |> Map.put(:note_label, format_note_label(note.note_name, note.octave, note_spelling))
       end)
     end)
-    |> maybe_filter_debug_rows_by_chord(selected_chord_filter)
   end
-
-  defp maybe_filter_debug_rows_by_chord(rows, nil), do: rows
-
-  defp maybe_filter_debug_rows_by_chord(rows, chord_filter) when is_integer(chord_filter) do
-    Enum.filter(rows, fn row -> row.chord_id == chord_filter end)
-  end
-
-  defp chord_filter_options(sample_entries) when is_list(sample_entries) do
-    [
-      %{value: "all", label: "All chords"}
-      | Enum.with_index(sample_entries)
-        |> Enum.map(fn {%{chord_spec: chord_spec}, index} ->
-          %{value: Integer.to_string(index), label: "#{index} · #{short_chord_label(chord_spec)}"}
-        end)
-    ]
-  end
-
-  defp selected_chord_filter_value(nil), do: "all"
-  defp selected_chord_filter_value(index) when is_integer(index), do: Integer.to_string(index)
 
   defp selected_sample_entry(sample_entries, selected_index)
        when is_list(sample_entries) and is_integer(selected_index) do
     Enum.at(sample_entries, selected_index)
+  end
+
+  defp all_chord_indices(sample_entries) when is_list(sample_entries) do
+    sample_entries
+    |> Enum.with_index()
+    |> Enum.map(fn {_entry, index} -> index end)
+  end
+
+  defp toggle_chord_index(active_indices, index) do
+    active_set = MapSet.new(active_indices)
+
+    next_set =
+      if MapSet.member?(active_set, index) do
+        if MapSet.size(active_set) == 1 do
+          active_set
+        else
+          MapSet.delete(active_set, index)
+        end
+      else
+        MapSet.put(active_set, index)
+      end
+
+    next_set
+    |> MapSet.to_list()
+    |> Enum.sort()
+  end
+
+  defp chord_active?(active_indices, index), do: index in active_indices
+
+  defp selected_scope_mbeats(
+         sample_entries,
+         sample_context,
+         active_chord_indices,
+         fallback_end_mbeat
+       ) do
+    bounds_by_index =
+      sample_entries
+      |> Enum.with_index()
+      |> Enum.map(fn {%{timeline_context: timeline_context}, index} ->
+        start_mbeat = SampleContext.position_to_mbeat(sample_context, timeline_context.start_beat)
+        end_mbeat = start_mbeat + TimelineContext.duration_mbeats(timeline_context)
+        %{index: index, start_mbeat: start_mbeat, end_mbeat: end_mbeat}
+      end)
+
+    selected_bounds = Enum.filter(bounds_by_index, &(&1.index in active_chord_indices))
+
+    case selected_bounds do
+      [] ->
+        {0, fallback_end_mbeat}
+
+      _ ->
+        {
+          Enum.min_by(selected_bounds, & &1.start_mbeat).start_mbeat,
+          Enum.max_by(selected_bounds, & &1.end_mbeat).end_mbeat
+        }
+    end
+  end
+
+  defp scope_frames(frames, window_start_mbeat, window_end_mbeat) do
+    Enum.filter(frames, fn frame ->
+      frame.at_mbeat >= window_start_mbeat and frame.at_mbeat <= window_end_mbeat
+    end)
   end
 
   defp preferred_note_spelling(sample_entries) when is_list(sample_entries) do
@@ -833,11 +981,22 @@ defmodule MenschWeb.HomeLive do
     "#{sample_context.bpm} bpm · #{num}/#{den}"
   end
 
-  defp chord_label(%ChordSpec{} = chord_spec) do
+  defp table_chord_label(%ChordSpec{} = chord_spec) do
     root = chord_spec.root |> Atom.to_string() |> String.replace("_sharp", "#") |> String.upcase()
-    modifier = chord_spec.modifier |> Atom.to_string()
-    "#{root} #{modifier} · Oct #{chord_spec.octave} · Inv #{chord_spec.inversion}"
+    modifier = table_modifier_label(chord_spec.modifier)
+    "#{root} #{modifier} · o#{chord_spec.octave} i#{chord_spec.inversion}"
   end
+
+  defp table_modifier_label(:major), do: "maj"
+  defp table_modifier_label(:minor), do: "min"
+  defp table_modifier_label(:dominant_seventh), do: "7"
+  defp table_modifier_label(:major_seventh), do: "maj7"
+  defp table_modifier_label(:minor_seventh), do: "m7"
+  defp table_modifier_label(:minor_major_seventh), do: "mMaj7"
+  defp table_modifier_label(:diminished), do: "dim"
+  defp table_modifier_label(:half_diminished), do: "m7b5"
+  defp table_modifier_label(:augmented), do: "aug"
+  defp table_modifier_label(modifier), do: Atom.to_string(modifier)
 
   defp machine_label(machine) do
     machine
@@ -873,14 +1032,14 @@ defmodule MenschWeb.HomeLive do
     |> Enum.reject(fn folder -> folder.samples == [] end)
   end
 
-  defp start_label_primary(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
+  defp table_start_label(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
     mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)
     ms = SampleContext.mbeats_to_ms(sample_context, mbeat)
 
-    "bar #{start_beat.bar} · beat #{start_beat.beat} · #{SampleContext.format_timestamp(ms)}"
+    "b#{start_beat.bar}.#{start_beat.beat} · #{SampleContext.format_timestamp(ms)}"
   end
 
-  defp duration_label_primary(
+  defp table_duration_label(
          %SampleContext{} = sample_context,
          %TimelineContext{} = timeline_context
        ) do
@@ -889,24 +1048,23 @@ defmodule MenschWeb.HomeLive do
     mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
     duration_ms = SampleContext.mbeats_to_ms(sample_context, duration_mbeats)
     duration_s = duration_ms / 1000
+    duration_s_label = :erlang.float_to_binary(duration_s, decimals: 2)
 
     musical =
       cond do
         rem(duration_mbeats, mbeats_per_bar) == 0 ->
-          bars = div(duration_mbeats, mbeats_per_bar)
-          "#{bars} bar"
+          "#{div(duration_mbeats, mbeats_per_bar)}b"
 
         rem(duration_mbeats, mbeats_per_beat) == 0 ->
-          beats = div(duration_mbeats, mbeats_per_beat)
-          "#{beats} beats"
+          "#{div(duration_mbeats, mbeats_per_beat)}bt"
 
         true ->
           beats = div(duration_mbeats, mbeats_per_beat)
           remainder_mbeats = rem(duration_mbeats, mbeats_per_beat)
-          "#{beats} beats + #{remainder_mbeats} mbeats"
+          "#{beats}bt+#{remainder_mbeats}m"
       end
 
-    "#{musical} · #{:erlang.float_to_binary(duration_s, decimals: 2)}s"
+    "#{musical} · #{duration_s_label}s"
   end
 
   defp sample_duration_label(sample_entries, %SampleContext{} = sample_context)
@@ -976,11 +1134,18 @@ defmodule MenschWeb.HomeLive do
     mbeats_per_subbeat = max(div(mbeats_per_beat, 4), 1)
 
     entries =
-      Enum.map(sample_entries, fn %{chord_spec: chord_spec, timeline_context: timeline_context} ->
+      sample_entries
+      |> Enum.with_index()
+      |> Enum.map(fn {%{chord_spec: chord_spec, timeline_context: timeline_context}, index} ->
         start_mbeat = SampleContext.position_to_mbeat(sample_context, timeline_context.start_beat)
         end_mbeat = start_mbeat + TimelineContext.duration_mbeats(timeline_context)
 
-        %{label: short_chord_label(chord_spec), start_mbeat: start_mbeat, end_mbeat: end_mbeat}
+        %{
+          index: index,
+          label: short_chord_label(chord_spec),
+          start_mbeat: start_mbeat,
+          end_mbeat: end_mbeat
+        }
       end)
 
     max_end_mbeat =
@@ -1009,19 +1174,25 @@ defmodule MenschWeb.HomeLive do
     entries_with_geometry =
       entries
       |> Enum.with_index()
-      |> Enum.map(fn {%{label: label, start_mbeat: start_mbeat, end_mbeat: end_mbeat}, index} ->
-        lane_y = lanes_top + index * (lane_height + lane_gap)
+      |> Enum.map(fn {%{
+                        index: source_index,
+                        label: label,
+                        start_mbeat: start_mbeat,
+                        end_mbeat: end_mbeat
+                      }, lane_index} ->
+        lane_y = lanes_top + lane_index * (lane_height + lane_gap)
         x = mbeat_to_svg_x(start_mbeat, total_mbeats)
         width = max(mbeat_to_svg_x(end_mbeat, total_mbeats) - x, 8)
 
         %{
+          index: source_index,
           label: label,
           x: x,
           y: lane_y + 1,
           width: width,
           height: lane_height - 2,
           text_y: lane_y + 14,
-          fill: timeline_color(index)
+          fill: timeline_color(source_index)
         }
       end)
 
@@ -1043,7 +1214,8 @@ defmodule MenschWeb.HomeLive do
     }
   end
 
-  defp sample_timeline_with_playhead(nil, _render_scope, _playhead_pct), do: nil
+  defp sample_timeline_with_playhead(nil, _render_scope, _playhead_pct, _active_chord_indices),
+    do: nil
 
   defp sample_timeline_with_playhead(
          %{
@@ -1051,20 +1223,123 @@ defmodule MenschWeb.HomeLive do
            total_mbeats: total_mbeats
          } = model,
          render_scope,
-         playhead_pct
+         playhead_pct,
+         active_chord_indices
        ) do
-    playhead_x = timeline_playhead_x(playhead_pct, render_scope, source_entries, total_mbeats)
-    Map.put(model, :playhead_x, playhead_x)
+    playhead_x =
+      timeline_playhead_x(
+        playhead_pct,
+        render_scope,
+        source_entries,
+        total_mbeats,
+        active_chord_indices
+      )
+
+    active_set = MapSet.new(active_chord_indices)
+    source_entries_by_index = Map.new(source_entries, &{&1.index, &1})
+
+    {window_start, window_end} =
+      case Enum.filter(source_entries, &MapSet.member?(active_set, &1.index)) do
+        [] ->
+          {0, total_mbeats}
+
+        selected ->
+          {
+            Enum.min_by(selected, & &1.start_mbeat).start_mbeat,
+            Enum.max_by(selected, & &1.end_mbeat).end_mbeat
+          }
+      end
+
+    styled_entries =
+      Enum.map(model.entries, fn entry ->
+        source_entry = Map.get(source_entries_by_index, entry.index)
+
+        in_window =
+          (source_entry &&
+             source_entry.start_mbeat < window_end) and source_entry.end_mbeat > window_start
+
+        is_active = MapSet.member?(active_set, entry.index)
+        state = timeline_entry_state(is_active, in_window)
+
+        entry
+        |> Map.put(:fill, timeline_entry_fill(state, entry.index))
+        |> Map.put(:text_fill, timeline_entry_text_fill(state))
+      end)
+
+    model
+    |> Map.put(:entries, styled_entries)
+    |> Map.put(:playhead_x, playhead_x)
   end
 
-  defp timeline_playhead_x(nil, _render_scope, _entries, _total_mbeats), do: nil
+  defp timeline_entry_state(true, _in_window), do: :active
+  defp timeline_entry_state(false, true), do: :inactive_in_window
+  defp timeline_entry_state(false, false), do: :inactive_outside_window
 
-  defp timeline_playhead_x(playhead_pct, :full_sample, _entries, total_mbeats)
+  defp timeline_entry_fill(:active, index), do: timeline_color(index)
+  defp timeline_entry_fill(:inactive_in_window, _index), do: "#303844"
+  defp timeline_entry_fill(:inactive_outside_window, _index), do: "#252c36"
+
+  defp timeline_entry_text_fill(:active), do: "var(--ui-timeline-label)"
+  defp timeline_entry_text_fill(:inactive_in_window), do: "#7D8898"
+  defp timeline_entry_text_fill(:inactive_outside_window), do: "#626D7D"
+
+  defp timeline_playhead_x(nil, _render_scope, _entries, _total_mbeats, _active_chord_indices),
+    do: nil
+
+  defp timeline_playhead_x(
+         playhead_pct,
+         :full_sample,
+         entries,
+         total_mbeats,
+         active_chord_indices
+       )
        when is_number(playhead_pct) do
-    mbeat_to_svg_x(total_mbeats * (playhead_pct / 100), total_mbeats)
+    clamped_pct = max(min(playhead_pct, 100), 0)
+
+    active_entries =
+      entries
+      |> Enum.filter(&(&1.index in active_chord_indices))
+      |> Enum.sort_by(& &1.start_mbeat)
+
+    case active_entries do
+      [] ->
+        mbeat_to_svg_x(total_mbeats * (clamped_pct / 100), total_mbeats)
+
+      _ ->
+        total_active_mbeats =
+          active_entries
+          |> Enum.map(&max(&1.end_mbeat - &1.start_mbeat, 0))
+          |> Enum.sum()
+          |> max(1)
+
+        compact_playhead_mbeat = total_active_mbeats * (clamped_pct / 100)
+
+        absolute_playhead_mbeat =
+          active_entries
+          |> Enum.reduce_while({compact_playhead_mbeat, 0}, fn entry, {remaining, _acc} ->
+            entry_duration = max(entry.end_mbeat - entry.start_mbeat, 0)
+
+            cond do
+              remaining <= entry_duration ->
+                {:halt, {remaining, entry.start_mbeat + remaining}}
+
+              true ->
+                {:cont, {remaining - entry_duration, entry.end_mbeat}}
+            end
+          end)
+          |> elem(1)
+
+        mbeat_to_svg_x(absolute_playhead_mbeat, total_mbeats)
+    end
   end
 
-  defp timeline_playhead_x(playhead_pct, {:entry, index}, entries, total_mbeats)
+  defp timeline_playhead_x(
+         playhead_pct,
+         {:entry, index},
+         entries,
+         total_mbeats,
+         _active_chord_indices
+       )
        when is_number(playhead_pct) and is_integer(index) do
     case Enum.at(entries, index) do
       %{start_mbeat: start_mbeat, end_mbeat: end_mbeat} ->
@@ -1077,7 +1352,14 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  defp timeline_playhead_x(_playhead_pct, _render_scope, _entries, _total_mbeats), do: nil
+  defp timeline_playhead_x(
+         _playhead_pct,
+         _render_scope,
+         _entries,
+         _total_mbeats,
+         _active_chord_indices
+       ),
+       do: nil
 
   defp timeline_color(index) do
     Enum.at(@chart_colors, rem(index, length(@chart_colors)))
@@ -1153,15 +1435,17 @@ defmodule MenschWeb.HomeLive do
          {min_v, max_v},
          render_scope,
          selected_note_key,
+         active_chord_indices,
+         window_start_mbeat,
          %SampleContext{} = _sample_context,
          total_mbeats
        ) do
-    colors = note_color_map(frames, render_scope, selected_note_key)
+    colors = note_color_map(frames, render_scope, selected_note_key, active_chord_indices)
     total_mbeats = max(total_mbeats, 1)
 
     frames
     |> Enum.flat_map(fn frame ->
-      local_mbeat = frame.at_mbeat
+      local_mbeat = max(frame.at_mbeat - window_start_mbeat, 0)
       x = local_mbeat / total_mbeats * 600
 
       Enum.map(frame.notes, fn note ->
@@ -1201,15 +1485,19 @@ defmodule MenschWeb.HomeLive do
          frames,
          render_scope,
          selected_note_key,
+         active_chord_indices,
+         window_start_mbeat,
          %SampleContext{} = _sample_context,
          total_mbeats
        ) do
-    colors = note_color_map(frames, render_scope, selected_note_key)
+    colors = note_color_map(frames, render_scope, selected_note_key, active_chord_indices)
     total_mbeats = max(total_mbeats, 1)
 
     segments =
       frames
-      |> Enum.flat_map(fn frame -> Enum.map(frame.notes, &{&1, frame.at_mbeat}) end)
+      |> Enum.flat_map(fn frame ->
+        Enum.map(frame.notes, &{&1, frame.at_mbeat - window_start_mbeat})
+      end)
       |> Enum.group_by(fn {note, _at_mbeat} -> note_series_key(note) end)
       |> Enum.flat_map(fn {series_key, entries} ->
         {channel, midi_note_number} = series_channel_note(series_key)
@@ -1323,11 +1611,11 @@ defmodule MenschWeb.HomeLive do
   # Assigns each distinct logical note-event key a stable color shared by both
   # the line charts and the note matrix, preventing channel/note reuse from
   # inheriting colors across distinct events.
-  defp note_color_map(frames, render_scope, selected_note_key) do
+  defp note_color_map(frames, render_scope, selected_note_key, active_chord_indices) do
     frames
     |> base_note_color_map(render_scope)
     |> Map.new(fn {note_key, color} ->
-      {note_key, focus_color(note_key, color, selected_note_key)}
+      {note_key, focus_color(note_key, color, selected_note_key, active_chord_indices)}
     end)
   end
 
@@ -1381,19 +1669,35 @@ defmodule MenschWeb.HomeLive do
   defp note_selected?(_note_key, nil), do: true
   defp note_selected?(note_key, selected_note_key), do: note_key == selected_note_key
 
-  defp focus_color(_series_key, color, nil), do: color
+  defp focus_color(series_key, color, nil, active_chord_indices) do
+    if note_in_active_chords?(series_key, active_chord_indices),
+      do: color,
+      else: @inactive_note_color
+  end
 
-  defp focus_color(series_key, color, {selected_channel, selected_note}) do
+  defp focus_color(series_key, color, {selected_channel, selected_note}, active_chord_indices) do
     {channel, midi_note} = series_channel_note(series_key)
 
-    if channel == selected_channel and midi_note == selected_note do
+    if channel == selected_channel and midi_note == selected_note and
+         note_in_active_chords?(series_key, active_chord_indices) do
       color
     else
       @inactive_note_color
     end
   end
 
-  defp focus_color(_series_key, color, _selected_note_key), do: color
+  defp focus_color(series_key, color, _selected_note_key, active_chord_indices) do
+    if note_in_active_chords?(series_key, active_chord_indices),
+      do: color,
+      else: @inactive_note_color
+  end
+
+  defp note_in_active_chords?(series_key, active_chord_indices) do
+    {entry_index, _machine_id, _chord_instance_id, _note_instance_id, _note, _channel} =
+      series_key
+
+    entry_index in active_chord_indices
+  end
 
   defp selected_note_label(nil), do: "all"
 
@@ -1490,67 +1794,90 @@ defmodule MenschWeb.HomeLive do
         |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
 
       %{frames: frames, duration_ms: duration_ms} ->
-        detail_total_mbeats =
+        full_total_mbeats =
           detail_total_mbeats(frames, duration_ms, socket.assigns.sample_context)
+
+        {window_start_mbeat, window_end_mbeat} =
+          selected_scope_mbeats(
+            socket.assigns.sample_entries,
+            socket.assigns.sample_context,
+            socket.assigns.active_chord_indices,
+            full_total_mbeats
+          )
+
+        scoped_frames = scope_frames(frames, window_start_mbeat, window_end_mbeat)
+        scoped_total_mbeats = max(window_end_mbeat - window_start_mbeat, 1)
 
         socket
         |> assign(
           :pressure_chart,
           build_chart(
-            frames,
+            scoped_frames,
             :pressure,
             {0, 127},
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
+            socket.assigns.active_chord_indices,
+            window_start_mbeat,
             socket.assigns.sample_context,
-            detail_total_mbeats
+            scoped_total_mbeats
           )
         )
         |> assign(
           :slide_chart,
           build_chart(
-            frames,
+            scoped_frames,
             :slide,
             {0, 127},
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
+            socket.assigns.active_chord_indices,
+            window_start_mbeat,
             socket.assigns.sample_context,
-            detail_total_mbeats
+            scoped_total_mbeats
           )
         )
         |> assign(
           :bend_chart,
           build_chart(
-            frames,
+            scoped_frames,
             :bend,
-            value_range(frames),
+            value_range(scoped_frames),
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
+            socket.assigns.active_chord_indices,
+            window_start_mbeat,
             socket.assigns.sample_context,
-            detail_total_mbeats
+            scoped_total_mbeats
           )
         )
         |> assign(
           :debug_rows,
-          debug_rows(frames, socket.assigns.sample_entries, socket.assigns.selected_chord_filter)
+          debug_rows(
+            scoped_frames,
+            socket.assigns.sample_entries,
+            socket.assigns.active_chord_indices
+          )
         )
         |> assign(
           :note_matrix,
           build_note_matrix(
-            frames,
+            scoped_frames,
             socket.assigns.render_scope,
             socket.assigns.selected_note_key,
+            socket.assigns.active_chord_indices,
+            window_start_mbeat,
             socket.assigns.sample_context,
-            detail_total_mbeats
+            scoped_total_mbeats
           )
         )
         |> assign(
           :chart_grid,
-          chart_grid_model(socket.assigns.sample_context, detail_total_mbeats)
+          chart_grid_model(socket.assigns.sample_context, scoped_total_mbeats)
         )
         |> assign(
           :note_matrix_grid,
-          note_matrix_grid_model(socket.assigns.sample_context, detail_total_mbeats)
+          note_matrix_grid_model(socket.assigns.sample_context, scoped_total_mbeats)
         )
     end
   end

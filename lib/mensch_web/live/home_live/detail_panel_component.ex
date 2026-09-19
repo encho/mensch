@@ -93,24 +93,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
       <div id="debug-frames" class="border border-zinc-700/60">
         <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-400">
           <span>All frames</span>
-          <form phx-change="set_chord_filter" class="flex items-center gap-2 normal-case">
-            <label for="chord-filter" class="text-[10px] uppercase tracking-wide text-zinc-500">
-              Chord id
-            </label>
-            <select
-              id="chord-filter"
-              name="chord_filter"
-              class="border border-zinc-600 bg-zinc-900 px-2 py-1 font-mono text-[10px] text-zinc-200"
-            >
-              <option
-                :for={option <- @chord_filter_options}
-                value={option.value}
-                selected={option.value == @selected_chord_filter}
-              >
-                {option.label}
-              </option>
-            </select>
-          </form>
+          <span class="text-[10px] uppercase tracking-wide text-zinc-500">Filtered by active chords</span>
         </div>
         <div class="max-h-48 overflow-y-auto">
           <table class="w-full text-left font-mono text-[11px]">

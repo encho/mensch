@@ -53,28 +53,12 @@ defmodule MenschWeb.Layouts do
     ~H"""
     <header class="border-b border-white/15 px-4 sm:px-6 lg:px-8">
       <div class="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 py-4">
-        <a href="/" class="flex items-center gap-1.5">
-          <img src={~p"/images/logo.svg"} width="20" />
-          <span class="text-base font-bold text-white">mensch</span>
-        </a>
-        <div class="flex items-center justify-center">{render_slot(@navbar_center)}</div>
         <div class="flex items-center gap-3">
-          <form
-            :if={@bpm}
-            phx-change="set_bpm"
-            class="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 focus-within:border-white/50"
-            title="Global tempo"
-          >
-            <label for="global-bpm" class="text-white/40">BPM</label>
-            <input
-              type="number"
-              name="bpm"
-              id="global-bpm"
-              min="1"
-              value={@bpm}
-              class="w-10 appearance-none border-0 bg-transparent p-0 text-right font-mono text-white [appearance:textfield] focus:outline-none focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-          </form>
+          <a href="/" class="flex items-center gap-1.5">
+            <img src={~p"/images/logo.svg"} width="20" />
+            <span class="text-base font-bold text-white">mensch</span>
+          </a>
+
           <div :if={@midi_status} class="relative">
             <button
               type="button"
@@ -89,7 +73,7 @@ defmodule MenschWeb.Layouts do
             <div
               id="midi-popup"
               phx-click-away={JS.hide(to: "#midi-popup")}
-              class="absolute right-0 top-full z-10 mt-3 hidden w-64 flex-col gap-3 border border-white/15 bg-black p-4"
+              class="absolute left-0 top-full z-10 mt-3 hidden w-64 flex-col gap-3 border border-white/15 bg-black p-4"
             >
               <div class="flex items-center gap-2">
                 <span class={[
@@ -110,15 +94,34 @@ defmodule MenschWeb.Layouts do
               </button>
             </div>
           </div>
-
+        </div>
+        <div class="flex items-center justify-center">{render_slot(@navbar_center)}</div>
+        <div class="flex items-center gap-3">
+          <form
+            :if={@bpm}
+            phx-change="set_bpm"
+            class="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 focus-within:border-white/50"
+            title="Global tempo"
+          >
+            <label for="global-bpm" class="text-white/40">BPM</label>
+            <input
+              type="number"
+              name="bpm"
+              id="global-bpm"
+              min="1"
+              value={@bpm}
+              class="w-10 appearance-none border-0 bg-transparent p-0 text-right font-mono text-white [appearance:textfield] focus:outline-none focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+          </form>
           <button
             :if={@show_samples_button}
             type="button"
             id="open-samples-modal"
             phx-click="open_samples_modal"
-            class="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 text-xs uppercase tracking-wide text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
+            aria-label="Open sample library"
+            class="flex size-9 items-center justify-center border border-white/20 text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
           >
-            <.icon name="hero-queue-list" class="size-4" /> Sample Library
+            <.icon name="hero-bars-3" class="size-4" />
           </button>
         </div>
       </div>
