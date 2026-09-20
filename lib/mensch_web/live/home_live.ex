@@ -725,9 +725,10 @@ defmodule MenschWeb.HomeLive do
           :for={entry <- @model.entries}
           x={entry.x + 6}
           y={entry.text_y}
-          fill={Map.get(entry, :text_fill, "var(--ui-timeline-label)")}
+          fill={Map.get(entry, :text_fill, "#000000")}
           fill-opacity="0.9"
-          font-size="10"
+          font-size="11"
+          font-weight="400"
           font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
         >
           {entry.label}
@@ -1485,7 +1486,7 @@ defmodule MenschWeb.HomeLive do
   defp timeline_entry_fill(:inactive_in_window, _index), do: "#303844"
   defp timeline_entry_fill(:inactive_outside_window, _index), do: "#252c36"
 
-  defp timeline_entry_text_fill(:active), do: "var(--ui-timeline-label)"
+  defp timeline_entry_text_fill(:active), do: "#000000"
   defp timeline_entry_text_fill(:inactive_in_window), do: "#7D8898"
   defp timeline_entry_text_fill(:inactive_outside_window), do: "#626D7D"
 
