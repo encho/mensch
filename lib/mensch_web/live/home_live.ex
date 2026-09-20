@@ -83,6 +83,9 @@ defmodule MenschWeb.HomeLive do
       |> assign(:pressure_chart, [])
       |> assign(:slide_chart, [])
       |> assign(:bend_chart, [])
+      |> assign(:pressure_axis, pressure_slide_axis())
+      |> assign(:slide_axis, pressure_slide_axis())
+      |> assign(:bend_axis, bend_axis({-1.0, 1.0}))
       |> assign(:debug_rows, [])
       |> assign(:note_matrix, [])
       |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
@@ -560,6 +563,9 @@ defmodule MenschWeb.HomeLive do
             pressure_chart={@pressure_chart}
             slide_chart={@slide_chart}
             bend_chart={@bend_chart}
+            pressure_axis={@pressure_axis}
+            slide_axis={@slide_axis}
+            bend_axis={@bend_axis}
             chart_grid={@chart_grid}
             debug_rows={@debug_rows}
             debug_on_filter={@debug_on_filter}
@@ -646,7 +652,7 @@ defmodule MenschWeb.HomeLive do
   defp sample_timeline(assigns) do
     ~H"""
     <div id="sample-timeline" class="space-y-2 bg-zinc-950/70 py-3">
-      <div class="flex items-center justify-between font-mono text-[11px] text-zinc-400">
+      <div class="ui-chart-title flex items-center justify-between font-mono text-[11px] text-zinc-400">
         <span class="uppercase tracking-wide">Timeline</span>
         <span>
           {@model.row_count} rows · {@model.bar_count} bars · {@model.beat_count} beats · {@model.total_mbeats} mbeats
@@ -2048,6 +2054,9 @@ defmodule MenschWeb.HomeLive do
         |> assign(:pressure_chart, [])
         |> assign(:slide_chart, [])
         |> assign(:bend_chart, [])
+        |> assign(:pressure_axis, pressure_slide_axis())
+        |> assign(:slide_axis, pressure_slide_axis())
+        |> assign(:bend_axis, bend_axis({-1.0, 1.0}))
         |> assign(:debug_rows, [])
         |> assign(:note_matrix, [])
         |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
@@ -2083,6 +2092,7 @@ defmodule MenschWeb.HomeLive do
             scoped_total_mbeats
           )
         )
+        |> assign(:pressure_axis, pressure_slide_axis())
         |> assign(
           :slide_chart,
           build_chart(
@@ -2097,6 +2107,8 @@ defmodule MenschWeb.HomeLive do
             scoped_total_mbeats
           )
         )
+        |> assign(:slide_axis, pressure_slide_axis())
+        |> assign(:bend_axis, bend_axis(value_range(scoped_frames)))
         |> assign(
           :bend_chart,
           build_chart(
@@ -2154,5 +2166,39 @@ defmodule MenschWeb.HomeLive do
       {same, same} -> {same - 0.0001, same + 0.0001}
       {min_v, max_v} -> {min_v, max_v}
     end
+  end
+
+  defp pressure_slide_axis do
+    %{
+      min: 0,
+      max: 127,
+      ticks: [
+        %{value: 0, label: "0"},
+        %{value: 32, label: "32"},
+        %{value: 64, label: "64"},
+        %{value: 96, label: "96"},
+        %{value: 127, label: "127"}
+      ]
+    }
+  end
+
+  defp bend_axis({min_v, max_v}) do
+    steps = 4
+
+    ticks =
+      for step_index <- 0..steps do
+        value = min_v + (max_v - min_v) * (step_index / steps)
+        %{value: value, label: format_bend_tick(value)}
+      end
+
+    %{min: min_v, max: max_v, ticks: ticks}
+  end
+
+  defp format_bend_tick(value) when is_number(value) do
+    value
+    |> Float.round(4)
+    |> :erlang.float_to_binary(decimals: 4)
+    |> String.replace(~r/0+$/, "")
+    |> String.replace(~r/\.$/, "")
   end
 end

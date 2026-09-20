@@ -6,7 +6,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
     ~H"""
     <div class="space-y-4 bg-zinc-950/75 py-4">
       <div id="note-matrix">
-        <div class="flex items-center justify-between gap-3 border-b border-zinc-700/60 py-1.5">
+        <div class="ui-chart-title flex items-center justify-between gap-3 border-b border-zinc-700/60 py-1.5">
           <div class="text-[11px] uppercase tracking-wide text-zinc-400">Note matrix</div>
           <div class="flex items-center gap-3 font-mono text-[10px] text-zinc-500">
             <span>Focus: {@selected_note_label}</span>
@@ -75,9 +75,14 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
         </div>
       </div>
 
-      <.chart title="Pressure" chart={@pressure_chart} grid={@chart_grid} />
-      <.chart title="Slide (Aftertouch)" chart={@slide_chart} grid={@chart_grid} />
-      <.chart title="Bend (Vibrato)" chart={@bend_chart} grid={@chart_grid} />
+      <.chart title="Pressure" chart={@pressure_chart} grid={@chart_grid} axis={@pressure_axis} />
+      <.chart
+        title="Slide (Aftertouch)"
+        chart={@slide_chart}
+        grid={@chart_grid}
+        axis={@slide_axis}
+      />
+      <.chart title="Bend (Vibrato)" chart={@bend_chart} grid={@chart_grid} axis={@bend_axis} />
 
       <div class="text-[11px] uppercase tracking-wide text-zinc-400">Rendered frames and curves</div>
 
@@ -175,21 +180,22 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
   attr :title, :string, required: true
   attr :chart, :list, required: true
   attr :grid, :map, required: true
+  attr :axis, :map, required: true
 
   defp chart(assigns) do
     ~H"""
     <div>
-      <div class="mb-1 text-[11px] uppercase tracking-wide text-zinc-400">{@title}</div>
-      <svg viewBox="0 0 600 120" class="w-full bg-zinc-950">
+      <div class="ui-chart-title text-[11px] uppercase tracking-wide text-zinc-400">{@title}</div>
+      <svg viewBox="0 0 600 120" class="w-full overflow-visible bg-zinc-950">
         <line
           :for={x <- @grid.subbeat_xs}
           x1={x}
           y1="0"
           x2={x}
           y2="120"
-          stroke="var(--ui-grid-subbeat)"
-          stroke-opacity="0.32"
-          stroke-width="1"
+          stroke="var(--ui-chart-x-gridline-color)"
+          stroke-opacity="var(--ui-chart-x-gridline-opacity)"
+          stroke-width="var(--ui-chart-x-gridline-width)"
         />
         <line
           :for={x <- @grid.beat_xs}
@@ -197,9 +203,9 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           y1="0"
           x2={x}
           y2="120"
-          stroke="var(--ui-grid-beat)"
-          stroke-opacity="0.38"
-          stroke-width="1"
+          stroke="var(--ui-chart-x-beat-gridline-color)"
+          stroke-opacity="var(--ui-chart-x-beat-gridline-opacity)"
+          stroke-width="var(--ui-chart-x-beat-gridline-width)"
         />
         <line
           :for={x <- @grid.bar_xs}
@@ -207,9 +213,9 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           y1="0"
           x2={x}
           y2="120"
-          stroke="var(--ui-grid-bar)"
-          stroke-opacity="0.45"
-          stroke-width="1.6"
+          stroke="var(--ui-chart-x-bar-gridline-color)"
+          stroke-opacity="var(--ui-chart-x-bar-gridline-opacity)"
+          stroke-width="var(--ui-chart-x-bar-gridline-width)"
         />
         <polyline
           :for={series <- @chart}
@@ -218,9 +224,54 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
           stroke={series.color}
           stroke-width="1.5"
         />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="120"
+          stroke="#d4d4d8"
+          stroke-opacity="0.85"
+          stroke-width="1.1"
+        />
+        <line
+          :for={tick <- @axis.ticks}
+          x1="0"
+          y1={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          x2="600"
+          y2={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          stroke="var(--ui-chart-y-gridline-color)"
+          stroke-opacity="var(--ui-chart-y-gridline-opacity)"
+          stroke-width="var(--ui-chart-y-gridline-width)"
+        />
+        <line
+          :for={tick <- @axis.ticks}
+          x1="0"
+          y1={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          x2="6"
+          y2={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          stroke="#d4d4d8"
+          stroke-opacity="0.8"
+          stroke-width="1"
+        />
+        <text
+          :for={tick <- @axis.ticks}
+          class="ui-chart-tick-label"
+          x="8"
+          y={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          fill="#d4d4d8"
+          dominant-baseline="middle"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
+        >
+          {tick.label}
+        </text>
       </svg>
     </div>
     """
+  end
+
+  defp chart_y_for_value(value, min_v, max_v) do
+    range = max(max_v - min_v, 0.0001)
+    120 - (value - min_v) / range * 120
   end
 
   defp format_bend(bend), do: Float.round(bend * 1.0, 5)

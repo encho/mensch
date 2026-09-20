@@ -33,7 +33,9 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             start_beat: %BeatPosition{bar: 1, beat: 0, mbeat: 0},
             duration_mbeats: 4000
           },
-          machine: %RootNote{params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}}
+          machine: %RootNote{
+            params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}
+          }
         },
         %{
           chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 3, inversion: 3},
@@ -41,7 +43,9 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             start_beat: %BeatPosition{bar: 2, beat: 0, mbeat: 0},
             duration_mbeats: 4000
           },
-          machine: %RootNote{params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}}
+          machine: %RootNote{
+            params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}
+          }
         }
       ]
     }
