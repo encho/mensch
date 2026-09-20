@@ -7,7 +7,7 @@ defmodule Mensch.NewModulation.LfoCurve do
 
   alias Mensch.SampleContext
 
-  @type curve :: :sine | :triangle | :saw_up | :saw_down | :square
+  @type curve :: :sine | :triangle | :square
   @type polarity :: :bipolar | :unipolar
   @type anchor :: :sample | :chord | :note
 
@@ -91,8 +91,6 @@ defmodule Mensch.NewModulation.LfoCurve do
 
   defp waveform_value(:sine, cycle_phase), do: :math.sin(2 * :math.pi() * cycle_phase)
   defp waveform_value(:triangle, cycle_phase), do: 1.0 - 4.0 * abs(cycle_phase - 0.5)
-  defp waveform_value(:saw_up, cycle_phase), do: cycle_phase
-  defp waveform_value(:saw_down, cycle_phase), do: -cycle_phase
   defp waveform_value(:square, cycle_phase), do: if(cycle_phase < 0.5, do: 1.0, else: -1.0)
 
   defp apply_polarity(value, %__MODULE__{polarity: :bipolar}), do: value
@@ -107,15 +105,14 @@ defmodule Mensch.NewModulation.LfoCurve do
   defp clamp_0_1(value), do: value |> max(0.0) |> min(1.0)
 
   defp normalize_curve!(curve, _field_name)
-       when curve in [:sine, :triangle, :saw_up, :saw_down, :square],
+         when curve in [:sine, :triangle, :square],
        do: curve
 
   defp normalize_curve!(:sin, _field_name), do: :sine
-  defp normalize_curve!(:saw, _field_name), do: :saw_up
 
   defp normalize_curve!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.curve must be one of :sine, :triangle, :saw_up, :saw_down, :square, got: #{inspect(other)}"
+      "#{field_name}.curve must be one of :sine, :triangle, :square, got: #{inspect(other)}"
   end
 
   defp normalize_scale!(value, _field_name) when is_integer(value), do: value * 1.0
