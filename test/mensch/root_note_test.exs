@@ -3,10 +3,11 @@ defmodule Mensch.RootNoteTest do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.LfoParams
   alias Mensch.Machine
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
+  alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoGroup
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -162,7 +163,10 @@ defmodule Mensch.RootNoteTest do
         params: %RootNoteParams{
           RootNoteParams.default()
           | pressure: 80,
-            lfo_pressure: %{scale: 0.0}
+            lfo_pressure: %{
+              lfo: %LfoGroup{initial: %LfoCurve{scale: 0.0}},
+              mode: :add
+            }
         }
       }
 
@@ -171,14 +175,19 @@ defmodule Mensch.RootNoteTest do
         params: %RootNoteParams{
           RootNoteParams.default()
           | pressure: 80,
-            lfo_pressure: %LfoParams{
-              curve: :square,
-              scale: 3.0,
-              cycles_per_bar: 1.0,
-              shift_mbeats: 0.0,
-              polarity: :bipolar,
-              time_base: :chord,
-              mode: :additive
+            lfo_pressure: %{
+              lfo: %LfoGroup{
+                initial: %LfoCurve{
+                  curve: :square,
+                  scale: 3.0,
+                  cycles_per_bar: 1.0,
+                  shift_mbeats: 0.0,
+                  polarity: :bipolar,
+                  time_base: :chord
+                },
+                operations: []
+              },
+              mode: :add
             }
         }
       }

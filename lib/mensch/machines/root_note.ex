@@ -8,12 +8,12 @@ defmodule Mensch.Machines.RootNote do
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.LfoParams
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
-  alias Mensch.Modulation.Lfo
   alias Mensch.Machines.RootNoteParams
+  alias Mensch.NewModulation
+  alias Mensch.NewModulation.Lfo
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -52,7 +52,7 @@ defmodule Mensch.Machines.RootNote do
         opts \\ []
       ) do
     %RootNoteParams{} = params = machine_params!(opts) |> hydrate_params()
-    pressure_lfo = Lfo.normalize!(params.lfo_pressure, field_name: "root_note lfo_pressure")
+    pressure_lfo = params.lfo_pressure
 
     frame_mbeats = SampleContext.frame_units(sample_context)
     entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
@@ -93,7 +93,8 @@ defmodule Mensch.Machines.RootNote do
         params.pressure,
         sample_context,
         entry_start_mbeat_abs,
-        pressure_lfo
+        pressure_lfo.lfo,
+        pressure_lfo.mode
       )
 
     max_note_end_mbeats = note_plan_item.delay_mbeats + chord_duration_mbeats
@@ -111,7 +112,8 @@ defmodule Mensch.Machines.RootNote do
          pressure,
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
-         %LfoParams{} = pressure_lfo
+         pressure_lfo,
+         pressure_lfo_mode
        ) do
     note_end_mbeat = min(note.delay_mbeats + duration_mbeats, duration_mbeats)
 
@@ -126,7 +128,8 @@ defmodule Mensch.Machines.RootNote do
             pressure,
             sample_context,
             entry_start_mbeat_abs,
-            pressure_lfo
+            pressure_lfo,
+            pressure_lfo_mode
           )
       }
     end
@@ -149,13 +152,14 @@ defmodule Mensch.Machines.RootNote do
          pressure,
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
-         %LfoParams{} = pressure_lfo
+         pressure_lfo,
+         pressure_lfo_mode
        ) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     phase = if(local_elapsed_mbeats < duration_mbeats, do: :sustain, else: :release)
 
-    pressure_lfo_norm =
-      Lfo.value_at_mbeat(
+    pressure_lfo_value =
+      Lfo.evaluate(
         pressure_lfo,
         at_mbeat,
         sample_context,
@@ -163,7 +167,8 @@ defmodule Mensch.Machines.RootNote do
         local_elapsed_mbeats
       )
 
-    modulated_pressure = Lfo.apply_to_pressure(pressure, pressure_lfo_norm, pressure_lfo)
+    modulated_pressure =
+      NewModulation.apply_to_pressure(pressure, pressure_lfo_value, pressure_lfo_mode)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
@@ -193,9 +198,22 @@ defmodule Mensch.Machines.RootNote do
     defaults = default_params() |> Map.from_struct()
     current = params |> Map.from_struct()
 
+    # Merge defaults first, then canonicalize lfo_pressure so rendering code can
+    # rely on a validated %{lfo: ..., mode: ...} shape.
     defaults
     |> Map.merge(current)
+    |> Map.update!(
+      :lfo_pressure,
+      &NewModulation.normalize_lfo_pressure!(&1, "root_note lfo_pressure")
+    )
     |> then(&struct!(RootNoteParams, &1))
+  end
+
+  @doc false
+  @spec normalize_lfo_pressure(map()) :: NewModulation.lfo_pressure()
+  # Public wrapper used by protocol controls/1 to expose normalized machine params.
+  def normalize_lfo_pressure(lfo_pressure) do
+    NewModulation.normalize_lfo_pressure!(lfo_pressure, "root_note lfo_pressure")
   end
 
   defp root_midi_note!(%ChordSpec{} = chord_spec, octave_offset) when is_integer(octave_offset) do
@@ -250,14 +268,12 @@ defmodule Mensch.Machines.RootNote do
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
-  alias Mensch.Modulation.Lfo
   alias Mensch.Machines.RootNote
 
   def id(_machine), do: RootNote.id()
 
   def controls(%RootNote{params: params}) do
-    lfo_pressure =
-      Lfo.normalize!(Map.get(params, :lfo_pressure), field_name: "root_note lfo_pressure")
+    lfo_pressure = RootNote.normalize_lfo_pressure(Map.get(params, :lfo_pressure))
 
     %{
       octave_offset: params.octave_offset,

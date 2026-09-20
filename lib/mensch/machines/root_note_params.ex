@@ -10,16 +10,21 @@ defmodule Mensch.Machines.RootNoteParams do
   * `velocity`: MIDI note-on velocity (`0..127`).
   * `pressure`: Constant baseline pressure value held for the full note
     (`0..127`) before LFO modulation is applied.
-  * `lfo_pressure`: Pressure LFO settings.
+  * `lfo_pressure`: Pressure modulation config represented as
+    `%{lfo: lfo_term, mode: :add | :multiply}`.
   """
 
-  alias Mensch.LfoParams
+  alias Mensch.NewModulation
+  alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoGroup
+
+  @type lfo_pressure :: NewModulation.lfo_pressure()
 
   @type t :: %__MODULE__{
           octave_offset: integer(),
           velocity: non_neg_integer(),
           pressure: non_neg_integer(),
-          lfo_pressure: LfoParams.t()
+          lfo_pressure: lfo_pressure()
         }
 
   @enforce_keys [
@@ -32,7 +37,7 @@ defmodule Mensch.Machines.RootNoteParams do
     :octave_offset,
     :velocity,
     :pressure,
-    lfo_pressure: %LfoParams{}
+    lfo_pressure: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :additive}
   ]
 
   @doc "Default parameters for the root note machine."
@@ -42,7 +47,7 @@ defmodule Mensch.Machines.RootNoteParams do
       octave_offset: 0,
       velocity: 100,
       pressure: 80,
-      lfo_pressure: LfoParams.default()
+      lfo_pressure: %{lfo: LfoGroup.default(), mode: :add}
     }
   end
 end
