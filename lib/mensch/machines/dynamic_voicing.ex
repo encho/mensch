@@ -485,7 +485,8 @@ defmodule Mensch.Machines.DynamicVoicing do
         local_elapsed_mbeats
       )
 
-    pressure = Lfo.apply_to_pressure(adsr_level, pressure_lfo_norm, pressure_lfo)
+    baseline_pressure = clamp_7bit(adsr_level * 127)
+    pressure = Lfo.apply_to_pressure(baseline_pressure, pressure_lfo_norm, pressure_lfo)
 
     # Slide modulation is additive over baseline 0; polarity is configured in lfo_slide.
     slide_lfo_norm =
@@ -602,6 +603,8 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   defp snap_mbeats(mbeats, mbeats_per_frame),
     do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
+
+  defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 
   defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_end_mbeat)
        when max_note_end_mbeats == chord_end_mbeat,

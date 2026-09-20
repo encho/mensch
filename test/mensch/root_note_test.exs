@@ -3,6 +3,7 @@ defmodule Mensch.RootNoteTest do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.LfoParams
   alias Mensch.Machine
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
@@ -144,6 +145,72 @@ defmodule Mensch.RootNoteTest do
 
     assert pressures != []
     assert Enum.all?(pressures, &(&1 == 80))
+  end
+
+  test "lfo_pressure modulates baseline pressure" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 500})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 3, inversion: 0}
+
+    base_machine =
+      %RootNote{
+        params: %RootNoteParams{
+          RootNoteParams.default()
+          | pressure: 80,
+            lfo_pressure: %{scale: 0.0}
+        }
+      }
+
+    modulated_machine =
+      %RootNote{
+        params: %RootNoteParams{
+          RootNoteParams.default()
+          | pressure: 80,
+            lfo_pressure: %LfoParams{
+              curve: :square,
+              scale: 3.0,
+              cycles_per_bar: 1.0,
+              shift_mbeats: 0.0,
+              polarity: :bipolar,
+              time_base: :chord,
+              mode: :additive
+            }
+        }
+      }
+
+    base_rendered =
+      Machine.build_frame_sequence(base_machine, chord_spec, sample_context, timeline_context, [])
+
+    modulated_rendered =
+      Machine.build_frame_sequence(
+        modulated_machine,
+        chord_spec,
+        sample_context,
+        timeline_context,
+        []
+      )
+
+    pressure_at = fn rendered, at_mbeat ->
+      rendered.frames
+      |> Enum.find(&(&1.at_mbeat == at_mbeat))
+      |> Map.fetch!(:notes)
+      |> hd()
+      |> Map.fetch!(:pressure)
+    end
+
+    base_at_1000 = pressure_at.(base_rendered, 1000)
+    base_at_3000 = pressure_at.(base_rendered, 3000)
+
+    mod_at_1000 = pressure_at.(modulated_rendered, 1000)
+    mod_at_3000 = pressure_at.(modulated_rendered, 3000)
+
+    assert mod_at_1000 > base_at_1000
+    assert mod_at_3000 < base_at_3000
   end
 
   defp first_note_on_note(frames) do

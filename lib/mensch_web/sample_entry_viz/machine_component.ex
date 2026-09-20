@@ -69,7 +69,8 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       {"octave_offset", params.octave_offset},
       {"velocity", params.velocity},
-      {"pressure", params.pressure}
+      {"pressure", params.pressure},
+      {"lfo_pressure", inspect(params.lfo_pressure)}
     ]
   end
 

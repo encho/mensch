@@ -80,15 +80,17 @@ defmodule Mensch.Modulation.Lfo do
     |> apply_polarity(lfo_params)
   end
 
-  @spec apply_to_pressure(float(), float(), LfoParams.t()) :: integer()
-  def apply_to_pressure(adsr_level, lfo_norm, %LfoParams{mode: :additive, scale: scale}) do
-    normalized = adsr_level + lfo_norm * adsr_level * scale
-    clamp_7bit(normalized * 127)
+  @spec apply_to_pressure(non_neg_integer(), float(), LfoParams.t()) :: integer()
+  def apply_to_pressure(baseline_7bit, lfo_norm, %LfoParams{mode: :additive, scale: scale}) do
+    clamp_7bit(baseline_7bit + lfo_norm * scale)
   end
 
-  def apply_to_pressure(adsr_level, lfo_norm, %LfoParams{mode: :multiplicative, scale: scale}) do
-    normalized = adsr_level * (1 + lfo_norm * adsr_level * scale)
-    clamp_7bit(normalized * 127)
+  def apply_to_pressure(
+        baseline_7bit,
+        lfo_norm,
+        %LfoParams{mode: :multiplicative, scale: scale}
+      ) do
+    clamp_7bit(baseline_7bit + lfo_norm * scale)
   end
 
   @spec apply_additive_to_7bit(non_neg_integer(), float(), LfoParams.t()) :: integer()

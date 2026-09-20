@@ -8,9 +8,11 @@ defmodule Mensch.Machines.RootNote do
   """
 
   alias Mensch.ChordSpec
+  alias Mensch.LfoParams
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
+  alias Mensch.Modulation.Lfo
   alias Mensch.Machines.RootNoteParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
@@ -38,7 +40,8 @@ defmodule Mensch.Machines.RootNote do
     %{
       octave_offset: params.octave_offset,
       velocity: params.velocity,
-      pressure: params.pressure
+      pressure: params.pressure,
+      lfo_pressure: params.lfo_pressure
     }
   end
 
@@ -49,8 +52,10 @@ defmodule Mensch.Machines.RootNote do
         opts \\ []
       ) do
     %RootNoteParams{} = params = machine_params!(opts) |> hydrate_params()
+    pressure_lfo = Lfo.normalize!(params.lfo_pressure, field_name: "root_note lfo_pressure")
 
     frame_mbeats = SampleContext.frame_units(sample_context)
+    entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
 
     chord_duration_mbeats =
       timeline_context
@@ -85,7 +90,10 @@ defmodule Mensch.Machines.RootNote do
         note_plan_item,
         chord_duration_mbeats,
         frame_mbeats,
-        params.pressure
+        params.pressure,
+        sample_context,
+        entry_start_mbeat_abs,
+        pressure_lfo
       )
 
     max_note_end_mbeats = note_plan_item.delay_mbeats + chord_duration_mbeats
@@ -96,11 +104,31 @@ defmodule Mensch.Machines.RootNote do
     }
   end
 
-  defp render_note_frame_stream(note, duration_mbeats, frame_mbeats, pressure) do
+  defp render_note_frame_stream(
+         note,
+         duration_mbeats,
+         frame_mbeats,
+         pressure,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs,
+         %LfoParams{} = pressure_lfo
+       ) do
     note_end_mbeat = min(note.delay_mbeats + duration_mbeats, duration_mbeats)
 
     for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
-      %{at_mbeat: at_mbeat, note: note_frame(note, at_mbeat, duration_mbeats, pressure)}
+      %{
+        at_mbeat: at_mbeat,
+        note:
+          note_frame(
+            note,
+            at_mbeat,
+            duration_mbeats,
+            pressure,
+            sample_context,
+            entry_start_mbeat_abs,
+            pressure_lfo
+          )
+      }
     end
   end
 
@@ -114,15 +142,34 @@ defmodule Mensch.Machines.RootNote do
     end
   end
 
-  defp note_frame(note, at_mbeat, duration_mbeats, pressure) do
+  defp note_frame(
+         note,
+         at_mbeat,
+         duration_mbeats,
+         pressure,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs,
+         %LfoParams{} = pressure_lfo
+       ) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
     phase = if(local_elapsed_mbeats < duration_mbeats, do: :sustain, else: :release)
+
+    pressure_lfo_norm =
+      Lfo.value_at_mbeat(
+        pressure_lfo,
+        at_mbeat,
+        sample_context,
+        entry_start_mbeat_abs,
+        local_elapsed_mbeats
+      )
+
+    modulated_pressure = Lfo.apply_to_pressure(pressure, pressure_lfo_norm, pressure_lfo)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
       note_off: local_elapsed_mbeats == duration_mbeats,
-      pressure: clamp_7bit(pressure),
+      pressure: modulated_pressure,
       bend: 0.0,
       slide: 0
     })
@@ -185,6 +232,13 @@ defmodule Mensch.Machines.RootNote do
   defp snap_mbeats(mbeats, mbeats_per_frame),
     do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
 
+  defp entry_start_mbeat_abs(opts) do
+    case Keyword.get(opts, :entry_start_mbeat_abs, 0) do
+      value when is_integer(value) and value >= 0 -> value
+      other -> raise ArgumentError, "invalid :entry_start_mbeat_abs: #{inspect(other)}"
+    end
+  end
+
   defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
        when max_note_end_mbeats == chord_duration_mbeats,
        do: :ok
@@ -193,20 +247,23 @@ defmodule Mensch.Machines.RootNote do
     raise ArgumentError,
           "root_note invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_duration_mbeats}"
   end
-
-  defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
+  alias Mensch.Modulation.Lfo
   alias Mensch.Machines.RootNote
 
   def id(_machine), do: RootNote.id()
 
   def controls(%RootNote{params: params}) do
+    lfo_pressure =
+      Lfo.normalize!(Map.get(params, :lfo_pressure), field_name: "root_note lfo_pressure")
+
     %{
       octave_offset: params.octave_offset,
       velocity: params.velocity,
-      pressure: params.pressure
+      pressure: params.pressure,
+      lfo_pressure: lfo_pressure
     }
   end
 

@@ -3,10 +3,21 @@ defmodule Mensch.SampleDb.Sample12RootNote do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.LfoParams
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
+
+  @lfo_pressure %LfoParams{
+    curve: :sine,
+    scale: 20.0,
+    cycles_per_bar: 10.0,
+    shift_mbeats: 0.0,
+    polarity: :bipolar,
+    time_base: :note,
+    mode: :additive
+  }
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
@@ -24,7 +35,11 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
-            params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}
+            params: %RootNoteParams{
+              RootNoteParams.default()
+              | octave_offset: -1,
+                lfo_pressure: @lfo_pressure
+            }
           }
         },
         %{
@@ -34,7 +49,11 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
-            params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}
+            params: %RootNoteParams{
+              RootNoteParams.default()
+              | octave_offset: -1,
+                lfo_pressure: @lfo_pressure
+            }
           }
         },
         %{
@@ -44,7 +63,11 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
-            params: %RootNoteParams{RootNoteParams.default() | octave_offset: -1}
+            params: %RootNoteParams{
+              RootNoteParams.default()
+              | octave_offset: -1,
+                lfo_pressure: @lfo_pressure
+            }
           }
         }
       ]
