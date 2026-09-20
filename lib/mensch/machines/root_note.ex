@@ -8,7 +8,6 @@ defmodule Mensch.Machines.RootNote do
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.Envelope.ADSR
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
@@ -39,14 +38,7 @@ defmodule Mensch.Machines.RootNote do
     %{
       octave_offset: params.octave_offset,
       velocity: params.velocity,
-      attack_mbeats: params.attack_mbeats,
-      decay_mbeats: params.decay_mbeats,
-      release_mbeats: params.release_mbeats,
-      attack_curve: params.attack_curve,
-      decay_curve: params.decay_curve,
-      release_curve: params.release_curve,
-      peak_level: params.peak_level,
-      sustain_level: params.sustain_level
+      pressure: params.pressure
     }
   end
 
@@ -88,24 +80,15 @@ defmodule Mensch.Machines.RootNote do
         delay_mbeats: sample_start_mbeat
       })
 
-    adsr =
-      ADSR.from_mbeats(chord_duration_mbeats, sample_context, %{
-        attack_mbeats: params.attack_mbeats,
-        decay_mbeats: params.decay_mbeats,
-        release_mbeats: params.release_mbeats,
-        attack_curve: params.attack_curve,
-        decay_curve: params.decay_curve,
-        release_curve: params.release_curve,
-        peak_level: params.peak_level,
-        sustain_level: params.sustain_level
-      })
-
-    planned_note = NotePlanItem.with_adsr(note_plan_item, adsr)
-
     note_frame_stream =
-      render_note_frame_stream(planned_note, chord_duration_mbeats, frame_mbeats)
+      render_note_frame_stream(
+        note_plan_item,
+        chord_duration_mbeats,
+        frame_mbeats,
+        params.pressure
+      )
 
-    max_note_end_mbeats = planned_note.delay_mbeats + planned_note.adsr.total_mbeats
+    max_note_end_mbeats = note_plan_item.delay_mbeats + chord_duration_mbeats
     assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
 
     %MachineFrameSequence{
@@ -113,11 +96,11 @@ defmodule Mensch.Machines.RootNote do
     }
   end
 
-  defp render_note_frame_stream(note, duration_mbeats, frame_mbeats) do
-    note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, duration_mbeats)
+  defp render_note_frame_stream(note, duration_mbeats, frame_mbeats, pressure) do
+    note_end_mbeat = min(note.delay_mbeats + duration_mbeats, duration_mbeats)
 
     for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
-      %{at_mbeat: at_mbeat, note: note_frame(note, at_mbeat)}
+      %{at_mbeat: at_mbeat, note: note_frame(note, at_mbeat, duration_mbeats, pressure)}
     end
   end
 
@@ -131,16 +114,15 @@ defmodule Mensch.Machines.RootNote do
     end
   end
 
-  defp note_frame(note, at_mbeat) do
+  defp note_frame(note, at_mbeat, duration_mbeats, pressure) do
     local_elapsed_mbeats = at_mbeat - note.delay_mbeats
-    phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
+    phase = if(local_elapsed_mbeats < duration_mbeats, do: :sustain, else: :release)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
-      note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
-      pressure:
-        ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats) |> then(&(&1 * 127)) |> clamp_7bit(),
+      note_off: local_elapsed_mbeats == duration_mbeats,
+      pressure: clamp_7bit(pressure),
       bend: 0.0,
       slide: 0
     })
@@ -224,14 +206,7 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
     %{
       octave_offset: params.octave_offset,
       velocity: params.velocity,
-      attack_mbeats: params.attack_mbeats,
-      decay_mbeats: params.decay_mbeats,
-      release_mbeats: params.release_mbeats,
-      attack_curve: params.attack_curve,
-      decay_curve: params.decay_curve,
-      release_curve: params.release_curve,
-      peak_level: params.peak_level,
-      sustain_level: params.sustain_level
+      pressure: params.pressure
     }
   end
 

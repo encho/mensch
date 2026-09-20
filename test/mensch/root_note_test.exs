@@ -118,6 +118,34 @@ defmodule Mensch.RootNoteTest do
     assert note_on_note.bend == 0.0
   end
 
+  test "uses constant pressure from machine params" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    timeline_context = %TimelineContext{
+      start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
+      duration_mbeats: 4000
+    }
+
+    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 3, inversion: 1}
+
+    machine =
+      %RootNote{params: %RootNoteParams{RootNoteParams.default() | pressure: 80}}
+
+    rendered =
+      Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
+
+    pressures =
+      rendered.frames
+      |> Enum.flat_map(fn frame ->
+        frame.notes
+        |> Enum.filter(fn note -> note.midi_note == 48 end)
+        |> Enum.map(& &1.pressure)
+      end)
+
+    assert pressures != []
+    assert Enum.all?(pressures, &(&1 == 80))
+  end
+
   defp first_note_on_note(frames) do
     frames
     |> Enum.find_value(fn frame ->

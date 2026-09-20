@@ -69,9 +69,7 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       {"octave_offset", params.octave_offset},
       {"velocity", params.velocity},
-      {"attack_mbeats", params.attack_mbeats},
-      {"decay_mbeats", params.decay_mbeats},
-      {"release_mbeats", params.release_mbeats}
+      {"pressure", params.pressure}
     ]
   end
 
