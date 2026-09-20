@@ -15,7 +15,7 @@ defmodule Mensch.NewModulation.LfoSaw do
 
   @type t :: %__MODULE__{
           curve: curve(),
-          scale: float(),
+          peak_value: float(),
           cycles_per_bar: float(),
           shift_mbeats: number(),
           polarity: polarity(),
@@ -24,7 +24,7 @@ defmodule Mensch.NewModulation.LfoSaw do
         }
 
   defstruct curve: :saw_up,
-            scale: 0.0,
+            peak_value: 0.0,
             cycles_per_bar: 1.0,
             shift_mbeats: 0.0,
             polarity: :bipolar,
@@ -44,7 +44,7 @@ defmodule Mensch.NewModulation.LfoSaw do
 
     %__MODULE__{
       curve: normalize_curve!(lfo_saw.curve, field_name),
-      scale: normalize_scale!(lfo_saw.scale, field_name),
+      peak_value: normalize_peak_value!(lfo_saw.peak_value, field_name),
       cycles_per_bar: normalize_cycles_per_bar!(lfo_saw.cycles_per_bar, field_name),
       shift_mbeats: normalize_shift_mbeats!(lfo_saw.shift_mbeats, field_name),
       polarity: normalize_polarity!(lfo_saw.polarity, field_name),
@@ -91,7 +91,7 @@ defmodule Mensch.NewModulation.LfoSaw do
     lfo_saw.curve
     |> waveform_value(cycle_phase, lfo_saw.drop_phase)
     |> apply_polarity(lfo_saw)
-    |> Kernel.*(lfo_saw.scale)
+    |> Kernel.*(lfo_saw.peak_value)
   end
 
   defp waveform_value(:saw_up, cycle_phase, drop_phase) when cycle_phase < drop_phase,
@@ -123,12 +123,12 @@ defmodule Mensch.NewModulation.LfoSaw do
           "#{field_name}.curve must be :saw_up or :saw_down, got: #{inspect(other)}"
   end
 
-  defp normalize_scale!(value, _field_name) when is_integer(value), do: value * 1.0
-  defp normalize_scale!(value, _field_name) when is_float(value), do: value
+    defp normalize_peak_value!(value, _field_name) when is_integer(value), do: value * 1.0
+    defp normalize_peak_value!(value, _field_name) when is_float(value), do: value
 
-  defp normalize_scale!(other, field_name) do
+    defp normalize_peak_value!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.scale must be a number, got: #{inspect(other)}"
+      "#{field_name}.peak_value must be a number, got: #{inspect(other)}"
   end
 
   defp normalize_cycles_per_bar!(value, _field_name) when is_integer(value) and value > 0,
@@ -183,7 +183,9 @@ defmodule Mensch.NewModulation.LfoSaw do
     map
     |> Enum.map(fn
       {"curve", value} -> {:curve, value}
-      {"scale", value} -> {:scale, value}
+      {"peak_value", value} -> {:peak_value, value}
+      {"scale", value} -> {:peak_value, value}
+      {:scale, value} -> {:peak_value, value}
       {"cycles_per_bar", value} -> {:cycles_per_bar, value}
       {"shift_mbeats", value} -> {:shift_mbeats, value}
       {"polarity", value} -> {:polarity, value}

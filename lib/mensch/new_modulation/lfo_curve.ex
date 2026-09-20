@@ -2,29 +2,28 @@ defmodule Mensch.NewModulation.LfoCurve do
   @moduledoc """
   Curve-based LFO source.
 
-  `scale` multiplies the waveform output directly.
+  The waveform output is mapped into `[min_value, max_value]`.
   """
 
   alias Mensch.SampleContext
 
   @type curve :: :sine | :triangle | :square
-  @type polarity :: :bipolar | :unipolar
   @type anchor :: :sample | :chord | :note
 
   @type t :: %__MODULE__{
           curve: curve(),
-          scale: float(),
+          min_value: float(),
+          max_value: float(),
           cycles_per_bar: float(),
           shift_mbeats: number(),
-          polarity: polarity(),
           anchor: anchor()
         }
 
   defstruct curve: :sine,
-            scale: 0.0,
+            min_value: 0.0,
+            max_value: 0.0,
             cycles_per_bar: 1.0,
             shift_mbeats: 0.0,
-            polarity: :bipolar,
             anchor: :sample
 
   @spec default() :: t()
@@ -40,10 +39,10 @@ defmodule Mensch.NewModulation.LfoCurve do
 
     %__MODULE__{
       curve: normalize_curve!(lfo_curve.curve, field_name),
-      scale: normalize_scale!(lfo_curve.scale, field_name),
+      min_value: normalize_value!(lfo_curve.min_value, field_name, :min_value),
+      max_value: normalize_value!(lfo_curve.max_value, field_name, :max_value),
       cycles_per_bar: normalize_cycles_per_bar!(lfo_curve.cycles_per_bar, field_name),
       shift_mbeats: normalize_shift_mbeats!(lfo_curve.shift_mbeats, field_name),
-      polarity: normalize_polarity!(lfo_curve.polarity, field_name),
       anchor: normalize_anchor!(lfo_curve.anchor, field_name)
     }
   end
@@ -85,24 +84,17 @@ defmodule Mensch.NewModulation.LfoCurve do
 
     lfo_curve.curve
     |> waveform_value(cycle_phase)
-    |> apply_polarity(lfo_curve)
-    |> Kernel.*(lfo_curve.scale)
+    |> map_to_range(lfo_curve.min_value, lfo_curve.max_value)
   end
 
   defp waveform_value(:sine, cycle_phase), do: :math.sin(2 * :math.pi() * cycle_phase)
   defp waveform_value(:triangle, cycle_phase), do: 1.0 - 4.0 * abs(cycle_phase - 0.5)
   defp waveform_value(:square, cycle_phase), do: if(cycle_phase < 0.5, do: 1.0, else: -1.0)
 
-  defp apply_polarity(value, %__MODULE__{polarity: :bipolar}), do: value
-
-  defp apply_polarity(value, %__MODULE__{polarity: :unipolar}) do
-    value
-    |> waveform_to_unipolar()
-    |> clamp_0_1()
+  defp map_to_range(value, min_value, max_value) do
+    normalized = (value + 1.0) / 2.0
+    min_value + normalized * (max_value - min_value)
   end
-
-  defp waveform_to_unipolar(value), do: (value + 1.0) / 2.0
-  defp clamp_0_1(value), do: value |> max(0.0) |> min(1.0)
 
   defp normalize_curve!(curve, _field_name)
        when curve in [:sine, :triangle, :square],
@@ -115,12 +107,12 @@ defmodule Mensch.NewModulation.LfoCurve do
           "#{field_name}.curve must be one of :sine, :triangle, :square, got: #{inspect(other)}"
   end
 
-  defp normalize_scale!(value, _field_name) when is_integer(value), do: value * 1.0
-  defp normalize_scale!(value, _field_name) when is_float(value), do: value
+  defp normalize_value!(value, _field_name, _value_name) when is_integer(value), do: value * 1.0
+  defp normalize_value!(value, _field_name, _value_name) when is_float(value), do: value
 
-  defp normalize_scale!(other, field_name) do
+  defp normalize_value!(other, field_name, value_name) do
     raise ArgumentError,
-          "#{field_name}.scale must be a number, got: #{inspect(other)}"
+          "#{field_name}.#{value_name} must be a number, got: #{inspect(other)}"
   end
 
   defp normalize_cycles_per_bar!(value, _field_name) when is_integer(value) and value > 0,
@@ -142,14 +134,6 @@ defmodule Mensch.NewModulation.LfoCurve do
           "#{field_name}.shift_mbeats must be a number, got: #{inspect(other)}"
   end
 
-  defp normalize_polarity!(polarity, _field_name) when polarity in [:bipolar, :unipolar],
-    do: polarity
-
-  defp normalize_polarity!(other, field_name) do
-    raise ArgumentError,
-          "#{field_name}.polarity must be :bipolar or :unipolar, got: #{inspect(other)}"
-  end
-
   defp normalize_anchor!(anchor, _field_name)
        when anchor in [:sample, :chord, :note],
        do: anchor
@@ -163,16 +147,41 @@ defmodule Mensch.NewModulation.LfoCurve do
     map
     |> Enum.map(fn
       {"curve", value} -> {:curve, value}
-      {"scale", value} -> {:scale, value}
+      {"min_value", value} -> {:min_value, value}
+      {"max_value", value} -> {:max_value, value}
       {"cycles_per_bar", value} -> {:cycles_per_bar, value}
       {"shift_mbeats", value} -> {:shift_mbeats, value}
-      {"polarity", value} -> {:polarity, value}
       {"anchor", value} -> {:anchor, value}
       {"time_base", value} -> {:anchor, value}
       {:time_base, value} -> {:anchor, value}
       pair -> pair
     end)
     |> Map.new()
+    |> maybe_apply_legacy_scale_polarity()
+  end
+
+  # Backward compatibility for older maps still using scale/polarity.
+  defp maybe_apply_legacy_scale_polarity(attrs) do
+    case {Map.get(attrs, :scale), Map.get(attrs, :polarity)} do
+      {nil, _} ->
+        attrs
+
+      {scale, polarity} when is_integer(scale) or is_float(scale) ->
+        scale_f = if(is_integer(scale), do: scale * 1.0, else: scale)
+
+        {min_value, max_value} =
+          case polarity do
+            :unipolar -> {0.0, scale_f}
+            _ -> {-scale_f, scale_f}
+          end
+
+        attrs
+        |> Map.put_new(:min_value, min_value)
+        |> Map.put_new(:max_value, max_value)
+
+      _ ->
+        attrs
+    end
   end
 end
 

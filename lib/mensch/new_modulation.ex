@@ -4,11 +4,19 @@ defmodule Mensch.NewModulation do
   """
 
   alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoConstant
+  alias Mensch.NewModulation.LfoEnvelope
   alias Mensch.NewModulation.LfoGroup
   alias Mensch.NewModulation.LfoRamp
   alias Mensch.NewModulation.LfoSaw
 
-  @type lfo_term :: LfoCurve.t() | LfoSaw.t() | LfoRamp.t() | LfoGroup.t()
+  @type lfo_term ::
+          LfoCurve.t()
+          | LfoSaw.t()
+          | LfoRamp.t()
+          | LfoEnvelope.t()
+          | LfoConstant.t()
+          | LfoGroup.t()
   @type mode :: :add | :multiply
   @type lfo_pressure :: %{lfo: lfo_term(), mode: mode()}
 

@@ -36,7 +36,7 @@ defmodule Mensch.Machines.RootNoteParams do
   defstruct [
     :octave_offset,
     :velocity,
-    :pressure,
+    pressure: 0,
     lfo_pressure: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :additive}
   ]
 
@@ -46,7 +46,7 @@ defmodule Mensch.Machines.RootNoteParams do
     %__MODULE__{
       octave_offset: 0,
       velocity: 100,
-      pressure: 80,
+      pressure: 0,
       lfo_pressure: %{lfo: LfoGroup.default(), mode: :add}
     }
   end

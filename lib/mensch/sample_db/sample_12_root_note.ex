@@ -5,7 +5,9 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   alias Mensch.ChordSpec
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
+  alias Mensch.NewModulation.LfoConstant
   alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoEnvelope
   alias Mensch.NewModulation.LfoGroup
   alias Mensch.NewModulation.LfoRamp
   alias Mensch.NewModulation.LfoSaw
@@ -29,7 +31,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   @lfo_pressure_saw %LfoGroup{
     initial: %LfoSaw{
       curve: :saw_up,
-      scale: 47.0,
+      peak_value: 127.0,
       cycles_per_bar: 1.0,
       shift_mbeats: 0.0,
       polarity: :bipolar,
@@ -42,10 +44,10 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   @lfo_pressure_group %LfoGroup{
     initial: %LfoCurve{
       curve: :sine,
-      scale: 30.0,
+      min_value: -30.0,
+      max_value: 30.0,
       cycles_per_bar: 10.0,
       shift_mbeats: 0.0,
-      polarity: :bipolar,
       anchor: :note
     },
     operations: [
@@ -59,6 +61,38 @@ defmodule Mensch.SampleDb.Sample12RootNote do
          anchor: :note
        }}
     ]
+  }
+
+  @lfo_pressure_envelope %LfoGroup{
+    initial: %LfoEnvelope{
+      start_value: 0.0,
+      peak_value: 100.0,
+      sustain_value: 50,
+      end_value: 0.0,
+      attack_mbeats: 1000.0,
+      decay_mbeats: 1000.0,
+      hold_mbeats: 1800.0,
+      release_mbeats: 200.0,
+      interpolation_function: :linear,
+      shift_mbeats: 0.0,
+      anchor: :note
+    },
+    operations: [
+      {:multiply,
+       %LfoCurve{
+         curve: :sine,
+         min_value: 0.9,
+         max_value: 1.1,
+         cycles_per_bar: 20.0,
+         shift_mbeats: 0.0,
+         anchor: :note
+       }}
+    ]
+  }
+
+  @lfo_pressure_constant %LfoGroup{
+    initial: %LfoConstant{value: 80.0},
+    operations: []
   }
 
   @spec sample(pos_integer()) :: map()
@@ -109,6 +143,34 @@ defmodule Mensch.SampleDb.Sample12RootNote do
               RootNoteParams.default()
               | octave_offset: -1,
                 lfo_pressure: %{lfo: @lfo_pressure_group, mode: :add}
+            }
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :d, modifier: :min7, octave: 3, inversion: 0},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
+            duration_mbeats: 4000
+          },
+          machine: %RootNote{
+            params: %RootNoteParams{
+              RootNoteParams.default()
+              | octave_offset: -1,
+                lfo_pressure: %{lfo: @lfo_pressure_envelope, mode: :add}
+            }
+          }
+        },
+        %{
+          chord_spec: %ChordSpec{root: :g, modifier: :maj7, octave: 3, inversion: 1},
+          timeline_context: %TimelineContext{
+            start_beat: %BeatPosition{bar: 4, beat: 0, mbeat: 0},
+            duration_mbeats: 4000
+          },
+          machine: %RootNote{
+            params: %RootNoteParams{
+              RootNoteParams.default()
+              | octave_offset: -1,
+                lfo_pressure: %{lfo: @lfo_pressure_constant, mode: :add}
             }
           }
         }

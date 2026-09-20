@@ -3,7 +3,9 @@ defmodule Mensch.NewModulationTest do
 
   alias Mensch.NewModulation
   alias Mensch.NewModulation.Lfo
+  alias Mensch.NewModulation.LfoConstant
   alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoEnvelope
   alias Mensch.NewModulation.LfoGroup
   alias Mensch.NewModulation.LfoRamp
   alias Mensch.NewModulation.LfoSaw
@@ -15,10 +17,10 @@ defmodule Mensch.NewModulationTest do
     curve =
       %LfoCurve{
         curve: :sine,
-        scale: 0.5,
+        min_value: -0.5,
+        max_value: 0.5,
         cycles_per_bar: 1.0,
         shift_mbeats: 0.0,
-        polarity: :bipolar,
         anchor: :chord
       }
 
@@ -27,15 +29,36 @@ defmodule Mensch.NewModulationTest do
     assert_in_delta value, 0.5, 1.0e-6
   end
 
+  test "lfo_constant always returns configured value" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    constant = %LfoConstant{value: 3.25}
+
+    assert Lfo.evaluate(constant, 0, sample_context, 0, 0) == 3.25
+    assert Lfo.evaluate(constant, 2000, sample_context, 4000, 1500) == 3.25
+  end
+
+  test "lfo_group normalizes constant term maps via value key" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    group =
+      %LfoGroup{
+        initial: %{value: 2.0},
+        operations: [{:multiply, %{value: 3.0}}]
+      }
+
+    assert Lfo.evaluate(group, 500, sample_context, 0, 500) == 6.0
+  end
+
   test "lfo_group evaluates operations left-to-right" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     group =
       %LfoGroup{
-        initial: %LfoCurve{curve: :square, scale: 2.0, anchor: :chord},
+        initial: %LfoCurve{curve: :square, min_value: -2.0, max_value: 2.0, anchor: :chord},
         operations: [
-          {:multiply, %LfoCurve{curve: :square, scale: 3.0, anchor: :chord}},
-          {:add, %LfoCurve{curve: :square, scale: 4.0, anchor: :chord}}
+          {:multiply, %LfoCurve{curve: :square, min_value: -3.0, max_value: 3.0, anchor: :chord}},
+          {:add, %LfoCurve{curve: :square, min_value: -4.0, max_value: 4.0, anchor: :chord}}
         ]
       }
 
@@ -50,14 +73,18 @@ defmodule Mensch.NewModulationTest do
 
     inner =
       %LfoGroup{
-        initial: %LfoCurve{curve: :square, scale: 2.0, anchor: :chord},
-        operations: [{:add, %LfoCurve{curve: :square, scale: 1.0, anchor: :chord}}]
+        initial: %LfoCurve{curve: :square, min_value: -2.0, max_value: 2.0, anchor: :chord},
+        operations: [
+          {:add, %LfoCurve{curve: :square, min_value: -1.0, max_value: 1.0, anchor: :chord}}
+        ]
       }
 
     outer =
       %LfoGroup{
         initial: inner,
-        operations: [{:multiply, %LfoCurve{curve: :square, scale: 3.0, anchor: :chord}}]
+        operations: [
+          {:multiply, %LfoCurve{curve: :square, min_value: -3.0, max_value: 3.0, anchor: :chord}}
+        ]
       }
 
     # ((2 + 1) * 3)
@@ -72,7 +99,7 @@ defmodule Mensch.NewModulationTest do
     saw =
       %LfoSaw{
         curve: :saw_up,
-        scale: 1.0,
+        peak_value: 1.0,
         cycles_per_bar: 1.0,
         shift_mbeats: 0.0,
         polarity: :bipolar,
@@ -92,7 +119,7 @@ defmodule Mensch.NewModulationTest do
 
     group =
       %LfoGroup{
-        initial: %{curve: :saw_up, scale: 1.0, drop_phase: 0.5, anchor: :chord},
+        initial: %{curve: :saw_up, peak_value: 1.0, drop_phase: 0.5, anchor: :chord},
         operations: []
       }
 
@@ -154,6 +181,55 @@ defmodule Mensch.NewModulationTest do
     assert_in_delta Lfo.evaluate(ramp, 500, sample_context, 0, 500), 0.0, 1.0e-6
     # At 1500, effective progress is (1500 - 1000) / 2000 = 0.25.
     assert_in_delta Lfo.evaluate(ramp, 1500, sample_context, 0, 1500), 0.25, 1.0e-6
+  end
+
+  test "lfo_envelope runs attack decay hold release segments" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    envelope =
+      %LfoEnvelope{
+        start_value: 0.0,
+        peak_value: 1.0,
+        sustain_value: 0.4,
+        end_value: 0.0,
+        attack_mbeats: 1000.0,
+        decay_mbeats: 1000.0,
+        hold_mbeats: 1000.0,
+        release_mbeats: 1000.0,
+        interpolation_function: :linear,
+        shift_mbeats: 0.0,
+        anchor: :chord
+      }
+
+    assert_in_delta Lfo.evaluate(envelope, 500, sample_context, 0, 500), 0.5, 1.0e-6
+    assert_in_delta Lfo.evaluate(envelope, 1500, sample_context, 0, 1500), 0.7, 1.0e-6
+    assert_in_delta Lfo.evaluate(envelope, 2500, sample_context, 0, 2500), 0.4, 1.0e-6
+    assert_in_delta Lfo.evaluate(envelope, 3500, sample_context, 0, 3500), 0.2, 1.0e-6
+    assert_in_delta Lfo.evaluate(envelope, 4500, sample_context, 0, 4500), 0.0, 1.0e-6
+  end
+
+  test "lfo_group normalizes envelope term maps" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    group =
+      %LfoGroup{
+        initial: %{
+          start_value: 0.0,
+          peak_value: 1.0,
+          sustain_value: 0.4,
+          end_value: 0.0,
+          attack_mbeats: 1000.0,
+          decay_mbeats: 1000.0,
+          hold_mbeats: 1000.0,
+          release_mbeats: 1000.0,
+          interpolation_function: :linear,
+          shift_mbeats: 0.0,
+          anchor: :chord
+        },
+        operations: []
+      }
+
+    assert_in_delta Lfo.evaluate(group, 500, sample_context, 0, 500), 0.5, 1.0e-6
   end
 
   test "apply_to_pressure clamps and rounds for add and multiply" do

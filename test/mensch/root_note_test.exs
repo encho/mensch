@@ -164,7 +164,7 @@ defmodule Mensch.RootNoteTest do
           RootNoteParams.default()
           | pressure: 80,
             lfo_pressure: %{
-              lfo: %LfoGroup{initial: %LfoCurve{scale: 0.0}},
+              lfo: %LfoGroup{initial: %LfoCurve{min_value: 0.0, max_value: 0.0}},
               mode: :add
             }
         }
@@ -179,10 +179,10 @@ defmodule Mensch.RootNoteTest do
               lfo: %LfoGroup{
                 initial: %LfoCurve{
                   curve: :square,
-                  scale: 3.0,
+                  min_value: -3.0,
+                  max_value: 3.0,
                   cycles_per_bar: 1.0,
                   shift_mbeats: 0.0,
-                  polarity: :bipolar,
                   anchor: :chord
                 },
                 operations: []

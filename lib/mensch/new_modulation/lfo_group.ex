@@ -6,12 +6,15 @@ defmodule Mensch.NewModulation.LfoGroup do
   each operation in sequence.
   """
 
+  alias Mensch.NewModulation.LfoConstant
   alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoEnvelope
   alias Mensch.NewModulation.LfoRamp
   alias Mensch.NewModulation.LfoSaw
 
   @type operation_name :: :add | :multiply
-  @type lfo_term :: LfoCurve.t() | LfoSaw.t() | LfoRamp.t() | t()
+  @type lfo_term ::
+          LfoCurve.t() | LfoSaw.t() | LfoRamp.t() | LfoEnvelope.t() | LfoConstant.t() | t()
   @type operation :: {operation_name(), lfo_term()}
 
   @type t :: %__MODULE__{
@@ -69,6 +72,14 @@ defmodule Mensch.NewModulation.LfoGroup do
     LfoRamp.normalize!(lfo_ramp, field_name: field_name)
   end
 
+  def normalize_term!(%LfoEnvelope{} = lfo_envelope, field_name) do
+    LfoEnvelope.normalize!(lfo_envelope, field_name: field_name)
+  end
+
+  def normalize_term!(%LfoConstant{} = lfo_constant, field_name) do
+    LfoConstant.normalize!(lfo_constant, field_name: field_name)
+  end
+
   def normalize_term!(%__MODULE__{} = lfo_group, field_name) do
     normalize!(lfo_group, field_name: field_name)
   end
@@ -78,15 +89,27 @@ defmodule Mensch.NewModulation.LfoGroup do
 
     cond do
       Map.has_key?(attrs, :initial) -> normalize!(attrs, field_name: field_name)
-      ramp_term_map?(attrs) -> LfoRamp.normalize!(attrs, field_name: field_name)
+      constant_term_map?(attrs) -> LfoConstant.normalize!(attrs, field_name: field_name)
       saw_term_map?(attrs) -> LfoSaw.normalize!(attrs, field_name: field_name)
+      envelope_term_map?(attrs) -> LfoEnvelope.normalize!(attrs, field_name: field_name)
+      ramp_term_map?(attrs) -> LfoRamp.normalize!(attrs, field_name: field_name)
       true -> LfoCurve.normalize!(attrs, field_name: field_name)
     end
   end
 
   def normalize_term!(other, field_name) do
     raise ArgumentError,
-          "#{field_name} must be #{inspect(LfoCurve)}, #{inspect(LfoSaw)}, #{inspect(LfoRamp)}, or #{inspect(__MODULE__)}, got: #{inspect(other)}"
+          "#{field_name} must be #{inspect(LfoCurve)}, #{inspect(LfoSaw)}, #{inspect(LfoRamp)}, #{inspect(LfoEnvelope)}, #{inspect(LfoConstant)}, or #{inspect(__MODULE__)}, got: #{inspect(other)}"
+  end
+
+  defp constant_term_map?(attrs) do
+    Map.has_key?(attrs, :value)
+  end
+
+  defp envelope_term_map?(attrs) do
+    Map.has_key?(attrs, :attack_mbeats) or Map.has_key?(attrs, :decay_mbeats) or
+      Map.has_key?(attrs, :hold_mbeats) or Map.has_key?(attrs, :release_mbeats) or
+      Map.has_key?(attrs, :peak_value) or Map.has_key?(attrs, :sustain_value)
   end
 
   defp ramp_term_map?(attrs) do

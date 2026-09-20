@@ -6,7 +6,9 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.SimpleChord
+  alias Mensch.NewModulation.LfoConstant
   alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoEnvelope
   alias Mensch.NewModulation.LfoGroup
   alias Mensch.NewModulation.LfoRamp
   alias Mensch.NewModulation.LfoSaw
@@ -114,10 +116,10 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       "curve:",
       "  curve: #{format_scalar(curve.curve)}",
-      "  scale: #{curve.scale}",
+      "  min_value: #{curve.min_value}",
+      "  max_value: #{curve.max_value}",
       "  cycles_per_bar: #{curve.cycles_per_bar}",
       "  shift_mbeats: #{curve.shift_mbeats}",
-      "  polarity: #{format_scalar(curve.polarity)}",
       "  anchor: #{format_scalar(curve.anchor)}"
     ]
     |> Enum.join("\n")
@@ -127,7 +129,7 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       "saw:",
       "  curve: #{format_scalar(saw.curve)}",
-      "  scale: #{saw.scale}",
+      "  peak_value: #{saw.peak_value}",
       "  cycles_per_bar: #{saw.cycles_per_bar}",
       "  shift_mbeats: #{saw.shift_mbeats}",
       "  polarity: #{format_scalar(saw.polarity)}",
@@ -146,6 +148,32 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
       "  span_mbeats: #{ramp.span_mbeats}",
       "  shift_mbeats: #{ramp.shift_mbeats}",
       "  anchor: #{format_scalar(ramp.anchor)}"
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_lfo_term(%LfoEnvelope{} = envelope) do
+    [
+      "envelope:",
+      "  start_value: #{envelope.start_value}",
+      "  peak_value: #{envelope.peak_value}",
+      "  sustain_value: #{envelope.sustain_value}",
+      "  end_value: #{envelope.end_value}",
+      "  attack_mbeats: #{envelope.attack_mbeats}",
+      "  decay_mbeats: #{envelope.decay_mbeats}",
+      "  hold_mbeats: #{envelope.hold_mbeats}",
+      "  release_mbeats: #{envelope.release_mbeats}",
+      "  interpolation_function: #{format_scalar(envelope.interpolation_function)}",
+      "  shift_mbeats: #{envelope.shift_mbeats}",
+      "  anchor: #{format_scalar(envelope.anchor)}"
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_lfo_term(%LfoConstant{} = constant) do
+    [
+      "constant:",
+      "  value: #{constant.value}"
     ]
     |> Enum.join("\n")
   end
