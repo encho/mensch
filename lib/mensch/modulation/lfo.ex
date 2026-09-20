@@ -169,12 +169,12 @@ defmodule Mensch.Modulation.Lfo do
   end
 
   defp normalize_time_base!(time_base, _field_name)
-         when time_base in [:sample, :chord, :note],
+       when time_base in [:sample, :chord, :note],
        do: time_base
 
   defp normalize_time_base!(other, field_name) do
     raise ArgumentError,
-      "#{field_name}.time_base must be :sample, :chord, or :note, got: #{inspect(other)}"
+          "#{field_name}.time_base must be :sample, :chord, or :note, got: #{inspect(other)}"
   end
 
   defp normalize_mode!(mode, _field_name) when mode in [:additive, :multiplicative], do: mode

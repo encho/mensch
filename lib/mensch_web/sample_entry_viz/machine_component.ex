@@ -4,6 +4,7 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
   alias Mensch.Machine
   alias Mensch.Machines.ArpMachine
   alias Mensch.Machines.DynamicVoicing
+  alias Mensch.Machines.RootNote
   alias Mensch.Machines.SimpleChord
 
   attr :machine, :map, required: true
@@ -58,6 +59,16 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       {"stagger_mbeats", params.stagger_mbeats},
       {"note_length_mode", inspect(params.note_length_mode)},
+      {"attack_mbeats", params.attack_mbeats},
+      {"decay_mbeats", params.decay_mbeats},
+      {"release_mbeats", params.release_mbeats}
+    ]
+  end
+
+  defp machine_params(%RootNote{params: params}) do
+    [
+      {"octave_offset", params.octave_offset},
+      {"velocity", params.velocity},
       {"attack_mbeats", params.attack_mbeats},
       {"decay_mbeats", params.decay_mbeats},
       {"release_mbeats", params.release_mbeats}
