@@ -105,14 +105,14 @@ defmodule Mensch.NewModulation.LfoCurve do
   defp clamp_0_1(value), do: value |> max(0.0) |> min(1.0)
 
   defp normalize_curve!(curve, _field_name)
-         when curve in [:sine, :triangle, :square],
+       when curve in [:sine, :triangle, :square],
        do: curve
 
   defp normalize_curve!(:sin, _field_name), do: :sine
 
   defp normalize_curve!(other, field_name) do
     raise ArgumentError,
-      "#{field_name}.curve must be one of :sine, :triangle, :square, got: #{inspect(other)}"
+          "#{field_name}.curve must be one of :sine, :triangle, :square, got: #{inspect(other)}"
   end
 
   defp normalize_scale!(value, _field_name) when is_integer(value), do: value * 1.0
