@@ -183,7 +183,7 @@ defmodule Mensch.RootNoteTest do
                   cycles_per_bar: 1.0,
                   shift_mbeats: 0.0,
                   polarity: :bipolar,
-                  time_base: :chord
+                  anchor: :chord
                 },
                 operations: []
               },

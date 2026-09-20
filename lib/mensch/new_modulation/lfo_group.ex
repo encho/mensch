@@ -7,9 +7,11 @@ defmodule Mensch.NewModulation.LfoGroup do
   """
 
   alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoRamp
+  alias Mensch.NewModulation.LfoSaw
 
   @type operation_name :: :add | :multiply
-  @type lfo_term :: LfoCurve.t() | t()
+  @type lfo_term :: LfoCurve.t() | LfoSaw.t() | LfoRamp.t() | t()
   @type operation :: {operation_name(), lfo_term()}
 
   @type t :: %__MODULE__{
@@ -59,6 +61,14 @@ defmodule Mensch.NewModulation.LfoGroup do
     LfoCurve.normalize!(lfo_curve, field_name: field_name)
   end
 
+  def normalize_term!(%LfoSaw{} = lfo_saw, field_name) do
+    LfoSaw.normalize!(lfo_saw, field_name: field_name)
+  end
+
+  def normalize_term!(%LfoRamp{} = lfo_ramp, field_name) do
+    LfoRamp.normalize!(lfo_ramp, field_name: field_name)
+  end
+
   def normalize_term!(%__MODULE__{} = lfo_group, field_name) do
     normalize!(lfo_group, field_name: field_name)
   end
@@ -68,13 +78,25 @@ defmodule Mensch.NewModulation.LfoGroup do
 
     cond do
       Map.has_key?(attrs, :initial) -> normalize!(attrs, field_name: field_name)
+      ramp_term_map?(attrs) -> LfoRamp.normalize!(attrs, field_name: field_name)
+      saw_term_map?(attrs) -> LfoSaw.normalize!(attrs, field_name: field_name)
       true -> LfoCurve.normalize!(attrs, field_name: field_name)
     end
   end
 
   def normalize_term!(other, field_name) do
     raise ArgumentError,
-          "#{field_name} must be #{inspect(LfoCurve)} or #{inspect(__MODULE__)}, got: #{inspect(other)}"
+          "#{field_name} must be #{inspect(LfoCurve)}, #{inspect(LfoSaw)}, #{inspect(LfoRamp)}, or #{inspect(__MODULE__)}, got: #{inspect(other)}"
+  end
+
+  defp ramp_term_map?(attrs) do
+    Map.has_key?(attrs, :span_mbeats) or Map.has_key?(attrs, :start_value) or
+      Map.has_key?(attrs, :end_value) or
+      Map.get(attrs, :interpolation_function) in [:linear, :ease_in, :ease_out, :ease_in_out]
+  end
+
+  defp saw_term_map?(attrs) do
+    Map.has_key?(attrs, :drop_phase) or Map.get(attrs, :curve) in [:saw, :saw_up, :saw_down]
   end
 
   defp normalize_operations!(operations, field_name) when is_list(operations) do

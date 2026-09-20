@@ -7,19 +7,58 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   alias Mensch.Machines.RootNoteParams
   alias Mensch.NewModulation.LfoCurve
   alias Mensch.NewModulation.LfoGroup
+  alias Mensch.NewModulation.LfoRamp
+  alias Mensch.NewModulation.LfoSaw
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
-  @lfo_pressure %LfoGroup{
+  # Example: non-cyclic linear ramp (holds once it reaches the end).
+  #
+  @lfo_pressure_ramp %LfoGroup{
+    initial: %Mensch.NewModulation.LfoRamp{
+      start_value: 0.0,
+      end_value: 47.0,
+      interpolation_function: :linear,
+      span_mbeats: 3000.0,
+      shift_mbeats: 1000.0,
+      anchor: :note
+    },
+    operations: []
+  }
+
+  @lfo_pressure_saw %LfoGroup{
+    initial: %LfoSaw{
+      curve: :saw_up,
+      scale: 47.0,
+      cycles_per_bar: 1.0,
+      shift_mbeats: 0.0,
+      polarity: :bipolar,
+      anchor: :note,
+      drop_phase: 0.75
+    },
+    operations: []
+  }
+
+  @lfo_pressure_group %LfoGroup{
     initial: %LfoCurve{
       curve: :sine,
-      scale: 20.0,
+      scale: 30.0,
       cycles_per_bar: 10.0,
       shift_mbeats: 0.0,
       polarity: :bipolar,
-      time_base: :note
+      anchor: :note
     },
-    operations: []
+    operations: [
+      {:multiply,
+       %LfoRamp{
+         start_value: 0.0,
+         end_value: 1.0,
+         interpolation_function: :linear,
+         span_mbeats: 4000.0,
+         shift_mbeats: 0,
+         anchor: :note
+       }}
+    ]
   }
 
   @spec sample(pos_integer()) :: map()
@@ -41,7 +80,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+                lfo_pressure: %{lfo: @lfo_pressure_saw, mode: :add}
             }
           }
         },
@@ -55,7 +94,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+                lfo_pressure: %{lfo: @lfo_pressure_ramp, mode: :add}
             }
           }
         },
@@ -69,7 +108,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+                lfo_pressure: %{lfo: @lfo_pressure_group, mode: :add}
             }
           }
         }

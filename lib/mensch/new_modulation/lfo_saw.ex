@@ -1,13 +1,15 @@
-defmodule Mensch.NewModulation.LfoCurve do
+defmodule Mensch.NewModulation.LfoSaw do
   @moduledoc """
-  Curve-based LFO source.
+  Saw-specific LFO source with configurable drop point.
 
-  `scale` multiplies the waveform output directly.
+  `drop_phase` controls when the abrupt reset happens in the cycle.
+  For example, `drop_phase: 0.75` means the ramp runs through 75% of the
+  cycle and then drops for the remaining 25%.
   """
 
   alias Mensch.SampleContext
 
-  @type curve :: :sine | :triangle | :saw_up | :saw_down | :square
+  @type curve :: :saw_up | :saw_down
   @type polarity :: :bipolar | :unipolar
   @type anchor :: :sample | :chord | :note
 
@@ -17,52 +19,55 @@ defmodule Mensch.NewModulation.LfoCurve do
           cycles_per_bar: float(),
           shift_mbeats: number(),
           polarity: polarity(),
-          anchor: anchor()
+          anchor: anchor(),
+          drop_phase: float()
         }
 
-  defstruct curve: :sine,
+  defstruct curve: :saw_up,
             scale: 0.0,
             cycles_per_bar: 1.0,
             shift_mbeats: 0.0,
             polarity: :bipolar,
-            anchor: :sample
+            anchor: :sample,
+            drop_phase: 1.0
 
   @spec default() :: t()
   def default, do: %__MODULE__{}
 
   @spec normalize!(t() | map() | nil, keyword()) :: t()
-  def normalize!(lfo_curve, opts \\ [])
+  def normalize!(lfo_saw, opts \\ [])
 
   def normalize!(nil, _opts), do: default()
 
-  def normalize!(%__MODULE__{} = lfo_curve, opts) do
-    field_name = Keyword.get(opts, :field_name, "lfo curve")
+  def normalize!(%__MODULE__{} = lfo_saw, opts) do
+    field_name = Keyword.get(opts, :field_name, "lfo saw")
 
     %__MODULE__{
-      curve: normalize_curve!(lfo_curve.curve, field_name),
-      scale: normalize_scale!(lfo_curve.scale, field_name),
-      cycles_per_bar: normalize_cycles_per_bar!(lfo_curve.cycles_per_bar, field_name),
-      shift_mbeats: normalize_shift_mbeats!(lfo_curve.shift_mbeats, field_name),
-      polarity: normalize_polarity!(lfo_curve.polarity, field_name),
-      anchor: normalize_anchor!(lfo_curve.anchor, field_name)
+      curve: normalize_curve!(lfo_saw.curve, field_name),
+      scale: normalize_scale!(lfo_saw.scale, field_name),
+      cycles_per_bar: normalize_cycles_per_bar!(lfo_saw.cycles_per_bar, field_name),
+      shift_mbeats: normalize_shift_mbeats!(lfo_saw.shift_mbeats, field_name),
+      polarity: normalize_polarity!(lfo_saw.polarity, field_name),
+      anchor: normalize_anchor!(lfo_saw.anchor, field_name),
+      drop_phase: normalize_drop_phase!(lfo_saw.drop_phase, field_name)
     }
   end
 
-  def normalize!(lfo_curve, opts) when is_map(lfo_curve) do
-    lfo_curve
+  def normalize!(lfo_saw, opts) when is_map(lfo_saw) do
+    lfo_saw
     |> symbolize_map_keys()
     |> then(fn attrs -> struct!(__MODULE__, Map.merge(Map.from_struct(default()), attrs)) end)
     |> normalize!(opts)
   end
 
   def normalize!(other, opts) do
-    field_name = Keyword.get(opts, :field_name, "lfo curve")
+    field_name = Keyword.get(opts, :field_name, "lfo saw")
     raise ArgumentError, "#{field_name} must be #{inspect(__MODULE__)}, got: #{inspect(other)}"
   end
 
   @spec value_at_mbeat(t(), integer(), SampleContext.t(), integer(), integer()) :: float()
   def value_at_mbeat(
-        %__MODULE__{} = lfo_curve,
+        %__MODULE__{} = lfo_saw,
         at_mbeat,
         %SampleContext{} = sample_context,
         entry_start_mbeat_abs,
@@ -73,27 +78,31 @@ defmodule Mensch.NewModulation.LfoCurve do
     mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
 
     timeline_mbeat =
-      case lfo_curve.anchor do
+      case lfo_saw.anchor do
         :sample -> entry_start_mbeat_abs + at_mbeat
         :chord -> at_mbeat
         :note -> note_local_mbeat
       end
 
-    shifted_mbeat = timeline_mbeat + lfo_curve.shift_mbeats
-    phase = shifted_mbeat / mbeats_per_bar * lfo_curve.cycles_per_bar
+    shifted_mbeat = timeline_mbeat + lfo_saw.shift_mbeats
+    phase = shifted_mbeat / mbeats_per_bar * lfo_saw.cycles_per_bar
     cycle_phase = phase - :math.floor(phase)
 
-    lfo_curve.curve
-    |> waveform_value(cycle_phase)
-    |> apply_polarity(lfo_curve)
-    |> Kernel.*(lfo_curve.scale)
+    lfo_saw.curve
+    |> waveform_value(cycle_phase, lfo_saw.drop_phase)
+    |> apply_polarity(lfo_saw)
+    |> Kernel.*(lfo_saw.scale)
   end
 
-  defp waveform_value(:sine, cycle_phase), do: :math.sin(2 * :math.pi() * cycle_phase)
-  defp waveform_value(:triangle, cycle_phase), do: 1.0 - 4.0 * abs(cycle_phase - 0.5)
-  defp waveform_value(:saw_up, cycle_phase), do: cycle_phase
-  defp waveform_value(:saw_down, cycle_phase), do: -cycle_phase
-  defp waveform_value(:square, cycle_phase), do: if(cycle_phase < 0.5, do: 1.0, else: -1.0)
+  defp waveform_value(:saw_up, cycle_phase, drop_phase) when cycle_phase < drop_phase,
+    do: cycle_phase / drop_phase
+
+  defp waveform_value(:saw_up, _cycle_phase, _drop_phase), do: 0.0
+
+  defp waveform_value(:saw_down, cycle_phase, drop_phase) when cycle_phase < drop_phase,
+    do: -(cycle_phase / drop_phase)
+
+  defp waveform_value(:saw_down, _cycle_phase, _drop_phase), do: 0.0
 
   defp apply_polarity(value, %__MODULE__{polarity: :bipolar}), do: value
 
@@ -106,16 +115,12 @@ defmodule Mensch.NewModulation.LfoCurve do
   defp waveform_to_unipolar(value), do: (value + 1.0) / 2.0
   defp clamp_0_1(value), do: value |> max(0.0) |> min(1.0)
 
-  defp normalize_curve!(curve, _field_name)
-       when curve in [:sine, :triangle, :saw_up, :saw_down, :square],
-       do: curve
-
-  defp normalize_curve!(:sin, _field_name), do: :sine
+  defp normalize_curve!(curve, _field_name) when curve in [:saw_up, :saw_down], do: curve
   defp normalize_curve!(:saw, _field_name), do: :saw_up
 
   defp normalize_curve!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.curve must be one of :sine, :triangle, :saw_up, :saw_down, :square, got: #{inspect(other)}"
+          "#{field_name}.curve must be :saw_up or :saw_down, got: #{inspect(other)}"
   end
 
   defp normalize_scale!(value, _field_name) when is_integer(value), do: value * 1.0
@@ -162,6 +167,18 @@ defmodule Mensch.NewModulation.LfoCurve do
           "#{field_name}.anchor must be :sample, :chord, or :note, got: #{inspect(other)}"
   end
 
+  defp normalize_drop_phase!(value, _field_name) when is_integer(value),
+    do: normalize_drop_phase!(value * 1.0, "")
+
+  defp normalize_drop_phase!(value, _field_name)
+       when is_float(value) and value > 0 and value <= 1,
+       do: value
+
+  defp normalize_drop_phase!(other, field_name) do
+    raise ArgumentError,
+          "#{field_name}.drop_phase must be > 0 and <= 1, got: #{inspect(other)}"
+  end
+
   defp symbolize_map_keys(map) do
     map
     |> Enum.map(fn
@@ -173,24 +190,25 @@ defmodule Mensch.NewModulation.LfoCurve do
       {"anchor", value} -> {:anchor, value}
       {"time_base", value} -> {:anchor, value}
       {:time_base, value} -> {:anchor, value}
+      {"drop_phase", value} -> {:drop_phase, value}
       pair -> pair
     end)
     |> Map.new()
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoCurve do
-  alias Mensch.NewModulation.LfoCurve
+defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoSaw do
+  alias Mensch.NewModulation.LfoSaw
 
   def evaluate(
-        %LfoCurve{} = lfo_curve,
+        %LfoSaw{} = lfo_saw,
         at_mbeat,
         sample_context,
         entry_start_mbeat_abs,
         note_local_mbeat
       ) do
-    lfo_curve
-    |> LfoCurve.normalize!(field_name: "lfo curve")
-    |> LfoCurve.value_at_mbeat(at_mbeat, sample_context, entry_start_mbeat_abs, note_local_mbeat)
+    lfo_saw
+    |> LfoSaw.normalize!(field_name: "lfo saw")
+    |> LfoSaw.value_at_mbeat(at_mbeat, sample_context, entry_start_mbeat_abs, note_local_mbeat)
   end
 end
