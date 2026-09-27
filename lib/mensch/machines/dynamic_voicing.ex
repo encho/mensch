@@ -12,6 +12,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
+  alias Mensch.Machine.RenderContextCommon
   alias Mensch.LfoParams
   alias Mensch.Modulation.Lfo
   alias Mensch.Machines.DynamicVoicingParams
@@ -27,6 +28,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     @enforce_keys [
       :params,
       :sample_context,
+      :chord_start_mbeat,
       :absolute_chord_start_mbeat,
       :frame_mbeats,
       :chord_duration_mbeats
@@ -35,6 +37,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     defstruct [
       :params,
       :sample_context,
+      :chord_start_mbeat,
       :absolute_chord_start_mbeat,
       :frame_mbeats,
       :chord_duration_mbeats
@@ -43,6 +46,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     @type t :: %__MODULE__{
             params: DynamicVoicingParams.t(),
             sample_context: SampleContext.t(),
+            chord_start_mbeat: non_neg_integer(),
             absolute_chord_start_mbeat: non_neg_integer(),
             frame_mbeats: pos_integer(),
             chord_duration_mbeats: non_neg_integer()
@@ -112,10 +116,16 @@ defmodule Mensch.Machines.DynamicVoicing do
       |> TimelineContext.duration_mbeats()
       |> snap_mbeats(frame_mbeats)
 
+    chord_start_mbeat =
+      timeline_context
+      |> TimelineContext.start_mbeat(sample_context)
+      |> snap_mbeats(frame_mbeats)
+
     render_context =
       build_render_context(
         params,
         sample_context,
+        chord_start_mbeat,
         absolute_chord_start_mbeat,
         frame_mbeats,
         chord_duration_mbeats
@@ -132,6 +142,7 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     slot_boundaries =
       build_slot_boundaries(
+        render_context.chord_start_mbeat,
         render_context.chord_duration_mbeats,
         voicing_count,
         render_context.frame_mbeats
@@ -147,11 +158,14 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     max_note_end_mbeats =
       case planned_notes do
-        [] -> render_context.chord_duration_mbeats
-        _ -> planned_notes |> Enum.map(&(&1.start_mbeat + &1.adsr.total_mbeats)) |> Enum.max()
+        [] -> render_context.chord_start_mbeat + render_context.chord_duration_mbeats
+        _ -> planned_notes |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
       end
 
-    assert_last_note_ends_at_chord_end!(max_note_end_mbeats, render_context.chord_duration_mbeats)
+    assert_last_note_ends_at_chord_end!(
+      max_note_end_mbeats,
+      render_context.chord_start_mbeat + render_context.chord_duration_mbeats
+    )
 
     note_frame_streams =
       Enum.map(planned_notes, fn planned_note ->
@@ -165,7 +179,8 @@ defmodule Mensch.Machines.DynamicVoicing do
       frames:
         stitch_note_frame_streams(
           note_frame_streams,
-          render_context.chord_duration_mbeats,
+          render_context.chord_start_mbeat,
+          render_context.chord_start_mbeat + render_context.chord_duration_mbeats,
           render_context.frame_mbeats
         )
     }
@@ -254,7 +269,12 @@ defmodule Mensch.Machines.DynamicVoicing do
     Enum.sort([highest - 12 | front])
   end
 
-  defp build_slot_boundaries(chord_duration_mbeats, voicing_count, frame_mbeats) do
+  defp build_slot_boundaries(
+         chord_start_mbeat,
+         chord_duration_mbeats,
+         voicing_count,
+         frame_mbeats
+       ) do
     total_frames = max(div(chord_duration_mbeats, frame_mbeats), 1)
     base_frames = div(total_frames, voicing_count)
     remainder_frames = rem(total_frames, voicing_count)
@@ -270,7 +290,10 @@ defmodule Mensch.Machines.DynamicVoicing do
               "dynamic_voicing requires enough duration for #{voicing_count} voicings at frame size #{frame_mbeats}"
       end
 
-    [0 | cumulative_boundaries(0, slot_lengths_in_frames, frame_mbeats)]
+    [
+      chord_start_mbeat
+      | cumulative_boundaries(chord_start_mbeat, slot_lengths_in_frames, frame_mbeats)
+    ]
   end
 
   defp cumulative_boundaries(start_mbeat, slot_lengths_in_frames, frame_mbeats) do
@@ -410,10 +433,11 @@ defmodule Mensch.Machines.DynamicVoicing do
         harmonic_tags: plan.harmonic_tags,
         role_tags: plan.role_tags,
         machine_note_tags: plan.machine_note_tags,
-        start_mbeat: plan.start_mbeat
+        start_mbeat: plan.start_mbeat,
+        duration_mbeats: plan.duration_mbeats
       })
 
-    {note_plan_item, plan.duration_mbeats}
+    note_plan_item
   end
 
   defp assign_dynamic_adsr(
@@ -422,7 +446,9 @@ defmodule Mensch.Machines.DynamicVoicing do
          frame_mbeats,
          absolute_chord_start_mbeat
        ) do
-    Enum.map(note_plan, fn {plan_note, duration_mbeats} ->
+    Enum.map(note_plan, fn plan_note ->
+      duration_mbeats = plan_note.duration_mbeats
+
       attack_mbeats =
         if boundary_start_note?(plan_note, absolute_chord_start_mbeat) do
           frame_mbeats
@@ -459,9 +485,9 @@ defmodule Mensch.Machines.DynamicVoicing do
   end
 
   defp render_note_frame_stream(note, %RenderContext{} = render_context) do
-    absolute_end_mbeat = render_context.chord_duration_mbeats
+    chord_end_mbeat = render_context.chord_start_mbeat + render_context.chord_duration_mbeats
     frame_mbeats = render_context.frame_mbeats
-    note_end_mbeat = min(note.start_mbeat + note.adsr.total_mbeats, absolute_end_mbeat)
+    note_end_mbeat = min(note.start_mbeat + note.duration_mbeats, chord_end_mbeat)
 
     for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
       %{
@@ -476,13 +502,18 @@ defmodule Mensch.Machines.DynamicVoicing do
     end
   end
 
-  defp stitch_note_frame_streams(note_frame_streams, absolute_end_mbeat, frame_mbeats) do
+  defp stitch_note_frame_streams(
+         note_frame_streams,
+         chord_start_mbeat,
+         chord_end_mbeat,
+         frame_mbeats
+       ) do
     notes_by_mbeat =
       note_frame_streams
       |> List.flatten()
       |> Enum.group_by(& &1.at_mbeat, & &1.note)
 
-    for at_mbeat <- 0..absolute_end_mbeat//frame_mbeats do
+    for at_mbeat <- chord_start_mbeat..chord_end_mbeat//frame_mbeats do
       frame_notes =
         notes_by_mbeat
         |> Map.get(at_mbeat, [])
@@ -556,7 +587,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
       note_on: local_elapsed_mbeats == 0,
-      note_off: local_elapsed_mbeats == note.adsr.total_mbeats,
+      note_off: local_elapsed_mbeats == note.duration_mbeats,
       pressure: pressure,
       bend: bend,
       slide: slide
@@ -566,20 +597,20 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp build_render_context(
          %DynamicVoicingParams{} = params,
          %SampleContext{} = sample_context,
+         chord_start_mbeat,
          absolute_chord_start_mbeat,
          frame_mbeats,
          chord_duration_mbeats
-       )
-       when is_integer(absolute_chord_start_mbeat) and absolute_chord_start_mbeat >= 0 and
-              is_integer(frame_mbeats) and frame_mbeats > 0 and
-              is_integer(chord_duration_mbeats) and chord_duration_mbeats >= 0 do
-    %RenderContext{
-      params: params,
-      sample_context: sample_context,
-      absolute_chord_start_mbeat: absolute_chord_start_mbeat,
-      frame_mbeats: frame_mbeats,
-      chord_duration_mbeats: chord_duration_mbeats
-    }
+       ) do
+    sample_context
+    |> RenderContextCommon.common_fields(
+      chord_start_mbeat,
+      absolute_chord_start_mbeat,
+      frame_mbeats,
+      chord_duration_mbeats
+    )
+    |> Map.put(:params, params)
+    |> then(&struct!(RenderContext, &1))
   end
 
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do

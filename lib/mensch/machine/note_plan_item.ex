@@ -32,6 +32,8 @@ defmodule Mensch.Machine.NotePlanItem do
   Invariants expected from builders:
 
   - `start_mbeat` is already quantized to the machine frame grid.
+  - `duration_mbeats` is the planned note lifecycle length and may differ from
+    the chord-entry duration.
   - `note_instance_id` and `degree_index` are non-negative.
   - `channel` may be `nil` until global channel allocation.
   - `adsr` may be `nil` until envelope assignment.
@@ -52,6 +54,7 @@ defmodule Mensch.Machine.NotePlanItem do
         role_tags: [],
         machine_note_tags: [],
         start_mbeat: 540,
+        duration_mbeats: 1200,
         adsr: nil
       }
   """
@@ -121,7 +124,8 @@ defmodule Mensch.Machine.NotePlanItem do
     :harmonic_tags,
     :role_tags,
     :machine_note_tags,
-    :start_mbeat
+    :start_mbeat,
+    :duration_mbeats
   ]
   defstruct note_name: nil,
             octave: nil,
@@ -133,6 +137,7 @@ defmodule Mensch.Machine.NotePlanItem do
             note_instance_id: nil,
             degree_index: nil,
             start_mbeat: nil,
+            duration_mbeats: nil,
             adsr: nil,
             harmonic_tags: [],
             role_tags: [],
@@ -160,6 +165,8 @@ defmodule Mensch.Machine.NotePlanItem do
     e.g. `[:entering]`.
   - `start_mbeat`: Absolute quantized note start time in mbeat units,
     e.g. `540`.
+  - `duration_mbeats`: Planned note lifecycle length in mbeat units,
+    e.g. `1200`.
   - `adsr`: Envelope assigned in the articulation stage, e.g. `nil` before
     assignment, then `%Mensch.Envelope.ADSR{...}`.
   """
@@ -177,6 +184,7 @@ defmodule Mensch.Machine.NotePlanItem do
           role_tags: [role_tag()],
           machine_note_tags: [machine_note_tag()],
           start_mbeat: non_neg_integer(),
+          duration_mbeats: non_neg_integer(),
           adsr: ADSR.t() | nil
         }
 

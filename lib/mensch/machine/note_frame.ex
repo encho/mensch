@@ -129,7 +129,8 @@ defmodule Mensch.Machine.NoteFrame do
         harmonic_tags: Map.get(note, :harmonic_tags, []),
         role_tags: Map.get(note, :role_tags, []),
         machine_note_tags: Map.get(note, :machine_note_tags, []),
-        start_mbeat: Map.fetch!(note, :start_mbeat)
+        start_mbeat: Map.fetch!(note, :start_mbeat),
+        duration_mbeats: Map.fetch!(note, :duration_mbeats)
       })
 
     attrs =
