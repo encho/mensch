@@ -8,9 +8,9 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   Modulation model:
 
-  - pressure baseline is generated per-note from a dynamic `LfoEnvelope`
-  - pressure/slide/bend modulation lanes are computed internally in
-    `with_note_modulators/2`
+  - pressure lane is a per-note `LfoGroup` composed from a dynamic
+    `LfoEnvelope` and a `LfoCurve`
+  - slide/bend lanes are computed internally in `with_note_modulators/2`
   """
 
   alias Mensch.ChordSpec
@@ -123,36 +123,10 @@ defmodule Mensch.Machines.DynamicVoicing do
     bend_lane = bend_lane(note, render_context)
     sample_context = render_context.common.sample_context
     absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
-    frame_mbeats = render_context.common.frame_mbeats
-
-    envelope_profile = %{
-      attack_mbeats: 120.0,
-      decay_mbeats: 280.0,
-      release_mbeats: 120.0,
-      sustain_level: 0.68
-    }
-
-    baseline_pressure_lfo =
-      dynamic_pressure_envelope(
-        note,
-        frame_mbeats,
-        absolute_chord_start_mbeat,
-        envelope_profile
-      )
 
     NotePlanItem.with_modulators(note, %{
       pressure_modulator: fn at_mbeat, local_elapsed_mbeats ->
-        baseline_pressure =
-          baseline_pressure_lfo
-          |> Lfo.evaluate(
-            at_mbeat,
-            sample_context,
-            absolute_chord_start_mbeat,
-            local_elapsed_mbeats
-          )
-          |> clamp_7bit()
-
-        pressure_modulation =
+        pressure_value =
           evaluate_lane_modulation(
             pressure_lane,
             at_mbeat,
@@ -160,8 +134,9 @@ defmodule Mensch.Machines.DynamicVoicing do
             absolute_chord_start_mbeat,
             local_elapsed_mbeats
           )
+          |> clamp_7bit()
 
-        Modulation.apply_to_pressure(baseline_pressure, pressure_modulation, pressure_lane.mode)
+        Modulation.apply_to_pressure(0, pressure_value, :add)
       end,
       slide_modulator: fn at_mbeat, local_elapsed_mbeats ->
         slide_modulation =
@@ -479,40 +454,6 @@ defmodule Mensch.Machines.DynamicVoicing do
     )
   end
 
-  defp dynamic_pressure_envelope(
-         note,
-         _frame_mbeats,
-         _absolute_chord_start_mbeat,
-         envelope_profile
-       ) do
-    note_duration = note.duration_mbeats * 1.0
-    attack_mbeats = envelope_profile.attack_mbeats
-    decay_mbeats = envelope_profile.decay_mbeats
-    release_mbeats = envelope_profile.release_mbeats
-    total_requested = attack_mbeats + decay_mbeats + release_mbeats
-
-    if total_requested > note_duration do
-      raise ArgumentError,
-            "dynamic_voicing pressure envelope exceeds note duration: attack(#{attack_mbeats}) + decay(#{decay_mbeats}) + release(#{release_mbeats}) = #{total_requested} > note duration #{note_duration} for note_instance_id #{note.note_instance_id}"
-    end
-
-    hold_mbeats = note_duration - total_requested
-
-    %LfoEnvelope{
-      start_value: 0.0,
-      peak_value: 127.0,
-      sustain_value: envelope_profile.sustain_level * 127.0,
-      end_value: 0.0,
-      attack_mbeats: attack_mbeats,
-      decay_mbeats: decay_mbeats,
-      hold_mbeats: hold_mbeats,
-      release_mbeats: release_mbeats,
-      interpolation_function: :linear,
-      shift_mbeats: 0.0,
-      anchor: :note
-    }
-  end
-
   defp apply_to_7bit(baseline_7bit, modulation_value, :add) do
     normalized = baseline_7bit / 127 + modulation_value
     clamp_7bit(normalized * 127)
@@ -531,19 +472,49 @@ defmodule Mensch.Machines.DynamicVoicing do
     clamp_bend(baseline_bend * (1 + modulation_value))
   end
 
-  defp pressure_lane(%NotePlanItem{}, %RenderContext{}) do
+  defp pressure_lane(%NotePlanItem{} = note, %RenderContext{}) do
+    attack_mbeats = 120.0
+    decay_mbeats = 280.0
+    release_mbeats = 120.0
+    sustain_level = 0.68
+    note_duration = note.duration_mbeats * 1.0
+    total_requested = attack_mbeats + decay_mbeats + release_mbeats
+
+    if total_requested > note_duration do
+      raise ArgumentError,
+            "dynamic_voicing pressure envelope exceeds note duration: attack(#{attack_mbeats}) + decay(#{decay_mbeats}) + release(#{release_mbeats}) = #{total_requested} > note duration #{note_duration} for note_instance_id #{note.note_instance_id}"
+    end
+
+    hold_mbeats = note_duration - total_requested
+
     Modulation.normalize_lfo_pressure!(
       %{
         lfo: %LfoGroup{
-          initial: %LfoCurve{
-            curve: :sine,
-            min_value: -0.25,
-            max_value: 0.25,
-            cycles_per_bar: 10.0,
-            shift_mbeats: 0.0,
-            anchor: :sample
-          },
-          operations: []
+          initial:
+            %LfoEnvelope{
+              start_value: 0.0,
+              peak_value: 127.0,
+              sustain_value: sustain_level * 127.0,
+              end_value: 0.0,
+              attack_mbeats: attack_mbeats,
+              decay_mbeats: decay_mbeats,
+              hold_mbeats: hold_mbeats,
+              release_mbeats: release_mbeats,
+              interpolation_function: :linear,
+              shift_mbeats: 0.0,
+              anchor: :note
+            },
+          operations: [
+            {:add,
+             %LfoCurve{
+               curve: :sine,
+               min_value: -4,
+               max_value: 4,
+               cycles_per_bar: 10.0,
+               shift_mbeats: 0.0,
+               anchor: :sample
+             }}
+          ]
         },
         mode: :add
       },
