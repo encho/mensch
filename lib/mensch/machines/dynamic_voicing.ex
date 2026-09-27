@@ -12,6 +12,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
+  alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
   alias Mensch.LfoParams
   alias Mensch.Modulation.Lfo
@@ -22,40 +23,24 @@ defmodule Mensch.Machines.DynamicVoicing do
   defmodule RenderContext do
     @moduledoc false
 
+    alias Mensch.Machine.RenderContextCommon
     alias Mensch.Machines.DynamicVoicingParams
-    alias Mensch.SampleContext
 
-    @enforce_keys [
-      :params,
-      :sample_context,
-      :chord_start_mbeat,
-      :absolute_chord_start_mbeat,
-      :frame_mbeats,
-      :chord_duration_mbeats
-    ]
+    @enforce_keys [:params, :common]
 
-    defstruct [
-      :params,
-      :sample_context,
-      :chord_start_mbeat,
-      :absolute_chord_start_mbeat,
-      :frame_mbeats,
-      :chord_duration_mbeats
-    ]
+    defstruct [:params, :common]
 
     @type t :: %__MODULE__{
             params: DynamicVoicingParams.t(),
-            sample_context: SampleContext.t(),
-            chord_start_mbeat: non_neg_integer(),
-            absolute_chord_start_mbeat: non_neg_integer(),
-            frame_mbeats: pos_integer(),
-            chord_duration_mbeats: non_neg_integer()
+            common: RenderContextCommon.t()
           }
   end
 
   @note_on_velocity 100
 
   @type t :: %__MODULE__{params: DynamicVoicingParams.t()}
+
+  @behaviour Pipeline
 
   @enforce_keys [:params]
   defstruct [:params]
@@ -98,8 +83,31 @@ defmodule Mensch.Machines.DynamicVoicing do
         opts \\ []
       ) do
     %DynamicVoicingParams{} = params = machine_params!(opts) |> hydrate_params()
-    absolute_chord_start_mbeat = absolute_chord_start_mbeat(opts)
 
+    Pipeline.build_frame_sequence(
+      __MODULE__,
+      %__MODULE__{params: params},
+      chord_spec,
+      sample_context,
+      timeline_context,
+      opts
+    )
+  end
+
+  @impl Pipeline
+  @spec build_render_context(t(), RenderContextCommon.common_fields()) ::
+          RenderContext.t()
+  def build_render_context(
+        %__MODULE__{params: params},
+        %RenderContextCommon{} = common
+      ) do
+    struct!(RenderContext, %{params: params, common: common})
+  end
+
+  @impl Pipeline
+  @spec build_note_plan(t(), ChordSpec.t(), RenderContext.t()) :: [NotePlanItem.t()]
+  def build_note_plan(%__MODULE__{}, %ChordSpec{} = chord_spec, %RenderContext{} = render_context) do
+    params = render_context.params
     direction = normalize_direction!(params.direction)
 
     inversion_count =
@@ -107,83 +115,29 @@ defmodule Mensch.Machines.DynamicVoicing do
       |> normalize_number_of_inversions!()
       |> validate_inversion_count_for_direction!(direction)
 
-    # Quantization step for this render: how many mbeats each frame advances.
-    frame_mbeats = SampleContext.frame_units(sample_context)
-
-    # Snap total chord duration to the frame grid so slot boundaries land on frame ticks.
-    chord_duration_mbeats =
-      timeline_context
-      |> TimelineContext.duration_mbeats()
-      |> snap_mbeats(frame_mbeats)
-
-    chord_start_mbeat =
-      timeline_context
-      |> TimelineContext.start_mbeat(sample_context)
-      |> snap_mbeats(frame_mbeats)
-
-    render_context =
-      build_render_context(
-        params,
-        sample_context,
-        chord_start_mbeat,
-        absolute_chord_start_mbeat,
-        frame_mbeats,
-        chord_duration_mbeats
-      )
-
     voicing_count =
       effective_voicing_count(
         requested_voicing_count(direction, inversion_count),
-        render_context.chord_duration_mbeats,
-        render_context.frame_mbeats
+        render_context.common.chord_duration_mbeats,
+        render_context.common.frame_mbeats
       )
 
     voicings = build_voicing_sequence(chord_spec, direction, inversion_count, voicing_count)
 
     slot_boundaries =
       build_slot_boundaries(
-        render_context.chord_start_mbeat,
-        render_context.chord_duration_mbeats,
+        render_context.common.chord_start_mbeat,
+        render_context.common.chord_duration_mbeats,
         voicing_count,
-        render_context.frame_mbeats
+        render_context.common.frame_mbeats
       )
 
-    planned_notes =
-      build_dynamic_note_plan(voicings, slot_boundaries)
-      |> assign_dynamic_adsr(
-        sample_context,
-        render_context.frame_mbeats,
-        render_context.absolute_chord_start_mbeat
-      )
-
-    max_note_end_mbeats =
-      case planned_notes do
-        [] -> render_context.chord_start_mbeat + render_context.chord_duration_mbeats
-        _ -> planned_notes |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
-      end
-
-    assert_last_note_ends_at_chord_end!(
-      max_note_end_mbeats,
-      render_context.chord_start_mbeat + render_context.chord_duration_mbeats
+    build_dynamic_note_plan(voicings, slot_boundaries)
+    |> assign_dynamic_adsr(
+      render_context.common.sample_context,
+      render_context.common.frame_mbeats,
+      render_context.common.absolute_chord_start_mbeat
     )
-
-    note_frame_streams =
-      Enum.map(planned_notes, fn planned_note ->
-        render_note_frame_stream(
-          planned_note,
-          render_context
-        )
-      end)
-
-    %MachineFrameSequence{
-      frames:
-        stitch_note_frame_streams(
-          note_frame_streams,
-          render_context.chord_start_mbeat,
-          render_context.chord_start_mbeat + render_context.chord_duration_mbeats,
-          render_context.frame_mbeats
-        )
-    }
   end
 
   defp build_voicing_sequence(
@@ -419,25 +373,22 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp lifecycle_to_note_plan_item(plan) do
     {note_name, octave} = ChordSpec.note_name(plan.midi_note)
 
-    note_plan_item =
-      NotePlanItem.new(%{
-        note_name: note_name,
-        octave: octave,
-        midi_note: plan.midi_note,
-        channel: nil,
-        note_on_velocity: @note_on_velocity,
-        machine_id: id(),
-        chord_instance_id: 0,
-        note_instance_id: plan.note_instance_id,
-        degree_index: plan.degree_index,
-        harmonic_tags: plan.harmonic_tags,
-        role_tags: plan.role_tags,
-        machine_note_tags: plan.machine_note_tags,
-        start_mbeat: plan.start_mbeat,
-        duration_mbeats: plan.duration_mbeats
-      })
-
-    note_plan_item
+    NotePlanItem.new(%{
+      note_name: note_name,
+      octave: octave,
+      midi_note: plan.midi_note,
+      channel: nil,
+      note_on_velocity: @note_on_velocity,
+      machine_id: id(),
+      chord_instance_id: 0,
+      note_instance_id: plan.note_instance_id,
+      degree_index: plan.degree_index,
+      harmonic_tags: plan.harmonic_tags,
+      role_tags: plan.role_tags,
+      machine_note_tags: plan.machine_note_tags,
+      start_mbeat: plan.start_mbeat,
+      duration_mbeats: plan.duration_mbeats
+    })
   end
 
   defp assign_dynamic_adsr(
@@ -484,9 +435,13 @@ defmodule Mensch.Machines.DynamicVoicing do
     })
   end
 
-  defp render_note_frame_stream(note, %RenderContext{} = render_context) do
-    chord_end_mbeat = render_context.chord_start_mbeat + render_context.chord_duration_mbeats
-    frame_mbeats = render_context.frame_mbeats
+  @impl Pipeline
+  @spec render_note_frame_stream(NotePlanItem.t(), RenderContext.t()) :: [map()]
+  def render_note_frame_stream(note, %RenderContext{} = render_context) do
+    chord_end_mbeat =
+      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
+
+    frame_mbeats = render_context.common.frame_mbeats
     note_end_mbeat = min(note.start_mbeat + note.duration_mbeats, chord_end_mbeat)
 
     for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
@@ -502,12 +457,13 @@ defmodule Mensch.Machines.DynamicVoicing do
     end
   end
 
-  defp stitch_note_frame_streams(
-         note_frame_streams,
-         chord_start_mbeat,
-         chord_end_mbeat,
-         frame_mbeats
-       ) do
+  @impl Pipeline
+  @spec stitch_note_frame_streams([[map()]], RenderContext.t()) :: [MachineFrameSequence.frame()]
+  def stitch_note_frame_streams(note_frame_streams, %RenderContext{} = render_context) do
+    chord_start_mbeat = render_context.common.chord_start_mbeat
+    chord_end_mbeat = chord_start_mbeat + render_context.common.chord_duration_mbeats
+    frame_mbeats = render_context.common.frame_mbeats
+
     notes_by_mbeat =
       note_frame_streams
       |> List.flatten()
@@ -523,15 +479,26 @@ defmodule Mensch.Machines.DynamicVoicing do
     end
   end
 
-  defp boundary_start_note?(plan_note, absolute_chord_start_mbeat) do
-    absolute_chord_start_mbeat + plan_note.start_mbeat > 0
+  @impl Pipeline
+  @spec assert_invariants([NotePlanItem.t()], RenderContext.t()) :: :ok
+  def assert_invariants(note_plan, %RenderContext{} = render_context) do
+    max_note_end_mbeats =
+      case note_plan do
+        [] ->
+          render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
+
+        _ ->
+          note_plan |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
+      end
+
+    assert_last_note_ends_at_chord_end!(
+      max_note_end_mbeats,
+      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
+    )
   end
 
-  defp absolute_chord_start_mbeat(opts) do
-    case Keyword.get(opts, :absolute_chord_start_mbeat, 0) do
-      value when is_integer(value) and value >= 0 -> value
-      other -> raise ArgumentError, "invalid :absolute_chord_start_mbeat: #{inspect(other)}"
-    end
+  defp boundary_start_note?(plan_note, absolute_chord_start_mbeat) do
+    absolute_chord_start_mbeat + plan_note.start_mbeat > 0
   end
 
   defp note_frame(
@@ -543,8 +510,8 @@ defmodule Mensch.Machines.DynamicVoicing do
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
     adsr_level = ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats)
 
-    %SampleContext{} = sample_context = render_context.sample_context
-    absolute_chord_start_mbeat = render_context.absolute_chord_start_mbeat
+    %SampleContext{} = sample_context = render_context.common.sample_context
+    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
     %LfoParams{} = pressure_lfo = render_context.params.lfo_pressure
     %LfoParams{} = slide_lfo = render_context.params.lfo_slide
     %LfoParams{} = bend_lfo = render_context.params.lfo_bend
@@ -592,25 +559,6 @@ defmodule Mensch.Machines.DynamicVoicing do
       bend: bend,
       slide: slide
     })
-  end
-
-  defp build_render_context(
-         %DynamicVoicingParams{} = params,
-         %SampleContext{} = sample_context,
-         chord_start_mbeat,
-         absolute_chord_start_mbeat,
-         frame_mbeats,
-         chord_duration_mbeats
-       ) do
-    sample_context
-    |> RenderContextCommon.common_fields(
-      chord_start_mbeat,
-      absolute_chord_start_mbeat,
-      frame_mbeats,
-      chord_duration_mbeats
-    )
-    |> Map.put(:params, params)
-    |> then(&struct!(RenderContext, &1))
   end
 
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do
@@ -698,9 +646,6 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp harmonic_tags_for_degree(2), do: [:fifth]
   defp harmonic_tags_for_degree(3), do: [:seventh]
   defp harmonic_tags_for_degree(_), do: [:tension]
-
-  defp snap_mbeats(mbeats, mbeats_per_frame),
-    do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
 

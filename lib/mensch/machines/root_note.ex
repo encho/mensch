@@ -14,6 +14,7 @@ defmodule Mensch.Machines.RootNote do
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
+  alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
   alias Mensch.Machines.RootNoteParams
   alias Mensch.NewModulation
@@ -24,37 +25,21 @@ defmodule Mensch.Machines.RootNote do
   defmodule RenderContext do
     @moduledoc false
 
+    alias Mensch.Machine.RenderContextCommon
     alias Mensch.Machines.RootNoteParams
-    alias Mensch.SampleContext
 
-    @enforce_keys [
-      :params,
-      :sample_context,
-      :chord_start_mbeat,
-      :absolute_chord_start_mbeat,
-      :frame_mbeats,
-      :chord_duration_mbeats
-    ]
-    defstruct [
-      :params,
-      :sample_context,
-      :chord_start_mbeat,
-      :absolute_chord_start_mbeat,
-      :frame_mbeats,
-      :chord_duration_mbeats
-    ]
+    @enforce_keys [:params, :common]
+    defstruct [:params, :common]
 
     @type t :: %__MODULE__{
             params: RootNoteParams.t(),
-            sample_context: SampleContext.t(),
-            chord_start_mbeat: non_neg_integer(),
-            absolute_chord_start_mbeat: non_neg_integer(),
-            frame_mbeats: pos_integer(),
-            chord_duration_mbeats: non_neg_integer()
+            common: RenderContextCommon.t()
           }
   end
 
   @type t :: %__MODULE__{params: RootNoteParams.t()}
+
+  @behaviour Pipeline
 
   @enforce_keys [:params]
   defstruct [:params]
@@ -90,40 +75,40 @@ defmodule Mensch.Machines.RootNote do
       ) do
     %RootNoteParams{} = params = machine_params!(opts) |> hydrate_params()
 
-    frame_mbeats = SampleContext.frame_units(sample_context)
-    absolute_chord_start_mbeat = absolute_chord_start_mbeat(opts)
+    Pipeline.build_frame_sequence(
+      __MODULE__,
+      %__MODULE__{params: params},
+      chord_spec,
+      sample_context,
+      timeline_context,
+      opts
+    )
+  end
 
-    chord_duration_mbeats =
-      timeline_context
-      |> TimelineContext.duration_mbeats()
-      |> snap_mbeats(frame_mbeats)
+  @impl Pipeline
+  @spec build_render_context(t(), RenderContextCommon.common_fields()) ::
+          RenderContext.t()
+  def build_render_context(
+        %__MODULE__{params: params},
+        %RenderContextCommon{} = common
+      ) do
+    struct!(RenderContext, %{params: params, common: common})
+  end
 
-    chord_start_mbeat =
-      timeline_context
-      |> TimelineContext.start_mbeat(sample_context)
-      |> snap_mbeats(frame_mbeats)
-
-    render_context =
-      build_render_context(
-        params,
-        sample_context,
-        chord_start_mbeat,
-        absolute_chord_start_mbeat,
-        frame_mbeats,
-        chord_duration_mbeats
-      )
-
-    root_midi_note = root_midi_note!(chord_spec, params.octave_offset)
+  @impl Pipeline
+  @spec build_note_plan(t(), ChordSpec.t(), RenderContext.t()) :: [NotePlanItem.t()]
+  def build_note_plan(%__MODULE__{}, %ChordSpec{} = chord_spec, %RenderContext{} = render_context) do
+    root_midi_note = root_midi_note!(chord_spec, render_context.params.octave_offset)
 
     {note_name, octave} = ChordSpec.note_name(root_midi_note)
 
-    note_plan_item =
+    [
       NotePlanItem.new(%{
         note_name: note_name,
         octave: octave,
         midi_note: root_midi_note,
         channel: nil,
-        note_on_velocity: params.velocity,
+        note_on_velocity: render_context.params.velocity,
         machine_id: id(),
         chord_instance_id: 0,
         note_instance_id: 0,
@@ -131,28 +116,19 @@ defmodule Mensch.Machines.RootNote do
         harmonic_tags: [:root],
         role_tags: [],
         machine_note_tags: [],
-        start_mbeat: render_context.chord_start_mbeat,
-        duration_mbeats: render_context.chord_duration_mbeats
+        start_mbeat: render_context.common.chord_start_mbeat,
+        duration_mbeats: render_context.common.chord_duration_mbeats
       })
-
-    note_frame_stream =
-      render_note_frame_stream(note_plan_item, render_context)
-
-    max_note_end_mbeats = note_plan_item.start_mbeat + note_plan_item.duration_mbeats
-
-    assert_last_note_ends_at_chord_end!(
-      max_note_end_mbeats,
-      render_context.chord_start_mbeat + render_context.chord_duration_mbeats
-    )
-
-    %MachineFrameSequence{
-      frames: stitch_note_frame_stream(note_frame_stream, render_context)
-    }
+    ]
   end
 
-  defp render_note_frame_stream(note, %RenderContext{} = render_context) do
-    chord_end_mbeat = render_context.chord_start_mbeat + render_context.chord_duration_mbeats
-    frame_mbeats = render_context.frame_mbeats
+  @impl Pipeline
+  @spec render_note_frame_stream(NotePlanItem.t(), RenderContext.t()) :: [map()]
+  def render_note_frame_stream(note, %RenderContext{} = render_context) do
+    chord_end_mbeat =
+      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
+
+    frame_mbeats = render_context.common.frame_mbeats
     note_end_mbeat = min(note.start_mbeat + note.duration_mbeats, chord_end_mbeat)
 
     for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
@@ -168,18 +144,39 @@ defmodule Mensch.Machines.RootNote do
     end
   end
 
-  defp stitch_note_frame_stream(note_frame_stream, %RenderContext{} = render_context) do
-    chord_start_mbeat = render_context.chord_start_mbeat
-    chord_end_mbeat = chord_start_mbeat + render_context.chord_duration_mbeats
-    frame_mbeats = render_context.frame_mbeats
+  @impl Pipeline
+  @spec stitch_note_frame_streams([[map()]], RenderContext.t()) :: [MachineFrameSequence.frame()]
+  def stitch_note_frame_streams(note_frame_streams, %RenderContext{} = render_context) do
+    chord_start_mbeat = render_context.common.chord_start_mbeat
+    chord_end_mbeat = chord_start_mbeat + render_context.common.chord_duration_mbeats
+    frame_mbeats = render_context.common.frame_mbeats
 
     notes_by_mbeat =
-      note_frame_stream
+      note_frame_streams
+      |> List.flatten()
       |> Enum.group_by(& &1.at_mbeat, & &1.note)
 
     for at_mbeat <- chord_start_mbeat..chord_end_mbeat//frame_mbeats do
       %{at_mbeat: at_mbeat, notes: Map.get(notes_by_mbeat, at_mbeat, [])}
     end
+  end
+
+  @impl Pipeline
+  @spec assert_invariants([NotePlanItem.t()], RenderContext.t()) :: :ok
+  def assert_invariants(note_plan, %RenderContext{} = render_context) do
+    max_note_end_mbeats =
+      case note_plan do
+        [] ->
+          render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
+
+        _ ->
+          note_plan |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
+      end
+
+    assert_last_note_ends_at_chord_end!(
+      max_note_end_mbeats,
+      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
+    )
   end
 
   defp note_frame(
@@ -190,8 +187,8 @@ defmodule Mensch.Machines.RootNote do
     local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = if(local_elapsed_mbeats < note.duration_mbeats, do: :sustain, else: :release)
 
-    %SampleContext{} = sample_context = render_context.sample_context
-    absolute_chord_start_mbeat = render_context.absolute_chord_start_mbeat
+    %SampleContext{} = sample_context = render_context.common.sample_context
+    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
     pressure_lfo = render_context.params.lfo_pressure.lfo
     pressure_lfo_mode = render_context.params.lfo_pressure.mode
 
@@ -215,25 +212,6 @@ defmodule Mensch.Machines.RootNote do
       bend: 0.0,
       slide: 0
     })
-  end
-
-  defp build_render_context(
-         %RootNoteParams{} = params,
-         %SampleContext{} = sample_context,
-         chord_start_mbeat,
-         absolute_chord_start_mbeat,
-         frame_mbeats,
-         chord_duration_mbeats
-       ) do
-    sample_context
-    |> RenderContextCommon.common_fields(
-      chord_start_mbeat,
-      absolute_chord_start_mbeat,
-      frame_mbeats,
-      chord_duration_mbeats
-    )
-    |> Map.put(:params, params)
-    |> then(&struct!(RenderContext, &1))
   end
 
   defp machine_params!(opts) do
@@ -301,16 +279,6 @@ defmodule Mensch.Machines.RootNote do
       end
 
     (octave + 1) * 12 + semitone
-  end
-
-  defp snap_mbeats(mbeats, mbeats_per_frame),
-    do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
-
-  defp absolute_chord_start_mbeat(opts) do
-    case Keyword.get(opts, :absolute_chord_start_mbeat, 0) do
-      value when is_integer(value) and value >= 0 -> value
-      other -> raise ArgumentError, "invalid :absolute_chord_start_mbeat: #{inspect(other)}"
-    end
   end
 
   defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)

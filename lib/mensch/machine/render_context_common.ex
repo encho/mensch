@@ -8,13 +8,30 @@ defmodule Mensch.Machine.RenderContextCommon do
 
   alias Mensch.SampleContext
 
-  @type common_fields :: %{
+  @enforce_keys [
+    :sample_context,
+    :chord_start_mbeat,
+    :absolute_chord_start_mbeat,
+    :frame_mbeats,
+    :chord_duration_mbeats
+  ]
+  defstruct [
+    :sample_context,
+    :chord_start_mbeat,
+    :absolute_chord_start_mbeat,
+    :frame_mbeats,
+    :chord_duration_mbeats
+  ]
+
+  @type t :: %__MODULE__{
           sample_context: SampleContext.t(),
           chord_start_mbeat: non_neg_integer(),
           absolute_chord_start_mbeat: non_neg_integer(),
           frame_mbeats: pos_integer(),
           chord_duration_mbeats: non_neg_integer()
         }
+
+  @type common_fields :: t()
 
   @spec common_fields(
           SampleContext.t(),
@@ -34,7 +51,7 @@ defmodule Mensch.Machine.RenderContextCommon do
              is_integer(absolute_chord_start_mbeat) and absolute_chord_start_mbeat >= 0 and
              is_integer(frame_mbeats) and frame_mbeats > 0 and
              is_integer(chord_duration_mbeats) and chord_duration_mbeats >= 0 do
-    %{
+    %__MODULE__{
       sample_context: sample_context,
       chord_start_mbeat: chord_start_mbeat,
       absolute_chord_start_mbeat: absolute_chord_start_mbeat,
