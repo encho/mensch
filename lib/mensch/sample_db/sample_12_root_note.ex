@@ -5,95 +5,8 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   alias Mensch.ChordSpec
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
-  alias Mensch.Modulation.LfoConstant
-  alias Mensch.Modulation.LfoCurve
-  alias Mensch.Modulation.LfoEnvelope
-  alias Mensch.Modulation.LfoGroup
-  alias Mensch.Modulation.LfoRamp
-  alias Mensch.Modulation.LfoSaw
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
-
-  # Example: non-cyclic linear ramp (holds once it reaches the end).
-  #
-  @lfo_pressure_ramp %LfoGroup{
-    initial: %Mensch.Modulation.LfoRamp{
-      start_value: 0.0,
-      end_value: 47.0,
-      interpolation_function: :linear,
-      span_mbeats: 3000.0,
-      shift_mbeats: 1000.0,
-      anchor: :note
-    },
-    operations: []
-  }
-
-  @lfo_pressure_saw %LfoGroup{
-    initial: %LfoSaw{
-      curve: :saw_up,
-      peak_value: 127.0,
-      cycles_per_bar: 1.0,
-      shift_mbeats: 0.0,
-      polarity: :bipolar,
-      anchor: :note,
-      drop_phase: 0.75
-    },
-    operations: []
-  }
-
-  @lfo_pressure_group %LfoGroup{
-    initial: %LfoCurve{
-      curve: :sine,
-      min_value: -30.0,
-      max_value: 30.0,
-      cycles_per_bar: 10.0,
-      shift_mbeats: 0.0,
-      anchor: :note
-    },
-    operations: [
-      {:multiply,
-       %LfoRamp{
-         start_value: 0.0,
-         end_value: 1.0,
-         interpolation_function: :linear,
-         span_mbeats: 4000.0,
-         shift_mbeats: 0,
-         anchor: :note
-       }}
-    ]
-  }
-
-  @lfo_pressure_envelope %LfoGroup{
-    initial: %LfoEnvelope{
-      start_value: 0.0,
-      peak_value: 100.0,
-      sustain_value: 50,
-      end_value: 0.0,
-      attack_mbeats: 1000.0,
-      decay_mbeats: 1000.0,
-      hold_mbeats: 1800.0,
-      release_mbeats: 200.0,
-      interpolation_function: :linear,
-      shift_mbeats: 0.0,
-      anchor: :note
-    },
-    operations: [
-      {:multiply,
-       %LfoCurve{
-         curve: :sine,
-         min_value: 0.9,
-         max_value: 1.1,
-         cycles_per_bar: 20.0,
-         shift_mbeats: 0.0,
-         anchor: :note
-       }}
-    ]
-  }
-
-  @lfo_pressure_constant %LfoGroup{
-    initial: %LfoConstant{value: 80.0},
-    operations: []
-  }
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
@@ -113,8 +26,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure_saw, mode: :add}
+              | octave_offset: -1
             }
           }
         },
@@ -127,8 +39,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure_ramp, mode: :add}
+              | octave_offset: -1
             }
           }
         },
@@ -141,8 +52,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure_group, mode: :add}
+              | octave_offset: -1
             }
           }
         },
@@ -155,8 +65,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure_envelope, mode: :add}
+              | octave_offset: -1
             }
           }
         },
@@ -169,8 +78,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
-                lfo_pressure: %{lfo: @lfo_pressure_constant, mode: :add}
+              | octave_offset: -1
             }
           }
         }

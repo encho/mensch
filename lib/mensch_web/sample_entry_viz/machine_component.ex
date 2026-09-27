@@ -4,12 +4,6 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
   alias Mensch.Machine
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.RootNote
-  alias Mensch.Modulation.LfoConstant
-  alias Mensch.Modulation.LfoCurve
-  alias Mensch.Modulation.LfoEnvelope
-  alias Mensch.Modulation.LfoGroup
-  alias Mensch.Modulation.LfoRamp
-  alias Mensch.Modulation.LfoSaw
 
   attr :machine, :map, required: true
 
@@ -52,129 +46,11 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       {"octave_offset", params.octave_offset},
       {"velocity", params.velocity},
-      {"pressure", params.pressure},
-      {"lfo_pressure", format_lfo_pressure(params.lfo_pressure)}
+      {"pressure", params.pressure}
     ]
   end
 
   defp machine_params(machine) do
     [{"details", inspect(machine)}]
   end
-
-  defp format_lfo_pressure(%{mode: mode, lfo: lfo}) do
-    [
-      "mode: #{format_scalar(mode)}",
-      "lfo:",
-      indent(format_lfo_term(lfo), 2)
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_pressure(other), do: inspect(other)
-
-  defp format_lfo_term(%LfoGroup{} = group) do
-    operations_text =
-      case group.operations do
-        [] -> "[]"
-        operations -> Enum.map_join(operations, "\n", &format_lfo_operation/1)
-      end
-
-    [
-      "group:",
-      "  initial:",
-      indent(format_lfo_term(group.initial), 4),
-      "  operations:",
-      indent(operations_text, 4)
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_term(%LfoCurve{} = curve) do
-    [
-      "curve:",
-      "  curve: #{format_scalar(curve.curve)}",
-      "  min_value: #{curve.min_value}",
-      "  max_value: #{curve.max_value}",
-      "  cycles_per_bar: #{curve.cycles_per_bar}",
-      "  shift_mbeats: #{curve.shift_mbeats}",
-      "  anchor: #{format_scalar(curve.anchor)}"
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_term(%LfoSaw{} = saw) do
-    [
-      "saw:",
-      "  curve: #{format_scalar(saw.curve)}",
-      "  peak_value: #{saw.peak_value}",
-      "  cycles_per_bar: #{saw.cycles_per_bar}",
-      "  shift_mbeats: #{saw.shift_mbeats}",
-      "  polarity: #{format_scalar(saw.polarity)}",
-      "  anchor: #{format_scalar(saw.anchor)}",
-      "  drop_phase: #{saw.drop_phase}"
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_term(%LfoRamp{} = ramp) do
-    [
-      "ramp:",
-      "  start_value: #{ramp.start_value}",
-      "  end_value: #{ramp.end_value}",
-      "  interpolation_function: #{format_scalar(ramp.interpolation_function)}",
-      "  span_mbeats: #{ramp.span_mbeats}",
-      "  shift_mbeats: #{ramp.shift_mbeats}",
-      "  anchor: #{format_scalar(ramp.anchor)}"
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_term(%LfoEnvelope{} = envelope) do
-    [
-      "envelope:",
-      "  start_value: #{envelope.start_value}",
-      "  peak_value: #{envelope.peak_value}",
-      "  sustain_value: #{envelope.sustain_value}",
-      "  end_value: #{envelope.end_value}",
-      "  attack_mbeats: #{envelope.attack_mbeats}",
-      "  decay_mbeats: #{envelope.decay_mbeats}",
-      "  hold_mbeats: #{envelope.hold_mbeats}",
-      "  release_mbeats: #{envelope.release_mbeats}",
-      "  interpolation_function: #{format_scalar(envelope.interpolation_function)}",
-      "  shift_mbeats: #{envelope.shift_mbeats}",
-      "  anchor: #{format_scalar(envelope.anchor)}"
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_term(%LfoConstant{} = constant) do
-    [
-      "constant:",
-      "  value: #{constant.value}"
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_term(other), do: inspect(other)
-
-  defp format_lfo_operation({op, term}) when op in [:add, :multiply] do
-    [
-      "- #{format_scalar(op)}:",
-      indent(format_lfo_term(term), 2)
-    ]
-    |> Enum.join("\n")
-  end
-
-  defp format_lfo_operation(other), do: "- #{inspect(other)}"
-
-  defp indent(text, spaces) do
-    pad = String.duplicate(" ", spaces)
-
-    text
-    |> String.split("\n")
-    |> Enum.map_join("\n", fn line -> pad <> line end)
-  end
-
-  defp format_scalar(value) when is_atom(value), do: Atom.to_string(value)
-  defp format_scalar(value), do: to_string(value)
 end

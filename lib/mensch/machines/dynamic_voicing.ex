@@ -490,26 +490,27 @@ defmodule Mensch.Machines.DynamicVoicing do
     Modulation.normalize_lfo_pressure!(
       %{
         lfo: %LfoGroup{
-          initial:
-            %LfoEnvelope{
-              start_value: 0.0,
-              peak_value: 127.0,
-              sustain_value: sustain_level * 127.0,
-              end_value: 0.0,
-              attack_mbeats: attack_mbeats,
-              decay_mbeats: decay_mbeats,
-              hold_mbeats: hold_mbeats,
-              release_mbeats: release_mbeats,
-              interpolation_function: :linear,
-              shift_mbeats: 0.0,
-              anchor: :note
-            },
+          initial: %LfoEnvelope{
+            start_value: 0.0,
+            peak_value: 127.0,
+            sustain_value: sustain_level * 127.0,
+            end_value: 0.0,
+            attack_mbeats: attack_mbeats,
+            decay_mbeats: decay_mbeats,
+            hold_mbeats: hold_mbeats,
+            release_mbeats: release_mbeats,
+            interpolation_function: :linear,
+            shift_mbeats: 0.0,
+            anchor: :note
+          },
           operations: [
             {:add,
              %LfoCurve{
                curve: :sine,
-               min_value: -4,
-               max_value: 4,
+               #  min_value: -4,
+               #  max_value: 4,
+               min_value: 0,
+               max_value: 0,
                cycles_per_bar: 10.0,
                shift_mbeats: 0.0,
                anchor: :sample
