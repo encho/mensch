@@ -1,4 +1,4 @@
-defmodule Mensch.NewModulation.LfoCurve do
+defmodule Mensch.Modulation.LfoCurve do
   @moduledoc """
   Curve-based LFO source.
 
@@ -194,8 +194,8 @@ defmodule Mensch.NewModulation.LfoCurve do
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoCurve do
-  alias Mensch.NewModulation.LfoCurve
+defimpl Mensch.Modulation.Lfo, for: Mensch.Modulation.LfoCurve do
+  alias Mensch.Modulation.LfoCurve
 
   def evaluate(
         %LfoCurve{} = lfo_curve,

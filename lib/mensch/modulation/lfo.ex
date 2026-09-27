@@ -1,4 +1,4 @@
-defprotocol Mensch.NewModulation.Lfo do
+defprotocol Mensch.Modulation.Lfo do
   @moduledoc """
   Evaluates a modulation source at a given time position.
 

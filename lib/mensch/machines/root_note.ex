@@ -16,8 +16,8 @@ defmodule Mensch.Machines.RootNote do
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
   alias Mensch.Machines.RootNoteParams
-  alias Mensch.NewModulation
-  alias Mensch.NewModulation.Lfo
+  alias Mensch.Modulation
+  alias Mensch.Modulation.Lfo
   alias Mensch.SampleContext
 
   defmodule RenderContext do
@@ -123,7 +123,7 @@ defmodule Mensch.Machines.RootNote do
       )
 
     modulated_pressure =
-      NewModulation.apply_to_pressure(0, pressure_lfo_value, pressure_lfo_mode)
+      Modulation.apply_to_pressure(0, pressure_lfo_value, pressure_lfo_mode)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
@@ -147,16 +147,16 @@ defmodule Mensch.Machines.RootNote do
     |> Map.merge(current)
     |> Map.update!(
       :lfo_pressure,
-      &NewModulation.normalize_lfo_pressure!(&1, "root_note lfo_pressure")
+      &Modulation.normalize_lfo_pressure!(&1, "root_note lfo_pressure")
     )
     |> then(&struct!(RootNoteParams, &1))
   end
 
   @doc false
-  @spec normalize_lfo_pressure(map()) :: NewModulation.lfo_pressure()
+  @spec normalize_lfo_pressure(map()) :: Modulation.lfo_pressure()
   # Public wrapper used by protocol controls/1 to expose normalized machine params.
   def normalize_lfo_pressure(lfo_pressure) do
-    NewModulation.normalize_lfo_pressure!(lfo_pressure, "root_note lfo_pressure")
+    Modulation.normalize_lfo_pressure!(lfo_pressure, "root_note lfo_pressure")
   end
 
   defp root_midi_note!(%ChordSpec{} = chord_spec, octave_offset) when is_integer(octave_offset) do

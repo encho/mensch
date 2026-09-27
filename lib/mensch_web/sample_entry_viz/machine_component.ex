@@ -4,12 +4,12 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
   alias Mensch.Machine
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.RootNote
-  alias Mensch.NewModulation.LfoConstant
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoEnvelope
-  alias Mensch.NewModulation.LfoGroup
-  alias Mensch.NewModulation.LfoRamp
-  alias Mensch.NewModulation.LfoSaw
+  alias Mensch.Modulation.LfoConstant
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoEnvelope
+  alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoRamp
+  alias Mensch.Modulation.LfoSaw
 
   attr :machine, :map, required: true
 

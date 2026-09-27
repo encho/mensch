@@ -1,4 +1,4 @@
-defmodule Mensch.NewModulation.LfoSaw do
+defmodule Mensch.Modulation.LfoSaw do
   @moduledoc """
   Saw-specific LFO source with configurable drop point.
 
@@ -199,8 +199,8 @@ defmodule Mensch.NewModulation.LfoSaw do
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoSaw do
-  alias Mensch.NewModulation.LfoSaw
+defimpl Mensch.Modulation.Lfo, for: Mensch.Modulation.LfoSaw do
+  alias Mensch.Modulation.LfoSaw
 
   def evaluate(
         %LfoSaw{} = lfo_saw,

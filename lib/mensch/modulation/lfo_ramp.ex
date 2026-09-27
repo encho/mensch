@@ -1,4 +1,4 @@
-defmodule Mensch.NewModulation.LfoRamp do
+defmodule Mensch.Modulation.LfoRamp do
   @moduledoc """
   Non-cyclic ramp LFO source.
 
@@ -165,8 +165,8 @@ defmodule Mensch.NewModulation.LfoRamp do
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoRamp do
-  alias Mensch.NewModulation.LfoRamp
+defimpl Mensch.Modulation.Lfo, for: Mensch.Modulation.LfoRamp do
+  alias Mensch.Modulation.LfoRamp
 
   def evaluate(
         %LfoRamp{} = lfo_ramp,

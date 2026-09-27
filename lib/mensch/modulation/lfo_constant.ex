@@ -1,4 +1,4 @@
-defmodule Mensch.NewModulation.LfoConstant do
+defmodule Mensch.Modulation.LfoConstant do
   @moduledoc """
   Constant modulation source.
 
@@ -55,8 +55,8 @@ defmodule Mensch.NewModulation.LfoConstant do
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoConstant do
-  alias Mensch.NewModulation.LfoConstant
+defimpl Mensch.Modulation.Lfo, for: Mensch.Modulation.LfoConstant do
+  alias Mensch.Modulation.LfoConstant
 
   def evaluate(
         %LfoConstant{} = lfo_constant,

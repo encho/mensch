@@ -15,11 +15,11 @@ defmodule Mensch.Machines.RootNoteParams do
     `%{lfo: lfo_term, mode: :add | :multiply}`.
   """
 
-  alias Mensch.NewModulation
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoGroup
+  alias Mensch.Modulation
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoGroup
 
-  @type lfo_pressure :: NewModulation.lfo_pressure()
+  @type lfo_pressure :: Modulation.lfo_pressure()
 
   @type t :: %__MODULE__{
           octave_offset: integer(),
@@ -38,7 +38,7 @@ defmodule Mensch.Machines.RootNoteParams do
     :octave_offset,
     :velocity,
     pressure: 0,
-    lfo_pressure: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :additive}
+    lfo_pressure: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add}
   ]
 
   @doc "Default parameters for the root note machine."

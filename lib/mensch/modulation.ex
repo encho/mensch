@@ -1,14 +1,14 @@
-defmodule Mensch.NewModulation do
+defmodule Mensch.Modulation do
   @moduledoc """
-  Shared helpers for the new modulation architecture.
+  Shared helpers for the modulation architecture.
   """
 
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoConstant
-  alias Mensch.NewModulation.LfoEnvelope
-  alias Mensch.NewModulation.LfoGroup
-  alias Mensch.NewModulation.LfoRamp
-  alias Mensch.NewModulation.LfoSaw
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoConstant
+  alias Mensch.Modulation.LfoEnvelope
+  alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoRamp
+  alias Mensch.Modulation.LfoSaw
 
   @type lfo_term ::
           LfoCurve.t()

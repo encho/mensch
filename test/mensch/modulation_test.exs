@@ -1,14 +1,14 @@
-defmodule Mensch.NewModulationTest do
+defmodule Mensch.ModulationTest do
   use ExUnit.Case, async: true
 
-  alias Mensch.NewModulation
-  alias Mensch.NewModulation.Lfo
-  alias Mensch.NewModulation.LfoConstant
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoEnvelope
-  alias Mensch.NewModulation.LfoGroup
-  alias Mensch.NewModulation.LfoRamp
-  alias Mensch.NewModulation.LfoSaw
+  alias Mensch.Modulation
+  alias Mensch.Modulation.Lfo
+  alias Mensch.Modulation.LfoConstant
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoEnvelope
+  alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoRamp
+  alias Mensch.Modulation.LfoSaw
   alias Mensch.SampleContext
 
   test "lfo_curve evaluates scaled sine value" do
@@ -233,11 +233,11 @@ defmodule Mensch.NewModulationTest do
   end
 
   test "apply_to_pressure clamps and rounds for add and multiply" do
-    assert NewModulation.apply_to_pressure(80, 2.6, :add) == 83
-    assert NewModulation.apply_to_pressure(120, 20.0, :add) == 127
-    assert NewModulation.apply_to_pressure(5, -20.0, :add) == 0
+    assert Modulation.apply_to_pressure(80, 2.6, :add) == 83
+    assert Modulation.apply_to_pressure(120, 20.0, :add) == 127
+    assert Modulation.apply_to_pressure(5, -20.0, :add) == 0
 
-    assert NewModulation.apply_to_pressure(80, 0.1, :multiply) == 88
-    assert NewModulation.apply_to_pressure(80, -1.0, :multiply) == 0
+    assert Modulation.apply_to_pressure(80, 0.1, :multiply) == 88
+    assert Modulation.apply_to_pressure(80, -1.0, :multiply) == 0
   end
 end

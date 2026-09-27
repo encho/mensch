@@ -1,4 +1,4 @@
-defmodule Mensch.NewModulation.LfoEnvelope do
+defmodule Mensch.Modulation.LfoEnvelope do
   @moduledoc """
   Piecewise ADSHR-style envelope modulation source.
 
@@ -234,8 +234,8 @@ defmodule Mensch.NewModulation.LfoEnvelope do
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoEnvelope do
-  alias Mensch.NewModulation.LfoEnvelope
+defimpl Mensch.Modulation.Lfo, for: Mensch.Modulation.LfoEnvelope do
+  alias Mensch.Modulation.LfoEnvelope
 
   def evaluate(
         %LfoEnvelope{} = lfo_envelope,

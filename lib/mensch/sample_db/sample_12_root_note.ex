@@ -5,19 +5,19 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   alias Mensch.ChordSpec
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
-  alias Mensch.NewModulation.LfoConstant
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoEnvelope
-  alias Mensch.NewModulation.LfoGroup
-  alias Mensch.NewModulation.LfoRamp
-  alias Mensch.NewModulation.LfoSaw
+  alias Mensch.Modulation.LfoConstant
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoEnvelope
+  alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoRamp
+  alias Mensch.Modulation.LfoSaw
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
   # Example: non-cyclic linear ramp (holds once it reaches the end).
   #
   @lfo_pressure_ramp %LfoGroup{
-    initial: %Mensch.NewModulation.LfoRamp{
+    initial: %Mensch.Modulation.LfoRamp{
       start_value: 0.0,
       end_value: 47.0,
       interpolation_function: :linear,

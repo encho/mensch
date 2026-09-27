@@ -6,8 +6,8 @@ defmodule Mensch.RootNoteTest do
   alias Mensch.Machine
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoGroup
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoGroup
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 

@@ -13,7 +13,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   - `lfo_slide` and `lfo_bend` are evaluated as dedicated modulation lanes
 
   All modulation lanes use `%{lfo: lfo_term, mode: :add | :multiply}` and are
-  normalized through `Mensch.NewModulation`.
+  normalized through `Mensch.Modulation`.
   """
 
   alias Mensch.ChordSpec
@@ -22,9 +22,9 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
   alias Mensch.Machines.DynamicVoicingParams
-  alias Mensch.NewModulation
-  alias Mensch.NewModulation.Lfo
-  alias Mensch.NewModulation.LfoEnvelope
+  alias Mensch.Modulation
+  alias Mensch.Modulation.Lfo
+  alias Mensch.Modulation.LfoEnvelope
   alias Mensch.SampleContext
 
   defmodule RenderContext do
@@ -411,7 +411,7 @@ defmodule Mensch.Machines.DynamicVoicing do
       )
 
     pressure =
-      NewModulation.apply_to_pressure(
+      Modulation.apply_to_pressure(
         baseline_pressure,
         pressure_modulation,
         render_context.params.lfo_pressure.mode
@@ -475,7 +475,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   end
 
   defp normalize_modulation_lane!(%{lfo: _lfo, mode: _mode} = lane, field_name) do
-    NewModulation.normalize_lfo_pressure!(lane, field_name)
+    Modulation.normalize_lfo_pressure!(lane, field_name)
   end
 
   defp normalize_modulation_lane!(lane, field_name) when is_map(lane) do
@@ -490,14 +490,14 @@ defmodule Mensch.Machines.DynamicVoicing do
         other -> other
       end
 
-    NewModulation.normalize_lfo_pressure!(
+    Modulation.normalize_lfo_pressure!(
       %{lfo: Map.drop(lane, [:__struct__, :mode, "mode"]), mode: normalized_mode},
       field_name
     )
   end
 
   defp normalize_modulation_lane!(other, field_name) do
-    NewModulation.normalize_lfo_pressure!(other, field_name)
+    Modulation.normalize_lfo_pressure!(other, field_name)
   end
 
   defp evaluate_lane_modulation(

@@ -22,13 +22,13 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     `%{lfo: lfo_term, mode: :add | :multiply}`.
   """
 
-  alias Mensch.NewModulation
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoGroup
+  alias Mensch.Modulation
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoGroup
 
   @type direction :: :up | :down | {:cycle_up, pos_integer()} | {:cycle_down, pos_integer()}
 
-  @type modulation_lane :: NewModulation.lfo_pressure()
+  @type modulation_lane :: Modulation.lfo_pressure()
 
   @type t :: %__MODULE__{
           direction: direction(),

@@ -1,4 +1,4 @@
-defmodule Mensch.NewModulation.LfoGroup do
+defmodule Mensch.Modulation.LfoGroup do
   @moduledoc """
   Ordered composition of LFO terms.
 
@@ -6,11 +6,11 @@ defmodule Mensch.NewModulation.LfoGroup do
   each operation in sequence.
   """
 
-  alias Mensch.NewModulation.LfoConstant
-  alias Mensch.NewModulation.LfoCurve
-  alias Mensch.NewModulation.LfoEnvelope
-  alias Mensch.NewModulation.LfoRamp
-  alias Mensch.NewModulation.LfoSaw
+  alias Mensch.Modulation.LfoConstant
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoEnvelope
+  alias Mensch.Modulation.LfoRamp
+  alias Mensch.Modulation.LfoSaw
 
   @type operation_name :: :add | :multiply
   @type lfo_term ::
@@ -149,9 +149,9 @@ defmodule Mensch.NewModulation.LfoGroup do
   end
 end
 
-defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoGroup do
-  alias Mensch.NewModulation.Lfo
-  alias Mensch.NewModulation.LfoGroup
+defimpl Mensch.Modulation.Lfo, for: Mensch.Modulation.LfoGroup do
+  alias Mensch.Modulation.Lfo
+  alias Mensch.Modulation.LfoGroup
 
   def evaluate(
         %LfoGroup{} = lfo_group,
