@@ -80,7 +80,7 @@ defmodule Mensch.Machines.StrummedMpe do
       )
 
     duration_mbeats =
-      notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
+      notes |> Enum.map(&(&1.start_mbeat + &1.adsr.total_mbeats)) |> Enum.max()
 
     %MachineFrameSequence{
       frames: build_frames(notes, duration_mbeats, frame_mbeats, sample_context)
@@ -101,8 +101,8 @@ defmodule Mensch.Machines.StrummedMpe do
     chord_notes
     |> Enum.with_index()
     |> Enum.map(fn {note_number, note_index} ->
-      note_delay_mbeats = note_index * note_stagger_mbeats
-      note_start_mbeat = sample_start_mbeat + note_delay_mbeats
+      note_start_mbeat = note_index * note_stagger_mbeats
+      note_start_mbeat = sample_start_mbeat + note_start_mbeat
       note_duration_mbeats = max(chord_end_mbeat - note_start_mbeat, 0)
       {note_name, octave} = ChordSpec.note_name(note_number)
 
@@ -119,7 +119,7 @@ defmodule Mensch.Machines.StrummedMpe do
         machine_id: id(),
         chord_instance_id: 0,
         note_instance_id: note_index,
-        delay_mbeats: note_start_mbeat,
+        start_mbeat: note_start_mbeat,
         adsr: adsr
       }
     end)
@@ -160,7 +160,7 @@ defmodule Mensch.Machines.StrummedMpe do
     end
   end
 
-  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
+  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.start_mbeat do
     NoteFrame.from_note_source(note, %{
       phase: :pending,
       note_on: false,
@@ -172,7 +172,7 @@ defmodule Mensch.Machines.StrummedMpe do
   end
 
   defp note_frame(note, at_mbeat, _sample_context)
-       when at_mbeat > note.delay_mbeats + note.adsr.total_mbeats do
+       when at_mbeat > note.start_mbeat + note.adsr.total_mbeats do
     NoteFrame.from_note_source(note, %{
       phase: :ended,
       note_on: false,
@@ -184,7 +184,7 @@ defmodule Mensch.Machines.StrummedMpe do
   end
 
   defp note_frame(note, at_mbeat, sample_context) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     local_elapsed_ms = SampleContext.mbeats_to_ms(sample_context, local_elapsed_mbeats)
 
     NoteFrame.from_note_source(note, %{

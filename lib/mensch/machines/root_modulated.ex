@@ -70,7 +70,7 @@ defmodule Mensch.Machines.RootModulated do
       machine_id: id(),
       chord_instance_id: 0,
       note_instance_id: 0,
-      delay_mbeats: sample_start_mbeat,
+      start_mbeat: sample_start_mbeat,
       adsr: adsr
     }
 
@@ -114,7 +114,7 @@ defmodule Mensch.Machines.RootModulated do
     end
   end
 
-  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
+  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.start_mbeat do
     NoteFrame.from_note_source(note, %{
       phase: :pending,
       note_on: false,
@@ -126,7 +126,7 @@ defmodule Mensch.Machines.RootModulated do
   end
 
   defp note_frame(note, at_mbeat, _sample_context)
-       when at_mbeat > note.delay_mbeats + note.adsr.total_mbeats do
+       when at_mbeat > note.start_mbeat + note.adsr.total_mbeats do
     NoteFrame.from_note_source(note, %{
       phase: :ended,
       note_on: false,
@@ -138,7 +138,7 @@ defmodule Mensch.Machines.RootModulated do
   end
 
   defp note_frame(note, at_mbeat, sample_context) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     local_elapsed_ms = SampleContext.mbeats_to_ms(sample_context, local_elapsed_mbeats)
 
     NoteFrame.from_note_source(note, %{

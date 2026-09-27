@@ -18,6 +18,22 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
+  defmodule RenderContext do
+    @moduledoc false
+
+    alias Mensch.Machines.DynamicVoicingParams
+    alias Mensch.SampleContext
+
+    @enforce_keys [:params, :sample_context, :entry_start_mbeat_abs]
+    defstruct [:params, :sample_context, :entry_start_mbeat_abs]
+
+    @type t :: %__MODULE__{
+            params: DynamicVoicingParams.t(),
+            sample_context: SampleContext.t(),
+            entry_start_mbeat_abs: non_neg_integer()
+          }
+  end
+
   @note_on_velocity 100
 
   @type t :: %__MODULE__{params: DynamicVoicingParams.t()}
@@ -63,6 +79,7 @@ defmodule Mensch.Machines.DynamicVoicing do
         opts \\ []
       ) do
     %DynamicVoicingParams{} = params = machine_params!(opts) |> hydrate_params()
+    render_context = build_render_context(params, sample_context, entry_start_mbeat_abs(opts))
 
     direction = normalize_direction!(params.direction)
 
@@ -71,15 +88,8 @@ defmodule Mensch.Machines.DynamicVoicing do
       |> normalize_number_of_inversions!()
       |> validate_inversion_count_for_direction!(direction)
 
-    # Validate and canonicalize LFO settings up front so frame rendering can
-    # assume strongly-typed values (curve/time base/mode) without branching.
-    pressure_lfo = Lfo.normalize!(params.lfo_pressure, field_name: "dynamic_voicing lfo_pressure")
-    slide_lfo = Lfo.normalize!(params.lfo_slide, field_name: "dynamic_voicing lfo_slide")
-    bend_lfo = Lfo.normalize!(params.lfo_bend, field_name: "dynamic_voicing lfo_bend")
-
     # Quantization step for this render: how many mbeats each frame advances.
     frame_mbeats = SampleContext.frame_units(sample_context)
-    entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
 
     # Snap total chord duration to the frame grid so slot boundaries land on frame ticks.
     chord_duration_mbeats =
@@ -100,12 +110,12 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     planned_notes =
       build_dynamic_note_plan(voicings, slot_boundaries)
-      |> assign_dynamic_adsr(sample_context, frame_mbeats, entry_start_mbeat_abs)
+      |> assign_dynamic_adsr(sample_context, frame_mbeats, render_context.entry_start_mbeat_abs)
 
     max_note_end_mbeats =
       case planned_notes do
         [] -> chord_duration_mbeats
-        _ -> planned_notes |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats)) |> Enum.max()
+        _ -> planned_notes |> Enum.map(&(&1.start_mbeat + &1.adsr.total_mbeats)) |> Enum.max()
       end
 
     assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
@@ -116,11 +126,7 @@ defmodule Mensch.Machines.DynamicVoicing do
           planned_note,
           chord_duration_mbeats,
           frame_mbeats,
-          sample_context,
-          entry_start_mbeat_abs,
-          pressure_lfo,
-          slide_lfo,
-          bend_lfo
+          render_context
         )
       end)
 
@@ -373,7 +379,7 @@ defmodule Mensch.Machines.DynamicVoicing do
         harmonic_tags: plan.harmonic_tags,
         role_tags: plan.role_tags,
         machine_note_tags: plan.machine_note_tags,
-        delay_mbeats: plan.start_mbeat
+        start_mbeat: plan.start_mbeat
       })
 
     {note_plan_item, plan.duration_mbeats}
@@ -425,26 +431,18 @@ defmodule Mensch.Machines.DynamicVoicing do
          note,
          absolute_end_mbeat,
          frame_mbeats,
-         %SampleContext{} = sample_context,
-         entry_start_mbeat_abs,
-         %LfoParams{} = pressure_lfo,
-         %LfoParams{} = slide_lfo,
-         %LfoParams{} = bend_lfo
+         %RenderContext{} = render_context
        ) do
-    note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, absolute_end_mbeat)
+    note_end_mbeat = min(note.start_mbeat + note.adsr.total_mbeats, absolute_end_mbeat)
 
-    for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
+    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
         note:
           note_frame(
             note,
             at_mbeat,
-            sample_context,
-            entry_start_mbeat_abs,
-            pressure_lfo,
-            slide_lfo,
-            bend_lfo
+            render_context
           )
       }
     end
@@ -467,7 +465,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   end
 
   defp boundary_start_note?(plan_note, entry_start_mbeat_abs) do
-    entry_start_mbeat_abs + plan_note.delay_mbeats > 0
+    entry_start_mbeat_abs + plan_note.start_mbeat > 0
   end
 
   defp entry_start_mbeat_abs(opts) do
@@ -480,15 +478,17 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp note_frame(
          note,
          at_mbeat,
-         %SampleContext{} = sample_context,
-         entry_start_mbeat_abs,
-         %LfoParams{} = pressure_lfo,
-         %LfoParams{} = slide_lfo,
-         %LfoParams{} = bend_lfo
+         %RenderContext{} = render_context
        ) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
     adsr_level = ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats)
+
+    %SampleContext{} = sample_context = render_context.sample_context
+    entry_start_mbeat_abs = render_context.entry_start_mbeat_abs
+    %LfoParams{} = pressure_lfo = render_context.params.lfo_pressure
+    %LfoParams{} = slide_lfo = render_context.params.lfo_slide
+    %LfoParams{} = bend_lfo = render_context.params.lfo_bend
 
     pressure_lfo_norm =
       Lfo.value_at_mbeat(
@@ -533,6 +533,19 @@ defmodule Mensch.Machines.DynamicVoicing do
       bend: bend,
       slide: slide
     })
+  end
+
+  defp build_render_context(
+         %DynamicVoicingParams{} = params,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs
+       )
+       when is_integer(entry_start_mbeat_abs) and entry_start_mbeat_abs >= 0 do
+    %RenderContext{
+      params: params,
+      sample_context: sample_context,
+      entry_start_mbeat_abs: entry_start_mbeat_abs
+    }
   end
 
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do

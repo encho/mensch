@@ -20,6 +20,22 @@ defmodule Mensch.Machines.RootNote do
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
+  defmodule RenderContext do
+    @moduledoc false
+
+    alias Mensch.Machines.RootNoteParams
+    alias Mensch.SampleContext
+
+    @enforce_keys [:params, :sample_context, :entry_start_mbeat_abs]
+    defstruct [:params, :sample_context, :entry_start_mbeat_abs]
+
+    @type t :: %__MODULE__{
+            params: RootNoteParams.t(),
+            sample_context: SampleContext.t(),
+            entry_start_mbeat_abs: non_neg_integer()
+          }
+  end
+
   @type t :: %__MODULE__{params: RootNoteParams.t()}
 
   @enforce_keys [:params]
@@ -55,10 +71,10 @@ defmodule Mensch.Machines.RootNote do
         opts \\ []
       ) do
     %RootNoteParams{} = params = machine_params!(opts) |> hydrate_params()
-    pressure_lfo = params.lfo_pressure
 
     frame_mbeats = SampleContext.frame_units(sample_context)
     entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
+    render_context = build_render_context(params, sample_context, entry_start_mbeat_abs)
 
     chord_duration_mbeats =
       timeline_context
@@ -88,7 +104,7 @@ defmodule Mensch.Machines.RootNote do
         harmonic_tags: [:root],
         role_tags: [],
         machine_note_tags: [],
-        delay_mbeats: sample_start_mbeat
+        start_mbeat: sample_start_mbeat
       })
 
     note_frame_stream =
@@ -96,13 +112,10 @@ defmodule Mensch.Machines.RootNote do
         note_plan_item,
         chord_duration_mbeats,
         frame_mbeats,
-        sample_context,
-        entry_start_mbeat_abs,
-        pressure_lfo.lfo,
-        pressure_lfo.mode
+        render_context
       )
 
-    max_note_end_mbeats = note_plan_item.delay_mbeats + chord_duration_mbeats
+    max_note_end_mbeats = note_plan_item.start_mbeat + chord_duration_mbeats
     assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
 
     %MachineFrameSequence{
@@ -114,14 +127,11 @@ defmodule Mensch.Machines.RootNote do
          note,
          duration_mbeats,
          frame_mbeats,
-         %SampleContext{} = sample_context,
-         entry_start_mbeat_abs,
-         pressure_lfo,
-         pressure_lfo_mode
+         %RenderContext{} = render_context
        ) do
-    note_end_mbeat = min(note.delay_mbeats + duration_mbeats, duration_mbeats)
+    note_end_mbeat = min(note.start_mbeat + duration_mbeats, duration_mbeats)
 
-    for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
+    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
         note:
@@ -129,10 +139,7 @@ defmodule Mensch.Machines.RootNote do
             note,
             at_mbeat,
             duration_mbeats,
-            sample_context,
-            entry_start_mbeat_abs,
-            pressure_lfo,
-            pressure_lfo_mode
+            render_context
           )
       }
     end
@@ -152,13 +159,15 @@ defmodule Mensch.Machines.RootNote do
          note,
          at_mbeat,
          duration_mbeats,
-         %SampleContext{} = sample_context,
-         entry_start_mbeat_abs,
-         pressure_lfo,
-         pressure_lfo_mode
+         %RenderContext{} = render_context
        ) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = if(local_elapsed_mbeats < duration_mbeats, do: :sustain, else: :release)
+
+    %SampleContext{} = sample_context = render_context.sample_context
+    entry_start_mbeat_abs = render_context.entry_start_mbeat_abs
+    pressure_lfo = render_context.params.lfo_pressure.lfo
+    pressure_lfo_mode = render_context.params.lfo_pressure.mode
 
     pressure_lfo_value =
       Lfo.evaluate(
@@ -180,6 +189,19 @@ defmodule Mensch.Machines.RootNote do
       bend: 0.0,
       slide: 0
     })
+  end
+
+  defp build_render_context(
+         %RootNoteParams{} = params,
+         %SampleContext{} = sample_context,
+         entry_start_mbeat_abs
+       )
+       when is_integer(entry_start_mbeat_abs) and entry_start_mbeat_abs >= 0 do
+    %RenderContext{
+      params: params,
+      sample_context: sample_context,
+      entry_start_mbeat_abs: entry_start_mbeat_abs
+    }
   end
 
   defp machine_params!(opts) do

@@ -84,7 +84,7 @@ defmodule Mensch.Machines.PulseRoot do
       machine_id: id(),
       chord_instance_id: 0,
       note_instance_id: 0,
-      delay_mbeats: sample_start_mbeat,
+      start_mbeat: sample_start_mbeat,
       total_mbeats: duration_mbeats,
       entry_start_mbeat_abs: entry_start_mbeat_abs,
       pulse_width_mbeats: pulse_width_mbeats,
@@ -104,7 +104,7 @@ defmodule Mensch.Machines.PulseRoot do
     end
   end
 
-  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.delay_mbeats do
+  defp note_frame(note, at_mbeat, _sample_context) when at_mbeat < note.start_mbeat do
     NoteFrame.from_note_source(note, %{
       phase: :pending,
       note_on: false,
@@ -116,7 +116,7 @@ defmodule Mensch.Machines.PulseRoot do
   end
 
   defp note_frame(note, at_mbeat, _sample_context)
-       when at_mbeat > note.delay_mbeats + note.total_mbeats do
+       when at_mbeat > note.start_mbeat + note.total_mbeats do
     NoteFrame.from_note_source(note, %{
       phase: :ended,
       note_on: false,
@@ -128,7 +128,7 @@ defmodule Mensch.Machines.PulseRoot do
   end
 
   defp note_frame(note, at_mbeat, _sample_context) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     absolute_mbeat = note.entry_start_mbeat_abs + at_mbeat
 
     pressure =

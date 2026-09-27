@@ -122,7 +122,7 @@ defmodule Mensch.Machines.ArpMachine do
 
         _ ->
           planned_notes_with_adsr
-          |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats))
+          |> Enum.map(&(&1.start_mbeat + &1.adsr.total_mbeats))
           |> Enum.max()
       end
 
@@ -156,7 +156,7 @@ defmodule Mensch.Machines.ArpMachine do
         harmonic_tags: harmonic_tags_for_degree(voiced_note.degree_index),
         role_tags: [],
         machine_note_tags: [],
-        delay_mbeats: voiced_note.delay_mbeats
+        start_mbeat: voiced_note.start_mbeat
       })
     end)
   end
@@ -183,8 +183,8 @@ defmodule Mensch.Machines.ArpMachine do
     voiced_notes
     |> Enum.with_index()
     |> Enum.map(fn {voiced_note, sequence_index} ->
-      delay_mbeats = sample_start_mbeat + sequence_index * stagger_mbeats
-      Map.put(voiced_note, :delay_mbeats, delay_mbeats)
+      start_mbeat = sample_start_mbeat + sequence_index * stagger_mbeats
+      Map.put(voiced_note, :start_mbeat, start_mbeat)
     end)
   end
 
@@ -234,9 +234,9 @@ defmodule Mensch.Machines.ArpMachine do
   end
 
   defp render_note_frame_stream(note, duration_mbeats, frame_mbeats) do
-    note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, duration_mbeats)
+    note_end_mbeat = min(note.start_mbeat + note.adsr.total_mbeats, duration_mbeats)
 
-    for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
+    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
         note: note_frame(note, at_mbeat)
@@ -266,7 +266,7 @@ defmodule Mensch.Machines.ArpMachine do
   end
 
   defp note_frame(note, at_mbeat) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
 
     NoteFrame.from_note_plan_item(note, %{

@@ -121,7 +121,7 @@ defmodule Mensch.Machines.SimpleChord do
 
         _ ->
           planned_notes_with_adsr
-          |> Enum.map(&(&1.delay_mbeats + &1.adsr.total_mbeats))
+          |> Enum.map(&(&1.start_mbeat + &1.adsr.total_mbeats))
           |> Enum.max()
       end
 
@@ -150,7 +150,7 @@ defmodule Mensch.Machines.SimpleChord do
   # note_instance_id:  [0, 1, 2, 3, 4, 5]
   # degree_index:      [0, 1, 2, 0, 2, 1]
   #
-  # With sample_start_mbeat=240 and stagger_mbeats=10, computed delay_mbeats are:
+  # With sample_start_mbeat=240 and stagger_mbeats=10, computed start_mbeat are:
   # [240, 250, 260, ...]
   defp build_note_plan(timed_voiced_notes) do
     Enum.map(timed_voiced_notes, fn voiced_note ->
@@ -183,7 +183,7 @@ defmodule Mensch.Machines.SimpleChord do
         # Machine-local tags can be layered later without changing schema.
         machine_note_tags: [],
         # Absolute quantized start time in mbeat units.
-        delay_mbeats: voiced_note.delay_mbeats
+        start_mbeat: voiced_note.start_mbeat
       })
     end)
   end
@@ -202,8 +202,8 @@ defmodule Mensch.Machines.SimpleChord do
     voiced_notes
     |> Enum.with_index()
     |> Enum.map(fn {voiced_note, sequence_index} ->
-      delay_mbeats = sample_start_mbeat + sequence_index * stagger_mbeats
-      Map.put(voiced_note, :delay_mbeats, delay_mbeats)
+      start_mbeat = sample_start_mbeat + sequence_index * stagger_mbeats
+      Map.put(voiced_note, :start_mbeat, start_mbeat)
     end)
   end
 
@@ -253,9 +253,9 @@ defmodule Mensch.Machines.SimpleChord do
   end
 
   defp render_note_frame_stream(note, duration_mbeats, frame_mbeats) do
-    note_end_mbeat = min(note.delay_mbeats + note.adsr.total_mbeats, duration_mbeats)
+    note_end_mbeat = min(note.start_mbeat + note.adsr.total_mbeats, duration_mbeats)
 
-    for at_mbeat <- note.delay_mbeats..note_end_mbeat//frame_mbeats do
+    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
         note: note_frame(note, at_mbeat)
@@ -285,7 +285,7 @@ defmodule Mensch.Machines.SimpleChord do
   end
 
   defp note_frame(note, at_mbeat) do
-    local_elapsed_mbeats = at_mbeat - note.delay_mbeats
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
 
     NoteFrame.from_note_plan_item(note, %{
