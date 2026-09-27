@@ -27,17 +27,11 @@ defmodule Mensch.Machine.Pipeline do
               render_context()
             ) :: [NotePlanItem.t()]
 
-  @callback render_note_frame_stream(
+  @callback render_note_frame(
               NotePlanItem.t(),
+              non_neg_integer(),
               render_context()
-            ) :: [map()]
-
-  @callback stitch_note_frame_streams(
-              [[map()]],
-              render_context()
-            ) :: [MachineFrameSequence.frame()]
-
-  @callback assert_invariants([NotePlanItem.t()], render_context()) :: :ok
+            ) :: map()
 
   @spec build_frame_sequence(
           module(),
@@ -63,16 +57,72 @@ defmodule Mensch.Machine.Pipeline do
 
     note_plan = module.build_note_plan(machine, chord_spec, render_context)
 
-    :ok = module.assert_invariants(note_plan, render_context)
+    :ok = assert_invariants(note_plan, render_context)
 
     note_frame_streams =
       Enum.map(note_plan, fn note ->
-        module.render_note_frame_stream(note, render_context)
+        render_note_frame_stream(module, note, render_context)
       end)
 
     %MachineFrameSequence{
-      frames: module.stitch_note_frame_streams(note_frame_streams, render_context)
+      frames: stitch_note_frame_streams(note_frame_streams, render_context)
     }
+  end
+
+  @spec stitch_note_frame_streams([[map()]], render_context()) :: [MachineFrameSequence.frame()]
+  defp stitch_note_frame_streams(note_frame_streams, render_context) do
+    common = Map.fetch!(render_context, :common)
+    chord_start_mbeat = common.chord_start_mbeat
+    chord_end_mbeat = chord_start_mbeat + common.chord_duration_mbeats
+    frame_mbeats = common.frame_mbeats
+
+    notes_by_mbeat =
+      note_frame_streams
+      |> List.flatten()
+      |> Enum.group_by(& &1.at_mbeat, & &1.note)
+
+    for at_mbeat <- chord_start_mbeat..chord_end_mbeat//frame_mbeats do
+      frame_notes =
+        notes_by_mbeat
+        |> Map.get(at_mbeat, [])
+        |> Enum.sort_by(&{Map.get(&1, :note_instance_id, 0), Map.get(&1, :midi_note, 0)})
+
+      %{at_mbeat: at_mbeat, notes: frame_notes}
+    end
+  end
+
+  @spec assert_invariants([NotePlanItem.t()], render_context()) :: :ok
+  defp assert_invariants(note_plan, render_context) do
+    common = Map.fetch!(render_context, :common)
+    chord_end_mbeat = common.chord_start_mbeat + common.chord_duration_mbeats
+
+    max_note_end_mbeats =
+      case note_plan do
+        [] -> chord_end_mbeat
+        _ -> note_plan |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
+      end
+
+    if max_note_end_mbeats == chord_end_mbeat do
+      :ok
+    else
+      raise ArgumentError,
+            "pipeline invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_end_mbeat}"
+    end
+  end
+
+  @spec render_note_frame_stream(module(), NotePlanItem.t(), render_context()) :: [map()]
+  defp render_note_frame_stream(module, note, render_context) when is_atom(module) do
+    common = Map.fetch!(render_context, :common)
+    chord_end_mbeat = common.chord_start_mbeat + common.chord_duration_mbeats
+    frame_mbeats = common.frame_mbeats
+    note_end_mbeat = min(note.start_mbeat + note.duration_mbeats, chord_end_mbeat)
+
+    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
+      %{
+        at_mbeat: at_mbeat,
+        note: module.render_note_frame(note, at_mbeat, render_context)
+      }
+    end
   end
 
   @spec build_common_fields(SampleContext.t(), TimelineContext.t(), keyword()) ::

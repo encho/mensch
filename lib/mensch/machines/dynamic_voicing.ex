@@ -9,7 +9,6 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   alias Mensch.ChordSpec
   alias Mensch.Envelope.ADSR
-  alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
@@ -401,7 +400,7 @@ defmodule Mensch.Machines.DynamicVoicing do
       duration_mbeats = plan_note.duration_mbeats
 
       attack_mbeats =
-        if boundary_start_note?(plan_note, absolute_chord_start_mbeat) do
+        if absolute_chord_start_mbeat + plan_note.start_mbeat > 0 do
           frame_mbeats
         else
           frame_mbeats * 2
@@ -436,76 +435,8 @@ defmodule Mensch.Machines.DynamicVoicing do
   end
 
   @impl Pipeline
-  @spec render_note_frame_stream(NotePlanItem.t(), RenderContext.t()) :: [map()]
-  def render_note_frame_stream(note, %RenderContext{} = render_context) do
-    chord_end_mbeat =
-      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
-
-    frame_mbeats = render_context.common.frame_mbeats
-    note_end_mbeat = min(note.start_mbeat + note.duration_mbeats, chord_end_mbeat)
-
-    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
-      %{
-        at_mbeat: at_mbeat,
-        note:
-          note_frame(
-            note,
-            at_mbeat,
-            render_context
-          )
-      }
-    end
-  end
-
-  @impl Pipeline
-  @spec stitch_note_frame_streams([[map()]], RenderContext.t()) :: [MachineFrameSequence.frame()]
-  def stitch_note_frame_streams(note_frame_streams, %RenderContext{} = render_context) do
-    chord_start_mbeat = render_context.common.chord_start_mbeat
-    chord_end_mbeat = chord_start_mbeat + render_context.common.chord_duration_mbeats
-    frame_mbeats = render_context.common.frame_mbeats
-
-    notes_by_mbeat =
-      note_frame_streams
-      |> List.flatten()
-      |> Enum.group_by(& &1.at_mbeat, & &1.note)
-
-    for at_mbeat <- chord_start_mbeat..chord_end_mbeat//frame_mbeats do
-      frame_notes =
-        notes_by_mbeat
-        |> Map.get(at_mbeat, [])
-        |> Enum.sort_by(&{&1.note_instance_id, &1.midi_note})
-
-      %{at_mbeat: at_mbeat, notes: frame_notes}
-    end
-  end
-
-  @impl Pipeline
-  @spec assert_invariants([NotePlanItem.t()], RenderContext.t()) :: :ok
-  def assert_invariants(note_plan, %RenderContext{} = render_context) do
-    max_note_end_mbeats =
-      case note_plan do
-        [] ->
-          render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
-
-        _ ->
-          note_plan |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
-      end
-
-    assert_last_note_ends_at_chord_end!(
-      max_note_end_mbeats,
-      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
-    )
-  end
-
-  defp boundary_start_note?(plan_note, absolute_chord_start_mbeat) do
-    absolute_chord_start_mbeat + plan_note.start_mbeat > 0
-  end
-
-  defp note_frame(
-         note,
-         at_mbeat,
-         %RenderContext{} = render_context
-       ) do
+  @spec render_note_frame(NotePlanItem.t(), non_neg_integer(), RenderContext.t()) :: map()
+  def render_note_frame(note, at_mbeat, %RenderContext{} = render_context) do
     local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
     adsr_level = ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats)
@@ -648,15 +579,6 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp harmonic_tags_for_degree(_), do: [:tension]
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
-
-  defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_end_mbeat)
-       when max_note_end_mbeats == chord_end_mbeat,
-       do: :ok
-
-  defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_end_mbeat) do
-    raise ArgumentError,
-          "dynamic_voicing invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_end_mbeat}"
-  end
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do

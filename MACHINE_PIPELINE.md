@@ -9,12 +9,17 @@ pipeline.
 
 - `build_render_context/2`
 - `build_note_plan/3`
-- `render_note_frame_stream/2`
-- `stitch_note_frame_streams/2`
-- `assert_invariants/2`
+- `render_note_frame/3`
 
 `Pipeline.build_frame_sequence/6` orchestrates these phases and returns
 `MachineFrameSequence`.
+
+Pipeline-owned responsibilities (shared across machines):
+
+- render note frame streams from note plans
+- stitch streams into dense chord-local frame timeline
+- sort frame notes by `{note_instance_id, midi_note}`
+- assert end-alignment invariant (last note ends at chord end)
 
 ## Shared Common Context
 
@@ -51,11 +56,12 @@ Implications:
 1. Intake and normalize machine params.
 2. Build typed render context from shared common fields.
 3. Build `NotePlanItem` values (`start_mbeat`, `duration_mbeats`, tags/provenance).
-4. Render per-note frame streams (`note_on`, `note_off`, phase, expression).
-5. Stitch streams into dense frame timeline over
+4. Pipeline renders per-note frame streams using machine `render_note_frame/3`.
+5. Pipeline stitches streams into dense frame timeline over
    `chord_start_mbeat..(chord_start_mbeat + chord_duration_mbeats)`.
-6. Assert machine invariants.
-7. Return local `MachineFrameSequence`.
+6. Pipeline sorts notes per frame by `{note_instance_id, midi_note}`.
+7. Pipeline asserts end-alignment invariant.
+8. Return local `MachineFrameSequence`.
 
 ## Naming Conventions
 

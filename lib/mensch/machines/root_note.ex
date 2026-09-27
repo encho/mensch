@@ -11,7 +11,6 @@ defmodule Mensch.Machines.RootNote do
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
@@ -123,67 +122,8 @@ defmodule Mensch.Machines.RootNote do
   end
 
   @impl Pipeline
-  @spec render_note_frame_stream(NotePlanItem.t(), RenderContext.t()) :: [map()]
-  def render_note_frame_stream(note, %RenderContext{} = render_context) do
-    chord_end_mbeat =
-      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
-
-    frame_mbeats = render_context.common.frame_mbeats
-    note_end_mbeat = min(note.start_mbeat + note.duration_mbeats, chord_end_mbeat)
-
-    for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
-      %{
-        at_mbeat: at_mbeat,
-        note:
-          note_frame(
-            note,
-            at_mbeat,
-            render_context
-          )
-      }
-    end
-  end
-
-  @impl Pipeline
-  @spec stitch_note_frame_streams([[map()]], RenderContext.t()) :: [MachineFrameSequence.frame()]
-  def stitch_note_frame_streams(note_frame_streams, %RenderContext{} = render_context) do
-    chord_start_mbeat = render_context.common.chord_start_mbeat
-    chord_end_mbeat = chord_start_mbeat + render_context.common.chord_duration_mbeats
-    frame_mbeats = render_context.common.frame_mbeats
-
-    notes_by_mbeat =
-      note_frame_streams
-      |> List.flatten()
-      |> Enum.group_by(& &1.at_mbeat, & &1.note)
-
-    for at_mbeat <- chord_start_mbeat..chord_end_mbeat//frame_mbeats do
-      %{at_mbeat: at_mbeat, notes: Map.get(notes_by_mbeat, at_mbeat, [])}
-    end
-  end
-
-  @impl Pipeline
-  @spec assert_invariants([NotePlanItem.t()], RenderContext.t()) :: :ok
-  def assert_invariants(note_plan, %RenderContext{} = render_context) do
-    max_note_end_mbeats =
-      case note_plan do
-        [] ->
-          render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
-
-        _ ->
-          note_plan |> Enum.map(&(&1.start_mbeat + &1.duration_mbeats)) |> Enum.max()
-      end
-
-    assert_last_note_ends_at_chord_end!(
-      max_note_end_mbeats,
-      render_context.common.chord_start_mbeat + render_context.common.chord_duration_mbeats
-    )
-  end
-
-  defp note_frame(
-         note,
-         at_mbeat,
-         %RenderContext{} = render_context
-       ) do
+  @spec render_note_frame(NotePlanItem.t(), non_neg_integer(), RenderContext.t()) :: map()
+  def render_note_frame(note, at_mbeat, %RenderContext{} = render_context) do
     local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = if(local_elapsed_mbeats < note.duration_mbeats, do: :sustain, else: :release)
 
@@ -279,15 +219,6 @@ defmodule Mensch.Machines.RootNote do
       end
 
     (octave + 1) * 12 + semitone
-  end
-
-  defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
-       when max_note_end_mbeats == chord_duration_mbeats,
-       do: :ok
-
-  defp assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats) do
-    raise ArgumentError,
-          "root_note invariant violated: last note ends at #{max_note_end_mbeats}, expected #{chord_duration_mbeats}"
   end
 end
 
