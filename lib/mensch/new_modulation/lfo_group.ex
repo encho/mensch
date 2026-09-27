@@ -157,7 +157,7 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoGroup do
         %LfoGroup{} = lfo_group,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       ) do
     lfo_group = LfoGroup.normalize!(lfo_group, field_name: "lfo group")
@@ -167,7 +167,7 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoGroup do
         lfo_group.initial,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       )
 
@@ -178,7 +178,7 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoGroup do
             term,
             at_mbeat,
             sample_context,
-            entry_start_mbeat_abs,
+            absolute_chord_start_mbeat,
             note_local_mbeat
           )
 
@@ -188,7 +188,7 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoGroup do
             term,
             at_mbeat,
             sample_context,
-            entry_start_mbeat_abs,
+            absolute_chord_start_mbeat,
             note_local_mbeat
           )
     end)

@@ -71,14 +71,14 @@ defmodule Mensch.NewModulation.LfoRamp do
         %__MODULE__{} = lfo_ramp,
         at_mbeat,
         %SampleContext{} = _sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       )
-      when is_integer(at_mbeat) and is_integer(entry_start_mbeat_abs) and
+      when is_integer(at_mbeat) and is_integer(absolute_chord_start_mbeat) and
              is_integer(note_local_mbeat) do
     timeline_mbeat =
       case lfo_ramp.anchor do
-        :sample -> entry_start_mbeat_abs + at_mbeat
+        :sample -> absolute_chord_start_mbeat + at_mbeat
         :chord -> at_mbeat
         :note -> note_local_mbeat
       end
@@ -172,11 +172,16 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoRamp do
         %LfoRamp{} = lfo_ramp,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       ) do
     lfo_ramp
     |> LfoRamp.normalize!(field_name: "lfo ramp")
-    |> LfoRamp.value_at_mbeat(at_mbeat, sample_context, entry_start_mbeat_abs, note_local_mbeat)
+    |> LfoRamp.value_at_mbeat(
+      at_mbeat,
+      sample_context,
+      absolute_chord_start_mbeat,
+      note_local_mbeat
+    )
   end
 end

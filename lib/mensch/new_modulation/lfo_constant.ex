@@ -62,7 +62,7 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoConstant do
         %LfoConstant{} = lfo_constant,
         _at_mbeat,
         _sample_context,
-        _entry_start_mbeat_abs,
+        _absolute_chord_start_mbeat,
         _note_local_mbeat
       ) do
     lfo_constant

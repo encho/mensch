@@ -566,7 +566,7 @@ defmodule Mensch.DynamicVoicingTest do
         chord_spec,
         sample_context,
         timeline_context,
-        entry_start_mbeat_abs: start_mbeat
+        absolute_chord_start_mbeat: start_mbeat
       )
 
     pressures =

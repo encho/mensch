@@ -64,16 +64,16 @@ defmodule Mensch.NewModulation.LfoCurve do
         %__MODULE__{} = lfo_curve,
         at_mbeat,
         %SampleContext{} = sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       )
-      when is_integer(at_mbeat) and is_integer(entry_start_mbeat_abs) and
+      when is_integer(at_mbeat) and is_integer(absolute_chord_start_mbeat) and
              is_integer(note_local_mbeat) do
     mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
 
     timeline_mbeat =
       case lfo_curve.anchor do
-        :sample -> entry_start_mbeat_abs + at_mbeat
+        :sample -> absolute_chord_start_mbeat + at_mbeat
         :chord -> at_mbeat
         :note -> note_local_mbeat
       end
@@ -192,11 +192,16 @@ defimpl Mensch.NewModulation.Lfo, for: Mensch.NewModulation.LfoCurve do
         %LfoCurve{} = lfo_curve,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       ) do
     lfo_curve
     |> LfoCurve.normalize!(field_name: "lfo curve")
-    |> LfoCurve.value_at_mbeat(at_mbeat, sample_context, entry_start_mbeat_abs, note_local_mbeat)
+    |> LfoCurve.value_at_mbeat(
+      at_mbeat,
+      sample_context,
+      absolute_chord_start_mbeat,
+      note_local_mbeat
+    )
   end
 end

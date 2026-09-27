@@ -73,7 +73,7 @@ defmodule Mensch.PerformanceAssembler do
       duration_mbeats: timeline_context.duration_mbeats
     }
 
-    machine_opts = [entry_start_mbeat_abs: start_mbeat]
+    machine_opts = [absolute_chord_start_mbeat: start_mbeat]
 
     chord_spec
     |> then(
@@ -111,7 +111,7 @@ defmodule Mensch.PerformanceAssembler do
     }
 
     machine_opts = [
-      entry_start_mbeat_abs: start_mbeat
+      absolute_chord_start_mbeat: start_mbeat
     ]
 
     local_entry =

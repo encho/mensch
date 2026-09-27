@@ -45,10 +45,10 @@ defmodule Mensch.Modulation.Lfo do
         %LfoParams{} = lfo_params,
         at_mbeat,
         %SampleContext{} = sample_context,
-        entry_start_mbeat_abs
+        absolute_chord_start_mbeat
       )
-      when is_integer(at_mbeat) and is_integer(entry_start_mbeat_abs) do
-    value_at_mbeat(lfo_params, at_mbeat, sample_context, entry_start_mbeat_abs, at_mbeat)
+      when is_integer(at_mbeat) and is_integer(absolute_chord_start_mbeat) do
+    value_at_mbeat(lfo_params, at_mbeat, sample_context, absolute_chord_start_mbeat, at_mbeat)
   end
 
   @spec value_at_mbeat(LfoParams.t(), integer(), SampleContext.t(), integer(), integer()) ::
@@ -57,16 +57,16 @@ defmodule Mensch.Modulation.Lfo do
         %LfoParams{} = lfo_params,
         at_mbeat,
         %SampleContext{} = sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         note_local_mbeat
       )
-      when is_integer(at_mbeat) and is_integer(entry_start_mbeat_abs) and
+      when is_integer(at_mbeat) and is_integer(absolute_chord_start_mbeat) and
              is_integer(note_local_mbeat) do
     mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
 
     timeline_mbeat =
       case lfo_params.time_base do
-        :sample -> entry_start_mbeat_abs + at_mbeat
+        :sample -> absolute_chord_start_mbeat + at_mbeat
         :chord -> at_mbeat
         :note -> note_local_mbeat
       end

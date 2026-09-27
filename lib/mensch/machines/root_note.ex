@@ -26,13 +26,27 @@ defmodule Mensch.Machines.RootNote do
     alias Mensch.Machines.RootNoteParams
     alias Mensch.SampleContext
 
-    @enforce_keys [:params, :sample_context, :entry_start_mbeat_abs]
-    defstruct [:params, :sample_context, :entry_start_mbeat_abs]
+    @enforce_keys [
+      :params,
+      :sample_context,
+      :absolute_chord_start_mbeat,
+      :frame_mbeats,
+      :chord_duration_mbeats
+    ]
+    defstruct [
+      :params,
+      :sample_context,
+      :absolute_chord_start_mbeat,
+      :frame_mbeats,
+      :chord_duration_mbeats
+    ]
 
     @type t :: %__MODULE__{
             params: RootNoteParams.t(),
             sample_context: SampleContext.t(),
-            entry_start_mbeat_abs: non_neg_integer()
+            absolute_chord_start_mbeat: non_neg_integer(),
+            frame_mbeats: pos_integer(),
+            chord_duration_mbeats: non_neg_integer()
           }
   end
 
@@ -73,13 +87,21 @@ defmodule Mensch.Machines.RootNote do
     %RootNoteParams{} = params = machine_params!(opts) |> hydrate_params()
 
     frame_mbeats = SampleContext.frame_units(sample_context)
-    entry_start_mbeat_abs = entry_start_mbeat_abs(opts)
-    render_context = build_render_context(params, sample_context, entry_start_mbeat_abs)
+    absolute_chord_start_mbeat = absolute_chord_start_mbeat(opts)
 
     chord_duration_mbeats =
       timeline_context
       |> TimelineContext.duration_mbeats()
       |> snap_mbeats(frame_mbeats)
+
+    render_context =
+      build_render_context(
+        params,
+        sample_context,
+        absolute_chord_start_mbeat,
+        frame_mbeats,
+        chord_duration_mbeats
+      )
 
     start_mbeat =
       timeline_context
@@ -108,27 +130,23 @@ defmodule Mensch.Machines.RootNote do
       })
 
     note_frame_stream =
-      render_note_frame_stream(
-        note_plan_item,
-        chord_duration_mbeats,
-        frame_mbeats,
-        render_context
-      )
+      render_note_frame_stream(note_plan_item, render_context)
 
-    max_note_end_mbeats = note_plan_item.start_mbeat + chord_duration_mbeats
-    assert_last_note_ends_at_chord_end!(max_note_end_mbeats, chord_duration_mbeats)
+    max_note_end_mbeats = note_plan_item.start_mbeat + render_context.chord_duration_mbeats
+
+    assert_last_note_ends_at_chord_end!(
+      max_note_end_mbeats,
+      render_context.chord_duration_mbeats
+    )
 
     %MachineFrameSequence{
-      frames: stitch_note_frame_stream(note_frame_stream, chord_duration_mbeats, frame_mbeats)
+      frames: stitch_note_frame_stream(note_frame_stream, render_context)
     }
   end
 
-  defp render_note_frame_stream(
-         note,
-         duration_mbeats,
-         frame_mbeats,
-         %RenderContext{} = render_context
-       ) do
+  defp render_note_frame_stream(note, %RenderContext{} = render_context) do
+    duration_mbeats = render_context.chord_duration_mbeats
+    frame_mbeats = render_context.frame_mbeats
     note_end_mbeat = min(note.start_mbeat + duration_mbeats, duration_mbeats)
 
     for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
@@ -138,14 +156,16 @@ defmodule Mensch.Machines.RootNote do
           note_frame(
             note,
             at_mbeat,
-            duration_mbeats,
             render_context
           )
       }
     end
   end
 
-  defp stitch_note_frame_stream(note_frame_stream, duration_mbeats, frame_mbeats) do
+  defp stitch_note_frame_stream(note_frame_stream, %RenderContext{} = render_context) do
+    duration_mbeats = render_context.chord_duration_mbeats
+    frame_mbeats = render_context.frame_mbeats
+
     notes_by_mbeat =
       note_frame_stream
       |> Enum.group_by(& &1.at_mbeat, & &1.note)
@@ -158,14 +178,14 @@ defmodule Mensch.Machines.RootNote do
   defp note_frame(
          note,
          at_mbeat,
-         duration_mbeats,
          %RenderContext{} = render_context
        ) do
+    duration_mbeats = render_context.chord_duration_mbeats
     local_elapsed_mbeats = at_mbeat - note.start_mbeat
     phase = if(local_elapsed_mbeats < duration_mbeats, do: :sustain, else: :release)
 
     %SampleContext{} = sample_context = render_context.sample_context
-    entry_start_mbeat_abs = render_context.entry_start_mbeat_abs
+    absolute_chord_start_mbeat = render_context.absolute_chord_start_mbeat
     pressure_lfo = render_context.params.lfo_pressure.lfo
     pressure_lfo_mode = render_context.params.lfo_pressure.mode
 
@@ -174,7 +194,7 @@ defmodule Mensch.Machines.RootNote do
         pressure_lfo,
         at_mbeat,
         sample_context,
-        entry_start_mbeat_abs,
+        absolute_chord_start_mbeat,
         local_elapsed_mbeats
       )
 
@@ -194,13 +214,19 @@ defmodule Mensch.Machines.RootNote do
   defp build_render_context(
          %RootNoteParams{} = params,
          %SampleContext{} = sample_context,
-         entry_start_mbeat_abs
+         absolute_chord_start_mbeat,
+         frame_mbeats,
+         chord_duration_mbeats
        )
-       when is_integer(entry_start_mbeat_abs) and entry_start_mbeat_abs >= 0 do
+       when is_integer(absolute_chord_start_mbeat) and absolute_chord_start_mbeat >= 0 and
+              is_integer(frame_mbeats) and frame_mbeats > 0 and
+              is_integer(chord_duration_mbeats) and chord_duration_mbeats >= 0 do
     %RenderContext{
       params: params,
       sample_context: sample_context,
-      entry_start_mbeat_abs: entry_start_mbeat_abs
+      absolute_chord_start_mbeat: absolute_chord_start_mbeat,
+      frame_mbeats: frame_mbeats,
+      chord_duration_mbeats: chord_duration_mbeats
     }
   end
 
@@ -274,10 +300,10 @@ defmodule Mensch.Machines.RootNote do
   defp snap_mbeats(mbeats, mbeats_per_frame),
     do: round(mbeats / mbeats_per_frame) * mbeats_per_frame
 
-  defp entry_start_mbeat_abs(opts) do
-    case Keyword.get(opts, :entry_start_mbeat_abs, 0) do
+  defp absolute_chord_start_mbeat(opts) do
+    case Keyword.get(opts, :absolute_chord_start_mbeat, 0) do
       value when is_integer(value) and value >= 0 -> value
-      other -> raise ArgumentError, "invalid :entry_start_mbeat_abs: #{inspect(other)}"
+      other -> raise ArgumentError, "invalid :absolute_chord_start_mbeat: #{inspect(other)}"
     end
   end
 
