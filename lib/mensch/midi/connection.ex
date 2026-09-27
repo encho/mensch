@@ -3,11 +3,12 @@ defmodule Mensch.Midi.Connection do
   Owns the real-time MIDI output connection to the Osmose (or any
   configured MIDI output device).
 
-  The device is looked up by name pattern via `Midiex.ports/2`. Osmose
-  exposes two MIDI ports; only "Osmose Port 2" (the "Haken" port) is
-  wired to its EaganMatrix sound engine ("Osmose Port 1" does not
-  produce audio), so the default pattern matches that one
-  specifically. This can be overridden with:
+  The device is looked up by name pattern via `Midiex.ports/2`. Newer
+  Osmose firmware exposes descriptive names such as "Osmose 49 haken"
+  and "Osmose 49 sound engine"; older firmware exposes "Osmose Port 2"
+  for the same destination. The default matcher supports both naming
+  schemes and prefers the Haken/sound-engine destination. This can be
+  overridden with:
 
       config :mensch, :midi_output_port_pattern, ~r/some other name/i
 
@@ -96,7 +97,8 @@ defmodule Mensch.Midi.Connection do
 
   defp connect(state) do
     case Midiex.ports(state.port_pattern, :output) do
-      [port | _] ->
+      [_ | _] = ports ->
+        port = pick_preferred_port(ports)
         out_conn = Midiex.open(port)
         Logger.info("Mensch.Midi.Connection: connected to #{port.name}")
         %{state | out_conn: out_conn, port_name: port.name}
@@ -111,6 +113,25 @@ defmodule Mensch.Midi.Connection do
   end
 
   defp default_port_pattern do
-    Application.get_env(:mensch, :midi_output_port_pattern, ~r/osmose.*2/i)
+    Application.get_env(
+      :mensch,
+      :midi_output_port_pattern,
+      ~r/osmose.*(haken|sound\s*engine|port\s*2)/i
+    )
+  end
+
+  # Prefer the true synthesis destination when multiple Osmose output ports
+  # match (firmware 2.3 can expose both "sound engine" and "haken").
+  defp pick_preferred_port(ports) do
+    Enum.max_by(ports, fn port ->
+      name = String.downcase(port.name)
+
+      cond do
+        String.contains?(name, "haken") -> 3
+        String.contains?(name, "sound engine") -> 2
+        String.contains?(name, "port 2") -> 1
+        true -> 0
+      end
+    end)
   end
 end
