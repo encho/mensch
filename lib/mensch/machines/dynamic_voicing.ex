@@ -17,7 +17,6 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Modulation.Lfo
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
-  alias Mensch.TimelineContext
 
   defmodule RenderContext do
     @moduledoc false
@@ -73,24 +72,6 @@ defmodule Mensch.Machines.DynamicVoicing do
       lfo_slide: params.lfo_slide,
       lfo_bend: params.lfo_bend
     }
-  end
-
-  def build_frame_sequence(
-        %ChordSpec{} = chord_spec,
-        %SampleContext{} = sample_context,
-        %TimelineContext{} = timeline_context,
-        opts \\ []
-      ) do
-    %DynamicVoicingParams{} = params = machine_params!(opts) |> hydrate_params()
-
-    Pipeline.build_frame_sequence(
-      __MODULE__,
-      %__MODULE__{params: params},
-      chord_spec,
-      sample_context,
-      timeline_context,
-      opts
-    )
   end
 
   @impl Pipeline
@@ -503,21 +484,9 @@ defmodule Mensch.Machines.DynamicVoicing do
     requested_voicing_count
   end
 
-  defp machine_params!(opts) do
-    case Keyword.fetch(opts, :machine_params) do
-      {:ok, %DynamicVoicingParams{} = params} ->
-        params
-
-      {:ok, other} ->
-        raise ArgumentError,
-              "expected #{inspect(DynamicVoicingParams)} in :machine_params, got #{inspect(other)}"
-
-      :error ->
-        raise ArgumentError, "missing :machine_params for #{inspect(__MODULE__)}"
-    end
-  end
-
-  defp hydrate_params(%DynamicVoicingParams{} = params) do
+  @doc false
+  @spec normalize_params(DynamicVoicingParams.t()) :: DynamicVoicingParams.t()
+  def normalize_params(%DynamicVoicingParams{} = params) do
     defaults = default_params() |> Map.from_struct()
     current = params |> Map.from_struct()
 
@@ -613,11 +582,15 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
         timeline_context,
         opts
       ) do
-    DynamicVoicing.build_frame_sequence(
+    normalized_params = DynamicVoicing.normalize_params(params)
+
+    Mensch.Machine.Pipeline.build_frame_sequence(
+      DynamicVoicing,
+      %DynamicVoicing{params: normalized_params},
       chord_spec,
       sample_context,
       timeline_context,
-      Keyword.put(opts, :machine_params, params)
+      opts
     )
   end
 end

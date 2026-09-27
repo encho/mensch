@@ -19,7 +19,6 @@ defmodule Mensch.Machines.RootNote do
   alias Mensch.NewModulation
   alias Mensch.NewModulation.Lfo
   alias Mensch.SampleContext
-  alias Mensch.TimelineContext
 
   defmodule RenderContext do
     @moduledoc false
@@ -64,24 +63,6 @@ defmodule Mensch.Machines.RootNote do
       pressure: params.pressure,
       lfo_pressure: params.lfo_pressure
     }
-  end
-
-  def build_frame_sequence(
-        %ChordSpec{} = chord_spec,
-        %SampleContext{} = sample_context,
-        %TimelineContext{} = timeline_context,
-        opts \\ []
-      ) do
-    %RootNoteParams{} = params = machine_params!(opts) |> hydrate_params()
-
-    Pipeline.build_frame_sequence(
-      __MODULE__,
-      %__MODULE__{params: params},
-      chord_spec,
-      sample_context,
-      timeline_context,
-      opts
-    )
   end
 
   @impl Pipeline
@@ -154,21 +135,9 @@ defmodule Mensch.Machines.RootNote do
     })
   end
 
-  defp machine_params!(opts) do
-    case Keyword.fetch(opts, :machine_params) do
-      {:ok, %RootNoteParams{} = params} ->
-        params
-
-      {:ok, other} ->
-        raise ArgumentError,
-              "expected #{inspect(RootNoteParams)} in :machine_params, got #{inspect(other)}"
-
-      :error ->
-        raise ArgumentError, "missing :machine_params for #{inspect(__MODULE__)}"
-    end
-  end
-
-  defp hydrate_params(%RootNoteParams{} = params) do
+  @doc false
+  @spec normalize_params(RootNoteParams.t()) :: RootNoteParams.t()
+  def normalize_params(%RootNoteParams{} = params) do
     defaults = default_params() |> Map.from_struct()
     current = params |> Map.from_struct()
 
@@ -245,11 +214,15 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
         timeline_context,
         opts
       ) do
-    RootNote.build_frame_sequence(
+    normalized_params = RootNote.normalize_params(params)
+
+    Mensch.Machine.Pipeline.build_frame_sequence(
+      RootNote,
+      %RootNote{params: normalized_params},
       chord_spec,
       sample_context,
       timeline_context,
-      Keyword.put(opts, :machine_params, params)
+      opts
     )
   end
 end
