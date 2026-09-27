@@ -5,6 +5,9 @@ defmodule Mensch.Machines.RootNote do
   The generated pitch is based on chord identity (`root` + `octave`) and is
   intentionally independent from chord inversion. `octave_offset` transposes the
   root by whole octaves.
+
+  RootNote always uses a zero pressure baseline. Any non-zero pressure must come
+  from `lfo_pressure` modulation.
   """
 
   alias Mensch.ChordSpec
@@ -90,7 +93,6 @@ defmodule Mensch.Machines.RootNote do
         note_plan_item,
         chord_duration_mbeats,
         frame_mbeats,
-        params.pressure,
         sample_context,
         entry_start_mbeat_abs,
         pressure_lfo.lfo,
@@ -109,7 +111,6 @@ defmodule Mensch.Machines.RootNote do
          note,
          duration_mbeats,
          frame_mbeats,
-         pressure,
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
          pressure_lfo,
@@ -125,7 +126,6 @@ defmodule Mensch.Machines.RootNote do
             note,
             at_mbeat,
             duration_mbeats,
-            pressure,
             sample_context,
             entry_start_mbeat_abs,
             pressure_lfo,
@@ -149,7 +149,6 @@ defmodule Mensch.Machines.RootNote do
          note,
          at_mbeat,
          duration_mbeats,
-         pressure,
          %SampleContext{} = sample_context,
          entry_start_mbeat_abs,
          pressure_lfo,
@@ -168,7 +167,7 @@ defmodule Mensch.Machines.RootNote do
       )
 
     modulated_pressure =
-      NewModulation.apply_to_pressure(pressure, pressure_lfo_value, pressure_lfo_mode)
+      NewModulation.apply_to_pressure(0, pressure_lfo_value, pressure_lfo_mode)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,

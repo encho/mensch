@@ -8,8 +8,9 @@ defmodule Mensch.Machines.RootNoteParams do
     This does not alter harmonic identity and is independent from chord
     inversion.
   * `velocity`: MIDI note-on velocity (`0..127`).
-  * `pressure`: Constant baseline pressure value held for the full note
-    (`0..127`) before LFO modulation is applied.
+  * `pressure`: Legacy field kept for compatibility. RootNote rendering uses a
+    fixed pressure baseline of `0`, so any non-zero pressure comes from
+    `lfo_pressure`.
   * `lfo_pressure`: Pressure modulation config represented as
     `%{lfo: lfo_term, mode: :add | :multiply}`.
   """

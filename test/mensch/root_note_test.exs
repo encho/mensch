@@ -120,7 +120,7 @@ defmodule Mensch.RootNoteTest do
     assert note_on_note.bend == 0.0
   end
 
-  test "uses constant pressure from machine params" do
+  test "ignores machine pressure baseline when lfo outputs zero" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     timeline_context = %TimelineContext{
@@ -145,10 +145,10 @@ defmodule Mensch.RootNoteTest do
       end)
 
     assert pressures != []
-    assert Enum.all?(pressures, &(&1 == 80))
+    assert Enum.all?(pressures, &(&1 == 0))
   end
 
-  test "lfo_pressure modulates baseline pressure" do
+  test "lfo_pressure fully determines pressure" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 500})
 
     timeline_context = %TimelineContext{
@@ -218,8 +218,10 @@ defmodule Mensch.RootNoteTest do
     mod_at_1000 = pressure_at.(modulated_rendered, 1000)
     mod_at_3000 = pressure_at.(modulated_rendered, 3000)
 
-    assert mod_at_1000 > base_at_1000
-    assert mod_at_3000 < base_at_3000
+    assert base_at_1000 == 0
+    assert base_at_3000 == 0
+    assert mod_at_1000 == 3
+    assert mod_at_3000 == 0
   end
 
   defp first_note_on_note(frames) do

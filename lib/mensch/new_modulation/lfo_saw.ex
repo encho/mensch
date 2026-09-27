@@ -123,12 +123,12 @@ defmodule Mensch.NewModulation.LfoSaw do
           "#{field_name}.curve must be :saw_up or :saw_down, got: #{inspect(other)}"
   end
 
-    defp normalize_peak_value!(value, _field_name) when is_integer(value), do: value * 1.0
-    defp normalize_peak_value!(value, _field_name) when is_float(value), do: value
+  defp normalize_peak_value!(value, _field_name) when is_integer(value), do: value * 1.0
+  defp normalize_peak_value!(value, _field_name) when is_float(value), do: value
 
-    defp normalize_peak_value!(other, field_name) do
+  defp normalize_peak_value!(other, field_name) do
     raise ArgumentError,
-      "#{field_name}.peak_value must be a number, got: #{inspect(other)}"
+          "#{field_name}.peak_value must be a number, got: #{inspect(other)}"
   end
 
   defp normalize_cycles_per_bar!(value, _field_name) when is_integer(value) and value > 0,
