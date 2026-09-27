@@ -8,19 +8,9 @@ defmodule Mensch.SampleDb do
   """
 
   alias Mensch.SampleContext
-  alias Mensch.SampleDb.Sample0SimpleChordTraversal
-  alias Mensch.SampleDb.Sample0bSimpleChordTraversalUp
-  alias Mensch.SampleDb.Sample1
-  alias Mensch.SampleDb.Sample1NoRelease
   alias Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv
   alias Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv
   alias Mensch.SampleDb.Sample12RootNote
-  alias Mensch.SampleDb.Sample2
-  alias Mensch.SampleDb.Sample2CMajorChords
-  alias Mensch.SampleDb.Sample3
-  alias Mensch.SampleDb.Sample4
-  alias Mensch.SampleDb.Sample5SimpleChord
-  alias Mensch.SampleDb.Sample6SimpleChordCMajorInversions
   alias Mensch.SampleDb.Sample7DynamicVoicing
   alias Mensch.SampleDb.Sample8DynamicVoicingOneBar
   alias Mensch.SampleDb.Sample9DynamicVoicingCMajor
@@ -28,22 +18,12 @@ defmodule Mensch.SampleDb do
   @default_frame_mbeats 50
 
   @samples [
-    Sample6SimpleChordCMajorInversions.sample(@default_frame_mbeats),
-    Sample5SimpleChord.sample(@default_frame_mbeats),
     Sample7DynamicVoicing.sample(@default_frame_mbeats),
     Sample9DynamicVoicingCMajor.sample(@default_frame_mbeats),
     Sample8DynamicVoicingOneBar.sample(@default_frame_mbeats),
     Sample10DynamicVoicingBFlatIIiivv.sample(@default_frame_mbeats),
     Sample11DynamicVoicingEMajorIIiivv.sample(@default_frame_mbeats),
-    Sample12RootNote.sample(@default_frame_mbeats),
-    Sample0SimpleChordTraversal.sample(@default_frame_mbeats),
-    Sample0bSimpleChordTraversalUp.sample(@default_frame_mbeats),
-    Sample1.sample(@default_frame_mbeats),
-    Sample1NoRelease.sample(@default_frame_mbeats),
-    Sample2CMajorChords.sample(@default_frame_mbeats),
-    Sample2.sample(@default_frame_mbeats),
-    Sample3.sample(@default_frame_mbeats),
-    Sample4.sample(@default_frame_mbeats)
+    Sample12RootNote.sample(@default_frame_mbeats)
   ]
 
   @doc "Returns default context used by sample-1 and ad hoc single-chord rendering."

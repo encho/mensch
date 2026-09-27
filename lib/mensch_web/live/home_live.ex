@@ -1186,8 +1186,6 @@ defmodule MenschWeb.HomeLive do
     |> Atom.to_string()
   end
 
-  defp machine_icon_name(%Mensch.Machines.SimpleChord{}), do: "hero-rectangle-group"
-  defp machine_icon_name(%Mensch.Machines.ArpMachine{}), do: "hero-arrows-up-down"
   defp machine_icon_name(_machine), do: "hero-cpu-chip"
 
   defp build_sample_folders(samples) when is_list(samples) do
@@ -1198,7 +1196,7 @@ defmodule MenschWeb.HomeLive do
         Map.get(sample, :folder, "Unfiled")
       end)
 
-    preferred_order = ["Root Note", "Dynamic Voicing", "Arp Machine", "Simple Chord", "Legacy"]
+    preferred_order = ["Root Note", "Dynamic Voicing"]
 
     folder_names =
       preferred_order ++

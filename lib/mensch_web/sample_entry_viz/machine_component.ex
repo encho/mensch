@@ -2,10 +2,8 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
   use MenschWeb, :html
 
   alias Mensch.Machine
-  alias Mensch.Machines.ArpMachine
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.RootNote
-  alias Mensch.Machines.SimpleChord
   alias Mensch.NewModulation.LfoConstant
   alias Mensch.NewModulation.LfoCurve
   alias Mensch.NewModulation.LfoEnvelope
@@ -47,27 +45,6 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     [
       {"direction", inspect(params.direction)},
       {"number_of_inversions", params.number_of_inversions}
-    ]
-  end
-
-  defp machine_params(%ArpMachine{params: params}) do
-    [
-      {"direction", inspect(params.direction)},
-      {"stagger_mbeats", params.stagger_mbeats},
-      {"octave_min_offset", params.octave_min_offset},
-      {"octave_max_offset", params.octave_max_offset},
-      {"cycle_count", params.cycle_count},
-      {"note_length_mode", inspect(params.note_length_mode)}
-    ]
-  end
-
-  defp machine_params(%SimpleChord{params: params}) do
-    [
-      {"stagger_mbeats", params.stagger_mbeats},
-      {"note_length_mode", inspect(params.note_length_mode)},
-      {"attack_mbeats", params.attack_mbeats},
-      {"decay_mbeats", params.decay_mbeats},
-      {"release_mbeats", params.release_mbeats}
     ]
   end
 
