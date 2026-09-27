@@ -85,6 +85,9 @@ defmodule Mensch.Machines.RootNote do
         chord_instance_id: 0,
         note_instance_id: 0,
         degree_index: 0,
+        harmonic_tags: [:root],
+        role_tags: [],
+        machine_note_tags: [],
         delay_mbeats: sample_start_mbeat
       })
 

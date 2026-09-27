@@ -17,6 +17,9 @@ defmodule Mensch.Machine.NoteFrame do
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
+    :harmonic_tags,
+    :role_tags,
+    :machine_note_tags,
     :phase,
     :note_on,
     :note_off,
@@ -34,6 +37,9 @@ defmodule Mensch.Machine.NoteFrame do
     :chord_instance_id,
     :note_instance_id,
     :degree_index,
+    :harmonic_tags,
+    :role_tags,
+    :machine_note_tags,
     :sample_entry_index,
     :phase,
     :note_on,
@@ -53,6 +59,9 @@ defmodule Mensch.Machine.NoteFrame do
           chord_instance_id: non_neg_integer(),
           note_instance_id: non_neg_integer(),
           degree_index: non_neg_integer() | nil,
+          harmonic_tags: [atom()],
+          role_tags: [atom()],
+          machine_note_tags: [atom()],
           sample_entry_index: integer() | nil,
           phase: atom(),
           note_on: boolean(),
@@ -82,6 +91,9 @@ defmodule Mensch.Machine.NoteFrame do
       chord_instance_id: note_plan_item.chord_instance_id,
       note_instance_id: note_plan_item.note_instance_id,
       degree_index: note_plan_item.degree_index,
+      harmonic_tags: note_plan_item.harmonic_tags,
+      role_tags: note_plan_item.role_tags,
+      machine_note_tags: note_plan_item.machine_note_tags,
       sample_entry_index: nil
     }
 
@@ -114,6 +126,9 @@ defmodule Mensch.Machine.NoteFrame do
         chord_instance_id: Map.fetch!(note, :chord_instance_id),
         note_instance_id: Map.fetch!(note, :note_instance_id),
         degree_index: Map.get(note, :degree_index, 0),
+        harmonic_tags: Map.get(note, :harmonic_tags, []),
+        role_tags: Map.get(note, :role_tags, []),
+        machine_note_tags: Map.get(note, :machine_note_tags, []),
         delay_mbeats: Map.fetch!(note, :delay_mbeats)
       })
 

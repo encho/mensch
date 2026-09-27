@@ -176,11 +176,23 @@ defmodule Mensch.Machines.SimpleChord do
         note_instance_id: voiced_note.note_instance_id,
         # Position in the harmonic source (may diverge in richer sequencers).
         degree_index: voiced_note.degree_index,
+        # Harmonic semantics used for downstream modulation policies.
+        harmonic_tags: harmonic_tags_for_degree(voiced_note.degree_index),
+        # Machine-agnostic role semantics (kept intentionally broad here).
+        role_tags: [],
+        # Machine-local tags can be layered later without changing schema.
+        machine_note_tags: [],
         # Absolute quantized start time in mbeat units.
         delay_mbeats: voiced_note.delay_mbeats
       })
     end)
   end
+
+  defp harmonic_tags_for_degree(0), do: [:root]
+  defp harmonic_tags_for_degree(1), do: [:third]
+  defp harmonic_tags_for_degree(2), do: [:fifth]
+  defp harmonic_tags_for_degree(3), do: [:seventh]
+  defp harmonic_tags_for_degree(_), do: [:tension]
 
   defp build_voiced_notes(%ChordSpec{} = chord_spec) do
     ChordTones.build_voiced_notes(ChordTones.new(), chord_spec)

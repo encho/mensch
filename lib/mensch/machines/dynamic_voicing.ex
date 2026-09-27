@@ -258,7 +258,10 @@ defmodule Mensch.Machines.DynamicVoicing do
          %{
            start_mbeat: first_start_mbeat,
            degree_index: degree_index,
-           note_instance_id: degree_index
+           note_instance_id: degree_index,
+           harmonic_tags: harmonic_tags_for_degree(degree_index),
+           role_tags: [],
+           machine_note_tags: []
          }}
       end)
 
@@ -318,10 +321,15 @@ defmodule Mensch.Machines.DynamicVoicing do
       Enum.reduce(to_start, {active_after_stops, state.next_note_instance_id}, fn midi_note,
                                                                                   {active,
                                                                                    next_id} ->
+        degree_index = Map.get(degree_index_by_note, midi_note, 0)
+
         new_note = %{
           start_mbeat: transition_mbeat,
-          degree_index: Map.get(degree_index_by_note, midi_note, 0),
-          note_instance_id: next_id
+          degree_index: degree_index,
+          note_instance_id: next_id,
+          harmonic_tags: harmonic_tags_for_degree(degree_index),
+          role_tags: [],
+          machine_note_tags: []
         }
 
         {Map.put(active, midi_note, new_note), next_id + 1}
@@ -341,7 +349,10 @@ defmodule Mensch.Machines.DynamicVoicing do
       start_mbeat: active_note.start_mbeat,
       duration_mbeats: max(end_mbeat - active_note.start_mbeat, 0),
       degree_index: active_note.degree_index,
-      note_instance_id: active_note.note_instance_id
+      note_instance_id: active_note.note_instance_id,
+      harmonic_tags: active_note.harmonic_tags,
+      role_tags: active_note.role_tags,
+      machine_note_tags: active_note.machine_note_tags
     }
   end
 
@@ -359,6 +370,9 @@ defmodule Mensch.Machines.DynamicVoicing do
         chord_instance_id: 0,
         note_instance_id: plan.note_instance_id,
         degree_index: plan.degree_index,
+        harmonic_tags: plan.harmonic_tags,
+        role_tags: plan.role_tags,
+        machine_note_tags: plan.machine_note_tags,
         delay_mbeats: plan.start_mbeat
       })
 
@@ -600,6 +614,12 @@ defmodule Mensch.Machines.DynamicVoicing do
   end
 
   defp validate_inversion_count_for_direction!(inversion_count, _direction), do: inversion_count
+
+  defp harmonic_tags_for_degree(0), do: [:root]
+  defp harmonic_tags_for_degree(1), do: [:third]
+  defp harmonic_tags_for_degree(2), do: [:fifth]
+  defp harmonic_tags_for_degree(3), do: [:seventh]
+  defp harmonic_tags_for_degree(_), do: [:tension]
 
   defp snap_mbeats(mbeats, mbeats_per_frame),
     do: round(mbeats / mbeats_per_frame) * mbeats_per_frame

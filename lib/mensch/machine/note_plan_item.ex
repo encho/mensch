@@ -18,6 +18,8 @@ defmodule Mensch.Machine.NotePlanItem do
 
   - `note_instance_id` identifies one note lifecycle from note-on to note-off.
   - `degree_index` tracks harmonic source position.
+  - `harmonic_tags`, `role_tags`, and `machine_note_tags` carry semantic
+    metadata for downstream modulation/rendering decisions.
 
   Those are intentionally separate so richer sequencers can diverge them.
 
@@ -46,12 +48,66 @@ defmodule Mensch.Machine.NotePlanItem do
         chord_instance_id: 0,
         note_instance_id: 3,
         degree_index: 0,
+        harmonic_tags: [:root],
+        role_tags: [],
+        machine_note_tags: [],
         delay_mbeats: 540,
         adsr: nil
       }
   """
 
   alias Mensch.Envelope.ADSR
+
+  @harmonic_tags [
+    :root,
+    :third,
+    :fifth,
+    :seventh,
+    :ninth,
+    :eleventh,
+    :thirteenth,
+    :tension,
+    :altered
+  ]
+
+  @role_tags [
+    :bass,
+    :lead,
+    :accent,
+    :support,
+    :pad,
+    :ghost
+  ]
+
+  @machine_note_tags [
+    :entering,
+    :sustaining,
+    :releasing,
+    :strum_head,
+    :strum_tail,
+    :cycle_boundary
+  ]
+
+  @type harmonic_tag ::
+          :root
+          | :third
+          | :fifth
+          | :seventh
+          | :ninth
+          | :eleventh
+          | :thirteenth
+          | :tension
+          | :altered
+
+  @type role_tag :: :bass | :lead | :accent | :support | :pad | :ghost
+
+  @type machine_note_tag ::
+          :entering
+          | :sustaining
+          | :releasing
+          | :strum_head
+          | :strum_tail
+          | :cycle_boundary
 
   @enforce_keys [
     :note_name,
@@ -62,21 +118,25 @@ defmodule Mensch.Machine.NotePlanItem do
     :chord_instance_id,
     :note_instance_id,
     :degree_index,
+    :harmonic_tags,
+    :role_tags,
+    :machine_note_tags,
     :delay_mbeats
   ]
-  defstruct [
-    :note_name,
-    :octave,
-    :midi_note,
-    :channel,
-    :note_on_velocity,
-    :machine_id,
-    :chord_instance_id,
-    :note_instance_id,
-    :degree_index,
-    :delay_mbeats,
-    :adsr
-  ]
+  defstruct note_name: nil,
+            octave: nil,
+            midi_note: nil,
+            channel: nil,
+            note_on_velocity: nil,
+            machine_id: nil,
+            chord_instance_id: nil,
+            note_instance_id: nil,
+            degree_index: nil,
+            delay_mbeats: nil,
+            adsr: nil,
+            harmonic_tags: [],
+            role_tags: [],
+            machine_note_tags: []
 
   @typedoc """
   A single planned note in the machine pipeline.
@@ -94,6 +154,10 @@ defmodule Mensch.Machine.NotePlanItem do
     e.g. `0` for the first entry.
   - `note_instance_id`: Stable note lifecycle id, e.g. `3`.
   - `degree_index`: Harmonic source position, e.g. `0` for the root degree.
+  - `harmonic_tags`: Harmonic labels for this note, e.g. `[:root]`.
+  - `role_tags`: Arrangement role labels, e.g. `[]`.
+  - `machine_note_tags`: Machine-local lifecycle/semantic tags,
+    e.g. `[:entering]`.
   - `delay_mbeats`: Absolute quantized note start time in mbeat units,
     e.g. `540`.
   - `adsr`: Envelope assigned in the articulation stage, e.g. `nil` before
@@ -109,6 +173,9 @@ defmodule Mensch.Machine.NotePlanItem do
           chord_instance_id: non_neg_integer(),
           note_instance_id: non_neg_integer(),
           degree_index: non_neg_integer(),
+          harmonic_tags: [harmonic_tag()],
+          role_tags: [role_tag()],
+          machine_note_tags: [machine_note_tag()],
           delay_mbeats: non_neg_integer(),
           adsr: ADSR.t() | nil
         }
@@ -122,6 +189,7 @@ defmodule Mensch.Machine.NotePlanItem do
   @spec new(map()) :: t()
   def new(attrs) when is_map(attrs) do
     struct!(__MODULE__, attrs)
+    |> normalize_and_validate_tags!()
   end
 
   @doc """
@@ -133,5 +201,37 @@ defmodule Mensch.Machine.NotePlanItem do
   @spec with_adsr(t(), ADSR.t()) :: t()
   def with_adsr(%__MODULE__{} = note_plan_item, %ADSR{} = adsr) do
     %__MODULE__{note_plan_item | adsr: adsr}
+  end
+
+  defp normalize_and_validate_tags!(%__MODULE__{} = note_plan_item) do
+    harmonic_tags = normalize_and_validate_tag_list!(note_plan_item.harmonic_tags, @harmonic_tags)
+    role_tags = normalize_and_validate_tag_list!(note_plan_item.role_tags, @role_tags)
+
+    machine_note_tags =
+      normalize_and_validate_tag_list!(note_plan_item.machine_note_tags, @machine_note_tags)
+
+    %__MODULE__{
+      note_plan_item
+      | harmonic_tags: harmonic_tags,
+        role_tags: role_tags,
+        machine_note_tags: machine_note_tags
+    }
+  end
+
+  defp normalize_and_validate_tag_list!(tags, allowed_tags) when is_list(tags) do
+    tags
+    |> Enum.uniq()
+    |> Enum.map(fn tag ->
+      if is_atom(tag) and Enum.member?(allowed_tags, tag) do
+        tag
+      else
+        raise ArgumentError,
+              "invalid tag #{inspect(tag)}; allowed tags: #{inspect(allowed_tags)}"
+      end
+    end)
+  end
+
+  defp normalize_and_validate_tag_list!(other, _allowed_tags) do
+    raise ArgumentError, "expected tag list, got: #{inspect(other)}"
   end
 end
