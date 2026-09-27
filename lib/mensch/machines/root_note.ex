@@ -81,7 +81,7 @@ defmodule Mensch.Machines.RootNote do
       |> TimelineContext.duration_mbeats()
       |> snap_mbeats(frame_mbeats)
 
-    sample_start_mbeat =
+    start_mbeat =
       timeline_context
       |> TimelineContext.start_mbeat(sample_context)
       |> snap_mbeats(frame_mbeats)
@@ -104,7 +104,7 @@ defmodule Mensch.Machines.RootNote do
         harmonic_tags: [:root],
         role_tags: [],
         machine_note_tags: [],
-        start_mbeat: sample_start_mbeat
+        start_mbeat: start_mbeat
       })
 
     note_frame_stream =
