@@ -5,22 +5,8 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
   alias Mensch.ChordSpec
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
-  alias Mensch.Modulation.LfoCurve
-  alias Mensch.Modulation.LfoGroup
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
-
-  @lfo_pressure %LfoGroup{
-    initial: %LfoCurve{
-      curve: :sine,
-      min_value: -0.25,
-      max_value: 0.25,
-      cycles_per_bar: 10.0,
-      shift_mbeats: 0.0,
-      anchor: :sample
-    },
-    operations: []
-  }
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
@@ -40,11 +26,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24,
-              envelope_attack_mbeats: 5.0,
-              envelope_decay_mbeats: 10.0,
-              envelope_release_mbeats: 5.0,
-              lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+              number_of_inversions: 24
             }
           }
         },
@@ -57,11 +39,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24,
-              envelope_attack_mbeats: 5.0,
-              envelope_decay_mbeats: 10.0,
-              envelope_release_mbeats: 5.0,
-              lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+              number_of_inversions: 24
             }
           }
         },
@@ -74,11 +52,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24,
-              envelope_attack_mbeats: 5.0,
-              envelope_decay_mbeats: 10.0,
-              envelope_release_mbeats: 5.0,
-              lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+              number_of_inversions: 24
             }
           }
         },
@@ -91,11 +65,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24,
-              envelope_attack_mbeats: 5.0,
-              envelope_decay_mbeats: 10.0,
-              envelope_release_mbeats: 5.0,
-              lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+              number_of_inversions: 24
             }
           }
         }

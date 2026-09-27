@@ -9,11 +9,8 @@ defmodule Mensch.Machines.DynamicVoicing do
   Modulation model:
 
   - pressure baseline is generated per-note from a dynamic `LfoEnvelope`
-  - `lfo_pressure` is applied over that baseline
-  - `lfo_slide` and `lfo_bend` are evaluated as dedicated modulation lanes
-
-  All modulation lanes use `%{lfo: lfo_term, mode: :add | :multiply}` and are
-  normalized through `Mensch.Modulation`.
+  - pressure/slide/bend modulation lanes are computed internally in
+    `with_note_modulators/2`
   """
 
   alias Mensch.ChordSpec
@@ -23,12 +20,9 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.Modulation
   alias Mensch.Modulation.Lfo
-  alias Mensch.Modulation.LfoConstant
   alias Mensch.Modulation.LfoCurve
   alias Mensch.Modulation.LfoEnvelope
   alias Mensch.Modulation.LfoGroup
-  alias Mensch.Modulation.LfoRamp
-  alias Mensch.Modulation.LfoSaw
 
   defmodule RenderContext do
     @moduledoc false
@@ -69,12 +63,6 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @spec controls() :: %{
           direction: :up,
-          envelope_attack_mbeats: float(),
-          envelope_decay_mbeats: float(),
-          envelope_release_mbeats: float(),
-          lfo_bend: DynamicVoicingParams.modulation_lane(),
-          lfo_pressure: DynamicVoicingParams.modulation_lane(),
-          lfo_slide: DynamicVoicingParams.modulation_lane(),
           number_of_inversions: 4
         }
   def controls do
@@ -82,13 +70,7 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     %{
       direction: params.direction,
-      number_of_inversions: params.number_of_inversions,
-      envelope_attack_mbeats: params.envelope_attack_mbeats,
-      envelope_decay_mbeats: params.envelope_decay_mbeats,
-      envelope_release_mbeats: params.envelope_release_mbeats,
-      lfo_pressure: params.lfo_pressure,
-      lfo_slide: params.lfo_slide,
-      lfo_bend: params.lfo_bend
+      number_of_inversions: params.number_of_inversions
     }
   end
 
@@ -136,24 +118,26 @@ defmodule Mensch.Machines.DynamicVoicing do
   @impl Pipeline
   @spec with_note_modulators(NotePlanItem.t(), RenderContext.t()) :: NotePlanItem.t()
   def with_note_modulators(%NotePlanItem{} = note, %RenderContext{} = render_context) do
-    pressure_lane = render_context.params.lfo_pressure
-    slide_lane = render_context.params.lfo_slide
-    bend_lane = render_context.params.lfo_bend
+    pressure_lane = pressure_lane(note, render_context)
+    slide_lane = slide_lane(note, render_context)
+    bend_lane = bend_lane(note, render_context)
     sample_context = render_context.common.sample_context
     absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
     frame_mbeats = render_context.common.frame_mbeats
-    attack_mbeats = render_context.params.envelope_attack_mbeats
-    decay_mbeats = render_context.params.envelope_decay_mbeats
-    release_mbeats = render_context.params.envelope_release_mbeats
+
+    envelope_profile = %{
+      attack_mbeats: 120.0,
+      decay_mbeats: 280.0,
+      release_mbeats: 120.0,
+      sustain_level: 0.68
+    }
 
     baseline_pressure_lfo =
       dynamic_pressure_envelope(
         note,
         frame_mbeats,
         absolute_chord_start_mbeat,
-        attack_mbeats,
-        decay_mbeats,
-        release_mbeats
+        envelope_profile
       )
 
     NotePlanItem.with_modulators(note, %{
@@ -476,68 +460,7 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     defaults
     |> Map.merge(current)
-    |> Map.update!(
-      :envelope_attack_mbeats,
-      &normalize_non_negative_number!(&1, "dynamic_voicing envelope_attack_mbeats")
-    )
-    |> Map.update!(
-      :envelope_decay_mbeats,
-      &normalize_non_negative_number!(&1, "dynamic_voicing envelope_decay_mbeats")
-    )
-    |> Map.update!(
-      :envelope_release_mbeats,
-      &normalize_non_negative_number!(&1, "dynamic_voicing envelope_release_mbeats")
-    )
-    |> Map.update!(:lfo_pressure, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_pressure"))
-    |> Map.update!(:lfo_slide, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_slide"))
-    |> Map.update!(:lfo_bend, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_bend"))
     |> then(&struct!(DynamicVoicingParams, &1))
-  end
-
-  defp normalize_non_negative_number!(value, _field_name)
-       when is_integer(value) and value >= 0,
-       do: value * 1.0
-
-  defp normalize_non_negative_number!(value, _field_name) when is_float(value) and value >= 0,
-    do: value
-
-  defp normalize_non_negative_number!(other, field_name) do
-    raise ArgumentError, "#{field_name} must be >= 0, got: #{inspect(other)}"
-  end
-
-  defp normalize_modulation_lane!(lane, field_name) when is_map(lane) do
-    lfo =
-      Map.get(lane, :lfo, Map.get(lane, "lfo"))
-      |> normalize_typed_lfo_term!("#{field_name}.lfo")
-
-    legacy_mode = Map.get(lane, :mode, Map.get(lane, "mode", :additive))
-
-    normalized_mode =
-      case legacy_mode do
-        :additive -> :add
-        :multiplicative -> :multiply
-        :add -> :add
-        :multiply -> :multiply
-        other -> other
-      end
-
-    Modulation.normalize_lfo_pressure!(%{lfo: lfo, mode: normalized_mode}, field_name)
-  end
-
-  defp normalize_modulation_lane!(other, field_name) do
-    Modulation.normalize_lfo_pressure!(other, field_name)
-  end
-
-  defp normalize_typed_lfo_term!(%LfoCurve{} = lfo, _field_name), do: lfo
-  defp normalize_typed_lfo_term!(%LfoSaw{} = lfo, _field_name), do: lfo
-  defp normalize_typed_lfo_term!(%LfoRamp{} = lfo, _field_name), do: lfo
-  defp normalize_typed_lfo_term!(%LfoEnvelope{} = lfo, _field_name), do: lfo
-  defp normalize_typed_lfo_term!(%LfoConstant{} = lfo, _field_name), do: lfo
-  defp normalize_typed_lfo_term!(%LfoGroup{} = lfo, _field_name), do: lfo
-
-  defp normalize_typed_lfo_term!(other, field_name) do
-    raise ArgumentError,
-          "#{field_name} must be a typed LFO struct (LfoCurve/LfoSaw/LfoRamp/LfoEnvelope/LfoConstant/LfoGroup), got: #{inspect(other)}"
   end
 
   defp evaluate_lane_modulation(
@@ -560,12 +483,13 @@ defmodule Mensch.Machines.DynamicVoicing do
          note,
          _frame_mbeats,
          _absolute_chord_start_mbeat,
-         attack_mbeats,
-         decay_mbeats,
-         release_mbeats
+         envelope_profile
        ) do
-    total_requested = attack_mbeats + decay_mbeats + release_mbeats
     note_duration = note.duration_mbeats * 1.0
+    attack_mbeats = envelope_profile.attack_mbeats
+    decay_mbeats = envelope_profile.decay_mbeats
+    release_mbeats = envelope_profile.release_mbeats
+    total_requested = attack_mbeats + decay_mbeats + release_mbeats
 
     if total_requested > note_duration do
       raise ArgumentError,
@@ -577,7 +501,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     %LfoEnvelope{
       start_value: 0.0,
       peak_value: 127.0,
-      sustain_value: 0.78 * 127.0,
+      sustain_value: envelope_profile.sustain_level * 127.0,
       end_value: 0.0,
       attack_mbeats: attack_mbeats,
       decay_mbeats: decay_mbeats,
@@ -605,6 +529,46 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   defp apply_to_bend(baseline_bend, modulation_value, :multiply) do
     clamp_bend(baseline_bend * (1 + modulation_value))
+  end
+
+  defp pressure_lane(%NotePlanItem{}, %RenderContext{}) do
+    Modulation.normalize_lfo_pressure!(
+      %{
+        lfo: %LfoGroup{
+          initial: %LfoCurve{
+            curve: :sine,
+            min_value: -0.25,
+            max_value: 0.25,
+            cycles_per_bar: 10.0,
+            shift_mbeats: 0.0,
+            anchor: :sample
+          },
+          operations: []
+        },
+        mode: :add
+      },
+      "dynamic_voicing internal pressure lane"
+    )
+  end
+
+  defp slide_lane(%NotePlanItem{}, %RenderContext{}) do
+    Modulation.normalize_lfo_pressure!(
+      %{
+        lfo: %LfoGroup{initial: %LfoCurve{min_value: 0.0, max_value: 0.0}, operations: []},
+        mode: :add
+      },
+      "dynamic_voicing internal slide lane"
+    )
+  end
+
+  defp bend_lane(%NotePlanItem{}, %RenderContext{}) do
+    Modulation.normalize_lfo_pressure!(
+      %{
+        lfo: %LfoGroup{initial: %LfoCurve{min_value: 0.0, max_value: 0.0}, operations: []},
+        mode: :add
+      },
+      "dynamic_voicing internal bend lane"
+    )
   end
 
   defp normalize_direction!(:up), do: :up
@@ -666,17 +630,9 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
   def id(_machine), do: DynamicVoicing.id()
 
   def controls(%DynamicVoicing{params: params}) do
-    normalized_params = DynamicVoicing.normalize_params(params)
-
     %{
       direction: params.direction,
-      number_of_inversions: params.number_of_inversions,
-      envelope_attack_mbeats: normalized_params.envelope_attack_mbeats,
-      envelope_decay_mbeats: normalized_params.envelope_decay_mbeats,
-      envelope_release_mbeats: normalized_params.envelope_release_mbeats,
-      lfo_pressure: normalized_params.lfo_pressure,
-      lfo_slide: normalized_params.lfo_slide,
-      lfo_bend: normalized_params.lfo_bend
+      number_of_inversions: params.number_of_inversions
     }
   end
 

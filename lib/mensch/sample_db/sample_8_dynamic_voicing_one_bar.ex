@@ -5,46 +5,8 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   alias Mensch.ChordSpec
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
-  alias Mensch.Modulation.LfoCurve
-  alias Mensch.Modulation.LfoGroup
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
-
-  @lfo_slide %LfoGroup{
-    initial: %LfoCurve{
-      curve: :sine,
-      min_value: 0.0,
-      max_value: 1.0,
-      cycles_per_bar: 6.0,
-      shift_mbeats: 0.0,
-      anchor: :note
-    },
-    operations: []
-  }
-
-  @lfo_bend %LfoGroup{
-    initial: %LfoCurve{
-      curve: :sine,
-      min_value: -0.001,
-      max_value: 0.001,
-      cycles_per_bar: 3.0,
-      shift_mbeats: 0.0,
-      anchor: :note
-    },
-    operations: []
-  }
-
-  @lfo_pressure %LfoGroup{
-    initial: %LfoCurve{
-      curve: :sine,
-      min_value: -5.0,
-      max_value: 5.0,
-      cycles_per_bar: 10.0,
-      shift_mbeats: 0.0,
-      anchor: :sample
-    },
-    operations: []
-  }
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
@@ -52,13 +14,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
       %DynamicVoicing{
         params: %DynamicVoicingParams{
           direction: :up,
-          number_of_inversions: 3,
-          envelope_attack_mbeats: 5.0,
-          envelope_decay_mbeats: 10.0,
-          envelope_release_mbeats: 5.0,
-          lfo_slide: %{lfo: @lfo_slide, mode: :add},
-          lfo_bend: %{lfo: @lfo_bend, mode: :add},
-          lfo_pressure: %{lfo: @lfo_pressure, mode: :add}
+          number_of_inversions: 3
         }
       }
 
