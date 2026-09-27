@@ -8,6 +8,7 @@ defmodule Mensch.Machine.Pipeline do
 
   alias Mensch.ChordSpec
   alias Mensch.Machine.MachineFrameSequence
+  alias Mensch.Machine.NoteModulationStrategy
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.RenderContextCommon
@@ -28,10 +29,10 @@ defmodule Mensch.Machine.Pipeline do
               render_context()
             ) :: [NotePlanItem.t()]
 
-  @callback with_note_modulators(
-              NotePlanItem.t(),
+  @callback modulation_strategy(
+              machine(),
               render_context()
-            ) :: NotePlanItem.t()
+            ) :: struct()
 
   @spec build_frame_sequence(
           module(),
@@ -55,9 +56,22 @@ defmodule Mensch.Machine.Pipeline do
     render_context =
       module.build_render_context(machine, common_fields)
 
+    note_plan = module.build_note_plan(machine, chord_spec, render_context)
+
+    modulation_strategy = module.modulation_strategy(machine, render_context)
+
+    modulation_context =
+      NoteModulationStrategy.build_context(modulation_strategy, note_plan, render_context)
+
     note_plan =
-      module.build_note_plan(machine, chord_spec, render_context)
-      |> Enum.map(&module.with_note_modulators(&1, render_context))
+      Enum.map(note_plan, fn note ->
+        NoteModulationStrategy.with_note_modulators(
+          modulation_strategy,
+          note,
+          modulation_context,
+          render_context
+        )
+      end)
 
     :ok = assert_invariants(note_plan, render_context)
 

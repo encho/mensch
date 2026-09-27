@@ -13,7 +13,7 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     If requested voicings do not fit the chord duration frame budget,
     validation fails with an error.
   Pressure envelope timings and modulation lanes are not part of params for
-  this machine. They are computed internally in `with_note_modulators/2`.
+  this machine. They are computed in the note-modulation strategy stage.
   """
 
   @type direction :: :up | :down | {:cycle_up, pos_integer()} | {:cycle_down, pos_integer()}

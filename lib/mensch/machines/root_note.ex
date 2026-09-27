@@ -7,19 +7,15 @@ defmodule Mensch.Machines.RootNote do
   root by whole octaves.
 
   RootNote always uses a zero pressure baseline. Any non-zero pressure must come
-  from internal pressure lane modulation.
+  from the configured note-modulation strategy.
   """
 
   alias Mensch.ChordSpec
   alias Mensch.Machine.NotePlanItem
+  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
   alias Mensch.Machines.RootNoteParams
-  alias Mensch.Modulation
-  alias Mensch.Modulation.Lfo
-  alias Mensch.Modulation.LfoCurve
-  alias Mensch.Modulation.LfoEnvelope
-  alias Mensch.Modulation.LfoGroup
 
   defmodule RenderContext do
     @moduledoc false
@@ -36,18 +32,22 @@ defmodule Mensch.Machines.RootNote do
           }
   end
 
-  @type t :: %__MODULE__{params: RootNoteParams.t()}
+  @type t :: %__MODULE__{params: RootNoteParams.t(), modulation_strategy: struct()}
 
   @behaviour Pipeline
 
   @enforce_keys [:params]
-  defstruct [:params]
+  defstruct [:params, modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"}]
 
   def id, do: :root_note
 
   def params_module, do: RootNoteParams
 
   def default_params, do: RootNoteParams.default()
+
+  def default_modulation_strategy do
+    %EnvelopedPressure{error_prefix: "root_note"}
+  end
 
   @spec new(RootNoteParams.t()) :: t()
   def new(%RootNoteParams{} = params), do: %__MODULE__{params: params}
@@ -103,53 +103,9 @@ defmodule Mensch.Machines.RootNote do
   end
 
   @impl Pipeline
-  @spec with_note_modulators(NotePlanItem.t(), RenderContext.t()) :: NotePlanItem.t()
-  def with_note_modulators(%NotePlanItem{} = note, %RenderContext{} = render_context) do
-    pressure_lane = pressure_lane(note, render_context)
-    slide_lane = slide_lane(note, render_context)
-    bend_lane = bend_lane(note, render_context)
-    sample_context = render_context.common.sample_context
-    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
-
-    NotePlanItem.with_modulators(note, %{
-      pressure_modulator: fn at_mbeat, local_elapsed_mbeats ->
-        pressure_value =
-          evaluate_lane_modulation(
-            pressure_lane,
-            at_mbeat,
-            sample_context,
-            absolute_chord_start_mbeat,
-            local_elapsed_mbeats
-          )
-
-        Modulation.apply_to_pressure(0, pressure_value, pressure_lane.mode)
-      end,
-      slide_modulator: fn at_mbeat, local_elapsed_mbeats ->
-        slide_value =
-          evaluate_lane_modulation(
-            slide_lane,
-            at_mbeat,
-            sample_context,
-            absolute_chord_start_mbeat,
-            local_elapsed_mbeats
-          )
-
-        apply_to_7bit(0, slide_value, slide_lane.mode)
-      end,
-      bend_modulator: fn at_mbeat, local_elapsed_mbeats ->
-        bend_value =
-          evaluate_lane_modulation(
-            bend_lane,
-            at_mbeat,
-            sample_context,
-            absolute_chord_start_mbeat,
-            local_elapsed_mbeats
-          )
-
-        apply_to_bend(0.0, bend_value, bend_lane.mode)
-      end
-    })
-  end
+  @spec modulation_strategy(t(), RenderContext.t()) :: struct()
+  def modulation_strategy(%__MODULE__{modulation_strategy: strategy}, %RenderContext{}),
+    do: strategy
 
   @doc false
   @spec normalize_params(RootNoteParams.t()) :: RootNoteParams.t()
@@ -160,109 +116,6 @@ defmodule Mensch.Machines.RootNote do
     defaults
     |> Map.merge(current)
     |> then(&struct!(RootNoteParams, &1))
-  end
-
-  defp evaluate_lane_modulation(
-         %{lfo: lfo},
-         at_mbeat,
-         sample_context,
-         absolute_chord_start_mbeat,
-         local_elapsed_mbeats
-       ) do
-    Lfo.evaluate(
-      lfo,
-      at_mbeat,
-      sample_context,
-      absolute_chord_start_mbeat,
-      local_elapsed_mbeats
-    )
-  end
-
-  defp pressure_lane(%NotePlanItem{} = note, %RenderContext{}) do
-    attack_mbeats = 120.0
-    decay_mbeats = 280.0
-    release_mbeats = 120.0
-    sustain_level = 0.68
-    note_duration = note.duration_mbeats * 1.0
-    total_requested = attack_mbeats + decay_mbeats + release_mbeats
-
-    if total_requested > note_duration do
-      raise ArgumentError,
-            "root_note pressure envelope exceeds note duration: attack(#{attack_mbeats}) + decay(#{decay_mbeats}) + release(#{release_mbeats}) = #{total_requested} > note duration #{note_duration} for note_instance_id #{note.note_instance_id}"
-    end
-
-    hold_mbeats = note_duration - total_requested
-
-    Modulation.normalize_lfo_pressure!(
-      %{
-        lfo: %LfoGroup{
-          initial: %LfoEnvelope{
-            start_value: 0.0,
-            peak_value: 127.0,
-            sustain_value: sustain_level * 127.0,
-            end_value: 0.0,
-            attack_mbeats: attack_mbeats,
-            decay_mbeats: decay_mbeats,
-            hold_mbeats: hold_mbeats,
-            release_mbeats: release_mbeats,
-            interpolation_function: :linear,
-            shift_mbeats: 0.0,
-            anchor: :note
-          },
-          operations: [
-            {:add,
-             %LfoCurve{
-               curve: :sine,
-               min_value: 0,
-               max_value: 0,
-               cycles_per_bar: 10.0,
-               shift_mbeats: 0.0,
-               anchor: :sample
-             }}
-          ]
-        },
-        mode: :add
-      },
-      "root_note internal pressure lane"
-    )
-  end
-
-  defp slide_lane(%NotePlanItem{}, %RenderContext{}) do
-    Modulation.normalize_lfo_pressure!(
-      %{
-        lfo: %LfoGroup{initial: %LfoCurve{min_value: 0.0, max_value: 0.0}, operations: []},
-        mode: :add
-      },
-      "root_note internal slide lane"
-    )
-  end
-
-  defp bend_lane(%NotePlanItem{}, %RenderContext{}) do
-    Modulation.normalize_lfo_pressure!(
-      %{
-        lfo: %LfoGroup{initial: %LfoCurve{min_value: 0.0, max_value: 0.0}, operations: []},
-        mode: :add
-      },
-      "root_note internal bend lane"
-    )
-  end
-
-  defp apply_to_7bit(baseline_7bit, modulation_value, :add) do
-    normalized = baseline_7bit / 127 + modulation_value
-    clamp_7bit(normalized * 127)
-  end
-
-  defp apply_to_7bit(baseline_7bit, modulation_value, :multiply) do
-    normalized = baseline_7bit / 127 * (1 + modulation_value)
-    clamp_7bit(normalized * 127)
-  end
-
-  defp apply_to_bend(baseline_bend, modulation_value, :add) do
-    clamp_bend(baseline_bend + modulation_value)
-  end
-
-  defp apply_to_bend(baseline_bend, modulation_value, :multiply) do
-    clamp_bend(baseline_bend * (1 + modulation_value))
   end
 
   defp root_midi_note!(%ChordSpec{} = chord_spec, octave_offset) when is_integer(octave_offset) do
@@ -295,9 +148,6 @@ defmodule Mensch.Machines.RootNote do
 
     (octave + 1) * 12 + semitone
   end
-
-  defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
-  defp clamp_bend(value), do: value |> max(-1.0) |> min(1.0)
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
@@ -305,16 +155,17 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
 
   def id(_machine), do: RootNote.id()
 
-  def controls(%RootNote{params: params}) do
+  def controls(%RootNote{params: params, modulation_strategy: modulation_strategy}) do
     %{
       octave_offset: params.octave_offset,
       velocity: params.velocity,
-      pressure: params.pressure
+      pressure: params.pressure,
+      note_modulation_strategy: inspect(modulation_strategy.__struct__)
     }
   end
 
   def build_frame_sequence(
-        %RootNote{params: params},
+        %RootNote{params: params, modulation_strategy: modulation_strategy},
         chord_spec,
         sample_context,
         timeline_context,
@@ -324,7 +175,7 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
 
     Mensch.Machine.Pipeline.build_frame_sequence(
       RootNote,
-      %RootNote{params: normalized_params},
+      %RootNote{params: normalized_params, modulation_strategy: modulation_strategy},
       chord_spec,
       sample_context,
       timeline_context,

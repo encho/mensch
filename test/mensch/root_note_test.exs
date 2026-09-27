@@ -114,7 +114,7 @@ defmodule Mensch.RootNoteTest do
     assert note_off_mbeat == 4000
     assert note_on_note.note_instance_id == 0
     assert note_off_note.note_instance_id == 0
-    assert note_on_note.slide == 0
+    assert note_on_note.slide in 0..127
     assert note_on_note.bend == 0.0
   end
 

@@ -74,11 +74,15 @@ defmodule Mensch.Player do
   end
 
   def handle_call(:stop, _from, state) do
-    {:reply, :ok, panic_all(state)}
+    state = panic_all(state)
+    schedule_panic_retries(state.ref)
+    {:reply, :ok, state}
   end
 
   def handle_call(:panic, _from, state) do
-    {:reply, :ok, panic_all(state)}
+    state = panic_all(state)
+    schedule_panic_retries(state.ref)
+    {:reply, :ok, state}
   end
 
   def handle_call(:status, _from, state) do
@@ -109,6 +113,15 @@ defmodule Mensch.Player do
   end
 
   def handle_info({:done, _ref}, state), do: {:noreply, state}
+
+  def handle_info({:panic_retry, ref, retries_left}, %{ref: ref} = state)
+      when is_integer(retries_left) and retries_left > 0 do
+    panic_burst(target_channels(state))
+    Process.send_after(self(), {:panic_retry, ref, retries_left - 1}, 30)
+    {:noreply, state}
+  end
+
+  def handle_info({:panic_retry, _ref, _retries_left}, state), do: {:noreply, state}
 
   defp send_frame(note) do
     if note.note_on do
@@ -147,13 +160,24 @@ defmodule Mensch.Player do
   end
 
   defp panic_all(state) do
-    Enum.each(Connection.member_channels(), fn channel ->
+    channels = target_channels(state)
+    panic_burst(channels)
+
+    %{state | status: :stopped, ref: make_ref(), active: MapSet.new()}
+  end
+
+  defp panic_burst(channels) do
+    Enum.each(channels, fn channel ->
       # Channel pressure zero prevents hanging expression after note-off.
       Connection.send_message(<<0xD0 + channel, 0>>)
       # Reset pitch bend to center.
       Connection.send_message(<<0xE0 + channel, 0, 64>>)
       # Reset timbre/slide controller.
       Connection.send_message(<<0xB0 + channel, 74, 0>>)
+      # Sustain off.
+      Connection.send_message(<<0xB0 + channel, 64, 0>>)
+      # Reset all controllers.
+      Connection.send_message(<<0xB0 + channel, 121, 0>>)
       # Panic CCs: all sound off + all notes off.
       Connection.send_message(<<0xB0 + channel, 120, 0>>)
       Connection.send_message(<<0xB0 + channel, 123, 0>>)
@@ -162,7 +186,24 @@ defmodule Mensch.Player do
         Connection.send_message(<<0x80 + channel, note, 0>>)
       end)
     end)
+  end
 
-    %{state | status: :stopped, ref: make_ref(), active: MapSet.new()}
+  defp schedule_panic_retries(ref) do
+    Process.send_after(self(), {:panic_retry, ref, 2}, 30)
+  end
+
+  defp target_channels(state) do
+    active_channels =
+      state.active
+      |> Enum.map(fn {channel, _note} -> channel end)
+      |> MapSet.new()
+
+    target_channels =
+      0..15
+      |> MapSet.new()
+      |> MapSet.union(MapSet.new(Connection.member_channels()))
+      |> MapSet.union(active_channels)
+
+    MapSet.to_list(target_channels)
   end
 end

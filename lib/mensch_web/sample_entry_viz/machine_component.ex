@@ -35,18 +35,20 @@ defmodule MenschWeb.SampleEntryViz.MachineComponent do
     |> Atom.to_string()
   end
 
-  defp machine_params(%DynamicVoicing{params: params}) do
+  defp machine_params(%DynamicVoicing{params: params, modulation_strategy: modulation_strategy}) do
     [
       {"direction", inspect(params.direction)},
-      {"number_of_inversions", params.number_of_inversions}
+      {"number_of_inversions", params.number_of_inversions},
+      {"note_modulation_strategy", inspect(modulation_strategy.__struct__)}
     ]
   end
 
-  defp machine_params(%RootNote{params: params}) do
+  defp machine_params(%RootNote{params: params, modulation_strategy: modulation_strategy}) do
     [
       {"octave_offset", params.octave_offset},
       {"velocity", params.velocity},
-      {"pressure", params.pressure}
+      {"pressure", params.pressure},
+      {"note_modulation_strategy", inspect(modulation_strategy.__struct__)}
     ]
   end
 
