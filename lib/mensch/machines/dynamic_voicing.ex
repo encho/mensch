@@ -17,7 +17,6 @@ defmodule Mensch.Machines.DynamicVoicing do
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
@@ -25,7 +24,6 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Modulation
   alias Mensch.Modulation.Lfo
   alias Mensch.Modulation.LfoEnvelope
-  alias Mensch.SampleContext
 
   defmodule RenderContext do
     @moduledoc false
@@ -66,6 +64,9 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @spec controls() :: %{
           direction: :up,
+          envelope_attack_mbeats: float(),
+          envelope_decay_mbeats: float(),
+          envelope_release_mbeats: float(),
           lfo_bend: DynamicVoicingParams.modulation_lane(),
           lfo_pressure: DynamicVoicingParams.modulation_lane(),
           lfo_slide: DynamicVoicingParams.modulation_lane(),
@@ -77,6 +78,9 @@ defmodule Mensch.Machines.DynamicVoicing do
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
+      envelope_attack_mbeats: params.envelope_attack_mbeats,
+      envelope_decay_mbeats: params.envelope_decay_mbeats,
+      envelope_release_mbeats: params.envelope_release_mbeats,
       lfo_pressure: params.lfo_pressure,
       lfo_slide: params.lfo_slide,
       lfo_bend: params.lfo_bend
@@ -122,6 +126,82 @@ defmodule Mensch.Machines.DynamicVoicing do
       )
 
     build_dynamic_note_plan(voicings, slot_boundaries)
+    |> attach_modulators(render_context)
+  end
+
+  defp attach_modulators(note_plan, %RenderContext{} = render_context) do
+    Enum.map(note_plan, &with_note_modulators(&1, render_context))
+  end
+
+  defp with_note_modulators(%NotePlanItem{} = note, %RenderContext{} = render_context) do
+    pressure_lane = render_context.params.lfo_pressure
+    slide_lane = render_context.params.lfo_slide
+    bend_lane = render_context.params.lfo_bend
+    sample_context = render_context.common.sample_context
+    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
+    frame_mbeats = render_context.common.frame_mbeats
+    attack_mbeats = render_context.params.envelope_attack_mbeats
+    decay_mbeats = render_context.params.envelope_decay_mbeats
+    release_mbeats = render_context.params.envelope_release_mbeats
+
+    baseline_pressure_lfo =
+      dynamic_pressure_envelope(
+        note,
+        frame_mbeats,
+        absolute_chord_start_mbeat,
+        attack_mbeats,
+        decay_mbeats,
+        release_mbeats
+      )
+
+    NotePlanItem.with_modulators(note, %{
+      pressure_modulator: fn at_mbeat, local_elapsed_mbeats ->
+        baseline_pressure =
+          baseline_pressure_lfo
+          |> Lfo.evaluate(
+            at_mbeat,
+            sample_context,
+            absolute_chord_start_mbeat,
+            local_elapsed_mbeats
+          )
+          |> clamp_7bit()
+
+        pressure_modulation =
+          evaluate_lane_modulation(
+            pressure_lane,
+            at_mbeat,
+            sample_context,
+            absolute_chord_start_mbeat,
+            local_elapsed_mbeats
+          )
+
+        Modulation.apply_to_pressure(baseline_pressure, pressure_modulation, pressure_lane.mode)
+      end,
+      slide_modulator: fn at_mbeat, local_elapsed_mbeats ->
+        slide_modulation =
+          evaluate_lane_modulation(
+            slide_lane,
+            at_mbeat,
+            sample_context,
+            absolute_chord_start_mbeat,
+            local_elapsed_mbeats
+          )
+
+        apply_to_7bit(0, slide_modulation, slide_lane.mode)
+      end,
+      bend_modulator: fn at_mbeat, local_elapsed_mbeats ->
+        bend_modulation =
+          evaluate_lane_modulation(
+            bend_lane,
+            at_mbeat,
+            sample_context,
+            absolute_chord_start_mbeat,
+            local_elapsed_mbeats
+          )
+
+        apply_to_bend(0.0, bend_modulation, bend_lane.mode)
+      end
+    })
   end
 
   defp build_voicing_sequence(
@@ -375,80 +455,6 @@ defmodule Mensch.Machines.DynamicVoicing do
     })
   end
 
-  @impl Pipeline
-  @spec render_note_frame(NotePlanItem.t(), non_neg_integer(), RenderContext.t()) :: map()
-  def render_note_frame(note, at_mbeat, %RenderContext{} = render_context) do
-    local_elapsed_mbeats = at_mbeat - note.start_mbeat
-    phase = dynamic_phase(local_elapsed_mbeats, note.duration_mbeats, render_context, note)
-
-    %SampleContext{} = sample_context = render_context.common.sample_context
-    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
-
-    pressure_envelope =
-      dynamic_pressure_envelope(
-        note,
-        render_context.common.frame_mbeats,
-        absolute_chord_start_mbeat
-      )
-
-    baseline_pressure =
-      pressure_envelope
-      |> Lfo.evaluate(
-        at_mbeat,
-        sample_context,
-        absolute_chord_start_mbeat,
-        local_elapsed_mbeats
-      )
-      |> clamp_7bit()
-
-    pressure_modulation =
-      evaluate_lane_modulation(
-        render_context.params.lfo_pressure,
-        at_mbeat,
-        sample_context,
-        absolute_chord_start_mbeat,
-        local_elapsed_mbeats
-      )
-
-    pressure =
-      Modulation.apply_to_pressure(
-        baseline_pressure,
-        pressure_modulation,
-        render_context.params.lfo_pressure.mode
-      )
-
-    slide_modulation =
-      evaluate_lane_modulation(
-        render_context.params.lfo_slide,
-        at_mbeat,
-        sample_context,
-        absolute_chord_start_mbeat,
-        local_elapsed_mbeats
-      )
-
-    slide = apply_to_7bit(0, slide_modulation, render_context.params.lfo_slide.mode)
-
-    bend_modulation =
-      evaluate_lane_modulation(
-        render_context.params.lfo_bend,
-        at_mbeat,
-        sample_context,
-        absolute_chord_start_mbeat,
-        local_elapsed_mbeats
-      )
-
-    bend = apply_to_bend(0.0, bend_modulation, render_context.params.lfo_bend.mode)
-
-    NoteFrame.from_note_plan_item(note, %{
-      phase: phase,
-      note_on: local_elapsed_mbeats == 0,
-      note_off: local_elapsed_mbeats == note.duration_mbeats,
-      pressure: pressure,
-      bend: bend,
-      slide: slide
-    })
-  end
-
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do
     total_frames = max(div(chord_duration_mbeats, frame_mbeats), 1)
 
@@ -468,10 +474,33 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     defaults
     |> Map.merge(current)
+    |> Map.update!(
+      :envelope_attack_mbeats,
+      &normalize_non_negative_number!(&1, "dynamic_voicing envelope_attack_mbeats")
+    )
+    |> Map.update!(
+      :envelope_decay_mbeats,
+      &normalize_non_negative_number!(&1, "dynamic_voicing envelope_decay_mbeats")
+    )
+    |> Map.update!(
+      :envelope_release_mbeats,
+      &normalize_non_negative_number!(&1, "dynamic_voicing envelope_release_mbeats")
+    )
     |> Map.update!(:lfo_pressure, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_pressure"))
     |> Map.update!(:lfo_slide, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_slide"))
     |> Map.update!(:lfo_bend, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_bend"))
     |> then(&struct!(DynamicVoicingParams, &1))
+  end
+
+  defp normalize_non_negative_number!(value, _field_name)
+       when is_integer(value) and value >= 0,
+       do: value * 1.0
+
+  defp normalize_non_negative_number!(value, _field_name) when is_float(value) and value >= 0,
+    do: value
+
+  defp normalize_non_negative_number!(other, field_name) do
+    raise ArgumentError, "#{field_name} must be >= 0, got: #{inspect(other)}"
   end
 
   defp normalize_modulation_lane!(%{lfo: _lfo, mode: _mode} = lane, field_name) do
@@ -516,51 +545,37 @@ defmodule Mensch.Machines.DynamicVoicing do
     )
   end
 
-  defp dynamic_pressure_envelope(note, frame_mbeats, absolute_chord_start_mbeat) do
-    attack_mbeats =
-      if absolute_chord_start_mbeat + note.start_mbeat > 0 do
-        frame_mbeats
-      else
-        frame_mbeats * 2
-      end
+  defp dynamic_pressure_envelope(
+         note,
+         _frame_mbeats,
+         _absolute_chord_start_mbeat,
+         attack_mbeats,
+         decay_mbeats,
+         release_mbeats
+       ) do
+    total_requested = attack_mbeats + decay_mbeats + release_mbeats
+    note_duration = note.duration_mbeats * 1.0
 
-    attack_mbeats = min(attack_mbeats, note.duration_mbeats)
-    remaining_after_attack = max(note.duration_mbeats - attack_mbeats, 0)
-    decay_mbeats = min(frame_mbeats * 2, remaining_after_attack)
-    hold_mbeats = max(note.duration_mbeats - attack_mbeats - decay_mbeats, 0)
+    if total_requested > note_duration do
+      raise ArgumentError,
+            "dynamic_voicing pressure envelope exceeds note duration: attack(#{attack_mbeats}) + decay(#{decay_mbeats}) + release(#{release_mbeats}) = #{total_requested} > note duration #{note_duration} for note_instance_id #{note.note_instance_id}"
+    end
+
+    hold_mbeats = note_duration - total_requested
 
     %LfoEnvelope{
       start_value: 0.0,
       peak_value: 127.0,
       sustain_value: 0.78 * 127.0,
       end_value: 0.0,
-      attack_mbeats: attack_mbeats * 1.0,
-      decay_mbeats: decay_mbeats * 1.0,
-      hold_mbeats: hold_mbeats * 1.0,
-      release_mbeats: 0.0,
+      attack_mbeats: attack_mbeats,
+      decay_mbeats: decay_mbeats,
+      hold_mbeats: hold_mbeats,
+      release_mbeats: release_mbeats,
       interpolation_function: :linear,
       shift_mbeats: 0.0,
       anchor: :note
     }
-  end
-
-  defp dynamic_phase(local_elapsed_mbeats, duration_mbeats, render_context, note) do
-    attack_mbeats =
-      if render_context.common.absolute_chord_start_mbeat + note.start_mbeat > 0 do
-        render_context.common.frame_mbeats
-      else
-        render_context.common.frame_mbeats * 2
-      end
-
-    attack_mbeats = min(attack_mbeats, duration_mbeats)
-    remaining_after_attack = max(duration_mbeats - attack_mbeats, 0)
-    decay_mbeats = min(render_context.common.frame_mbeats * 2, remaining_after_attack)
-
-    cond do
-      local_elapsed_mbeats < attack_mbeats -> :attack
-      local_elapsed_mbeats < attack_mbeats + decay_mbeats -> :decay
-      true -> :sustain
-    end
   end
 
   defp apply_to_7bit(baseline_7bit, modulation_value, :add) do
@@ -645,6 +660,9 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
+      envelope_attack_mbeats: normalized_params.envelope_attack_mbeats,
+      envelope_decay_mbeats: normalized_params.envelope_decay_mbeats,
+      envelope_release_mbeats: normalized_params.envelope_release_mbeats,
       lfo_pressure: normalized_params.lfo_pressure,
       lfo_slide: normalized_params.lfo_slide,
       lfo_bend: normalized_params.lfo_bend

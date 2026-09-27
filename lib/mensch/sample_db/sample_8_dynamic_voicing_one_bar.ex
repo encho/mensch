@@ -50,6 +50,9 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 3,
+          envelope_attack_mbeats: 5.0,
+          envelope_decay_mbeats: 10.0,
+          envelope_release_mbeats: 5.0,
           lfo_slide: @lfo_slide,
           lfo_bend: @lfo_bend,
           lfo_pressure: @lfo_pressure

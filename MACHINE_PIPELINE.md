@@ -9,13 +9,13 @@ pipeline.
 
 - `build_render_context/2`
 - `build_note_plan/3`
-- `render_note_frame/3`
 
 `Pipeline.build_frame_sequence/6` orchestrates these phases and returns
 `MachineFrameSequence`.
 
 Pipeline-owned responsibilities (shared across machines):
 
+- render `NoteFrame` values from `NotePlanItem` modulators via `render_note_to_frame/2`
 - render note frame streams from note plans
 - stitch streams into dense chord-local frame timeline
 - sort frame notes by `{note_instance_id, midi_note}`
@@ -55,8 +55,11 @@ Implications:
 
 1. Intake and normalize machine params.
 2. Build typed render context from shared common fields.
-3. Build `NotePlanItem` values (`start_mbeat`, `duration_mbeats`, tags/provenance).
-4. Pipeline renders per-note frame streams using machine `render_note_frame/3`.
+3. Build `NotePlanItem` values (`start_mbeat`, `duration_mbeats`, tags/provenance,
+  and attached `pressure_modulator` / `slide_modulator` / `bend_modulator`
+  functions).
+4. Pipeline renders per-note frames through `render_note_to_frame/2`
+  (machine-agnostic).
 5. Pipeline stitches streams into dense frame timeline over
    `chord_start_mbeat..(chord_start_mbeat + chord_duration_mbeats)`.
 6. Pipeline sorts notes per frame by `{note_instance_id, midi_note}`.
@@ -75,8 +78,17 @@ Implications:
 ## Machine Notes
 
 - `RootNote`: one root note, pressure baseline fixed to `0`; pressure comes
-  from `lfo_pressure` modulation.
+  from `lfo_pressure` modulation. The machine attaches per-note modulator
+  functions directly on `NotePlanItem`.
 - `DynamicVoicing`: inversion-transition lifecycles with per-note
   `duration_mbeats` carried in `NotePlanItem`; pressure baseline is generated
   from a per-note envelope (`LfoEnvelope`) and then combined with lane
-  modulation (`lfo_pressure`, `lfo_slide`, `lfo_bend`).
+  modulation (`lfo_pressure`, `lfo_slide`, `lfo_bend`) inside per-note
+  modulator functions.
+
+## Current Simplifications
+
+- `phase` is no longer part of note frames.
+- Machines no longer implement `render_note_frame/3`; frame rendering is fully
+  centralized in pipeline.
+- Playback/export expression emission is now gated by `note_off` only.

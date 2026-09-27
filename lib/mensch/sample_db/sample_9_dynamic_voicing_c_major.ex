@@ -62,6 +62,9 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_slide: @lfo_slide,
               lfo_pressure: @lfo_pressure,
               lfo_bend: @lfo_bend
@@ -78,6 +81,9 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_slide: @lfo_slide,
               lfo_pressure: @lfo_pressure,
               lfo_bend: @lfo_bend
@@ -94,6 +100,9 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_slide: @lfo_slide,
               lfo_pressure: @lfo_pressure,
               lfo_bend: @lfo_bend
@@ -110,6 +119,9 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 10,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_slide: @lfo_slide,
               lfo_pressure: @lfo_pressure,
               lfo_bend: @lfo_bend

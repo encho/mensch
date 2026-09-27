@@ -20,6 +20,12 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     `%{lfo: lfo_term, mode: :add | :multiply}`.
   * `lfo_bend`: Bend modulation lane config represented as
     `%{lfo: lfo_term, mode: :add | :multiply}`.
+  * `envelope_attack_mbeats`: Per-note pressure envelope attack duration.
+  * `envelope_decay_mbeats`: Per-note pressure envelope decay duration.
+  * `envelope_release_mbeats`: Per-note pressure envelope release duration.
+
+  Hold is computed as `note.duration_mbeats - (attack + decay + release)`.
+  If this would be negative for a note, rendering raises.
   """
 
   alias Mensch.Modulation
@@ -29,19 +35,26 @@ defmodule Mensch.Machines.DynamicVoicingParams do
   @type direction :: :up | :down | {:cycle_up, pos_integer()} | {:cycle_down, pos_integer()}
 
   @type modulation_lane :: Modulation.lfo_pressure()
+  @type non_neg_number :: non_neg_integer() | float()
 
   @type t :: %__MODULE__{
           direction: direction(),
           number_of_inversions: pos_integer(),
           lfo_pressure: modulation_lane(),
           lfo_slide: modulation_lane(),
-          lfo_bend: modulation_lane()
+          lfo_bend: modulation_lane(),
+          envelope_attack_mbeats: non_neg_number(),
+          envelope_decay_mbeats: non_neg_number(),
+          envelope_release_mbeats: non_neg_number()
         }
 
   @enforce_keys [:direction, :number_of_inversions]
   defstruct [
     :direction,
     :number_of_inversions,
+    envelope_attack_mbeats: 0.0,
+    envelope_decay_mbeats: 0.0,
+    envelope_release_mbeats: 0.0,
     lfo_pressure: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add},
     lfo_slide: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add},
     lfo_bend: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add}
@@ -53,6 +66,9 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     %__MODULE__{
       direction: :up,
       number_of_inversions: 4,
+      envelope_attack_mbeats: 0.0,
+      envelope_decay_mbeats: 0.0,
+      envelope_release_mbeats: 0.0,
       lfo_pressure: %{lfo: LfoGroup.default(), mode: :add},
       lfo_slide: %{lfo: LfoGroup.default(), mode: :add},
       lfo_bend: %{lfo: LfoGroup.default(), mode: :add}

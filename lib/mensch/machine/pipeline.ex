@@ -8,6 +8,7 @@ defmodule Mensch.Machine.Pipeline do
 
   alias Mensch.ChordSpec
   alias Mensch.Machine.MachineFrameSequence
+  alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.RenderContextCommon
   alias Mensch.SampleContext
@@ -26,12 +27,6 @@ defmodule Mensch.Machine.Pipeline do
               ChordSpec.t(),
               render_context()
             ) :: [NotePlanItem.t()]
-
-  @callback render_note_frame(
-              NotePlanItem.t(),
-              non_neg_integer(),
-              render_context()
-            ) :: map()
 
   @spec build_frame_sequence(
           module(),
@@ -55,18 +50,41 @@ defmodule Mensch.Machine.Pipeline do
     render_context =
       module.build_render_context(machine, common_fields)
 
-    note_plan = module.build_note_plan(machine, chord_spec, render_context)
+    note_plan =
+      module.build_note_plan(machine, chord_spec, render_context)
 
     :ok = assert_invariants(note_plan, render_context)
 
     note_frame_streams =
       Enum.map(note_plan, fn note ->
-        render_note_frame_stream(module, note, render_context)
+        render_note_frame_stream(note, render_context)
       end)
 
     %MachineFrameSequence{
       frames: stitch_note_frame_streams(note_frame_streams, render_context)
     }
+  end
+
+  @doc "Render a single NotePlanItem at a frame position using attached modulators."
+  @spec render_note_to_frame(NotePlanItem.t(), non_neg_integer()) :: NoteFrame.t()
+  def render_note_to_frame(%NotePlanItem{} = note, at_mbeat) when is_integer(at_mbeat) do
+    local_elapsed_mbeats = at_mbeat - note.start_mbeat
+
+    pressure_modulator = Map.fetch!(note, :pressure_modulator)
+    slide_modulator = Map.fetch!(note, :slide_modulator)
+    bend_modulator = Map.fetch!(note, :bend_modulator)
+
+    modulated_pressure = pressure_modulator.(at_mbeat, local_elapsed_mbeats)
+    modulated_slide = slide_modulator.(at_mbeat, local_elapsed_mbeats)
+    modulated_bend = bend_modulator.(at_mbeat, local_elapsed_mbeats)
+
+    NoteFrame.from_note_plan_item(note, %{
+      note_on: local_elapsed_mbeats == 0,
+      note_off: local_elapsed_mbeats == note.duration_mbeats,
+      pressure: modulated_pressure,
+      bend: modulated_bend,
+      slide: modulated_slide
+    })
   end
 
   @spec stitch_note_frame_streams([[map()]], render_context()) :: [MachineFrameSequence.frame()]
@@ -110,8 +128,8 @@ defmodule Mensch.Machine.Pipeline do
     end
   end
 
-  @spec render_note_frame_stream(module(), NotePlanItem.t(), render_context()) :: [map()]
-  defp render_note_frame_stream(module, note, render_context) when is_atom(module) do
+  @spec render_note_frame_stream(NotePlanItem.t(), render_context()) :: [map()]
+  defp render_note_frame_stream(note, render_context) do
     common = Map.fetch!(render_context, :common)
     chord_end_mbeat = common.chord_start_mbeat + common.chord_duration_mbeats
     frame_mbeats = common.frame_mbeats
@@ -120,7 +138,7 @@ defmodule Mensch.Machine.Pipeline do
     for at_mbeat <- note.start_mbeat..note_end_mbeat//frame_mbeats do
       %{
         at_mbeat: at_mbeat,
-        note: module.render_note_frame(note, at_mbeat, render_context)
+        note: render_note_to_frame(note, at_mbeat)
       }
     end
   end

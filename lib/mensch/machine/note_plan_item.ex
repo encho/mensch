@@ -10,7 +10,7 @@ defmodule Mensch.Machine.NotePlanItem do
 
   1. Sequencing stage creates `%NotePlanItem{}` values with pitch, ordering,
     and quantized timing fields.
-  2. Articulation stage may enrich items with machine-specific modulation data.
+  2. Articulation stage may enrich items with machine-specific modulation functions.
   3. Frame rendering stage consumes the enriched item to emit per-frame note
     states (active phases and eventual note-off).
 
@@ -133,9 +133,14 @@ defmodule Mensch.Machine.NotePlanItem do
             degree_index: nil,
             start_mbeat: nil,
             duration_mbeats: nil,
+            pressure_modulator: nil,
+            slide_modulator: nil,
+            bend_modulator: nil,
             harmonic_tags: [],
             role_tags: [],
             machine_note_tags: []
+
+  @type modulator_fn :: (non_neg_integer(), non_neg_integer() -> number())
 
   @typedoc """
   A single planned note in the machine pipeline.
@@ -161,6 +166,9 @@ defmodule Mensch.Machine.NotePlanItem do
     e.g. `540`.
   - `duration_mbeats`: Planned note lifecycle length in mbeat units,
     e.g. `1200`.
+  - `pressure_modulator`: Optional machine-provided pressure modulator function.
+  - `slide_modulator`: Optional machine-provided slide modulator function.
+  - `bend_modulator`: Optional machine-provided bend modulator function.
   """
   @type t :: %__MODULE__{
           note_name: atom(),
@@ -176,7 +184,10 @@ defmodule Mensch.Machine.NotePlanItem do
           role_tags: [role_tag()],
           machine_note_tags: [machine_note_tag()],
           start_mbeat: non_neg_integer(),
-          duration_mbeats: non_neg_integer()
+          duration_mbeats: non_neg_integer(),
+          pressure_modulator: modulator_fn() | nil,
+          slide_modulator: modulator_fn() | nil,
+          bend_modulator: modulator_fn() | nil
         }
 
   @doc """
@@ -189,6 +200,17 @@ defmodule Mensch.Machine.NotePlanItem do
   def new(attrs) when is_map(attrs) do
     struct!(__MODULE__, attrs)
     |> normalize_and_validate_tags!()
+  end
+
+  @doc "Attach per-note modulation functions used during frame rendering."
+  @spec with_modulators(t(), map()) :: t()
+  def with_modulators(%__MODULE__{} = note_plan_item, modulators) when is_map(modulators) do
+    %__MODULE__{
+      note_plan_item
+      | pressure_modulator: Map.get(modulators, :pressure_modulator),
+        slide_modulator: Map.get(modulators, :slide_modulator),
+        bend_modulator: Map.get(modulators, :bend_modulator)
+    }
   end
 
   defp normalize_and_validate_tags!(%__MODULE__{} = note_plan_item) do

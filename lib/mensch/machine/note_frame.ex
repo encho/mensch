@@ -3,7 +3,7 @@ defmodule Mensch.Machine.NoteFrame do
   Canonical per-frame note event shape emitted by machines.
 
   A note frame represents one note's runtime state at a specific frame point,
-  including articulation phase and outbound MPE controls.
+  including outbound MPE controls.
   """
 
   alias Mensch.Machine.NotePlanItem
@@ -20,7 +20,6 @@ defmodule Mensch.Machine.NoteFrame do
     :harmonic_tags,
     :role_tags,
     :machine_note_tags,
-    :phase,
     :note_on,
     :note_off,
     :pressure,
@@ -41,7 +40,6 @@ defmodule Mensch.Machine.NoteFrame do
     :role_tags,
     :machine_note_tags,
     :sample_entry_index,
-    :phase,
     :note_on,
     :note_off,
     :pressure,
@@ -63,7 +61,6 @@ defmodule Mensch.Machine.NoteFrame do
           role_tags: [atom()],
           machine_note_tags: [atom()],
           sample_entry_index: integer() | nil,
-          phase: atom(),
           note_on: boolean(),
           note_off: boolean(),
           pressure: non_neg_integer(),

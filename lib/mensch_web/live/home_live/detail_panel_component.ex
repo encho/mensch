@@ -138,7 +138,6 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 <th class="px-3 py-1.5 font-normal">chord</th>
                 <th class="px-3 py-1.5 font-normal">note</th>
                 <th class="px-3 py-1.5 font-normal">ch</th>
-                <th class="px-3 py-1.5 font-normal">phase</th>
                 <th class="px-3 py-1.5 font-normal">on</th>
                 <th class="px-3 py-1.5 font-normal">off</th>
                 <th class="px-3 py-1.5 font-normal">velocity</th>
@@ -161,7 +160,6 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                   {Map.get(row, :note_label, "#{row.note_name}#{row.octave}")}
                 </td>
                 <td class="px-3 py-1.5">{row.channel}</td>
-                <td class="px-3 py-1.5">{row.phase}</td>
                 <td class="px-3 py-1.5">{row.note_on}</td>
                 <td class="px-3 py-1.5">{row.note_off}</td>
                 <td class="px-3 py-1.5">{if row.note_on, do: row.note_on_velocity, else: "-"}</td>

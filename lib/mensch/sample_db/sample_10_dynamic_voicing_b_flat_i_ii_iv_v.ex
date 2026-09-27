@@ -29,6 +29,9 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_pressure: %{
                 lfo: %{
                   curve: :sine,
@@ -52,6 +55,9 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_pressure: %{
                 lfo: %{
                   curve: :sine,
@@ -75,6 +81,9 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_pressure: %{
                 lfo: %{
                   curve: :sine,
@@ -98,6 +107,9 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
+              envelope_attack_mbeats: 5.0,
+              envelope_decay_mbeats: 10.0,
+              envelope_release_mbeats: 5.0,
               lfo_pressure: %{
                 lfo: %{
                   curve: :sine,
