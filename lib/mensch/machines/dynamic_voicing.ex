@@ -23,7 +23,12 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.Modulation
   alias Mensch.Modulation.Lfo
+  alias Mensch.Modulation.LfoConstant
+  alias Mensch.Modulation.LfoCurve
   alias Mensch.Modulation.LfoEnvelope
+  alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoRamp
+  alias Mensch.Modulation.LfoSaw
 
   defmodule RenderContext do
     @moduledoc false
@@ -503,11 +508,11 @@ defmodule Mensch.Machines.DynamicVoicing do
     raise ArgumentError, "#{field_name} must be >= 0, got: #{inspect(other)}"
   end
 
-  defp normalize_modulation_lane!(%{lfo: _lfo, mode: _mode} = lane, field_name) do
-    Modulation.normalize_lfo_pressure!(lane, field_name)
-  end
-
   defp normalize_modulation_lane!(lane, field_name) when is_map(lane) do
+    lfo =
+      Map.get(lane, :lfo, Map.get(lane, "lfo"))
+      |> normalize_typed_lfo_term!("#{field_name}.lfo")
+
     legacy_mode = Map.get(lane, :mode, Map.get(lane, "mode", :additive))
 
     normalized_mode =
@@ -519,14 +524,23 @@ defmodule Mensch.Machines.DynamicVoicing do
         other -> other
       end
 
-    Modulation.normalize_lfo_pressure!(
-      %{lfo: Map.drop(lane, [:__struct__, :mode, "mode"]), mode: normalized_mode},
-      field_name
-    )
+    Modulation.normalize_lfo_pressure!(%{lfo: lfo, mode: normalized_mode}, field_name)
   end
 
   defp normalize_modulation_lane!(other, field_name) do
     Modulation.normalize_lfo_pressure!(other, field_name)
+  end
+
+  defp normalize_typed_lfo_term!(%LfoCurve{} = lfo, _field_name), do: lfo
+  defp normalize_typed_lfo_term!(%LfoSaw{} = lfo, _field_name), do: lfo
+  defp normalize_typed_lfo_term!(%LfoRamp{} = lfo, _field_name), do: lfo
+  defp normalize_typed_lfo_term!(%LfoEnvelope{} = lfo, _field_name), do: lfo
+  defp normalize_typed_lfo_term!(%LfoConstant{} = lfo, _field_name), do: lfo
+  defp normalize_typed_lfo_term!(%LfoGroup{} = lfo, _field_name), do: lfo
+
+  defp normalize_typed_lfo_term!(other, field_name) do
+    raise ArgumentError,
+          "#{field_name} must be a typed LFO struct (LfoCurve/LfoSaw/LfoRamp/LfoEnvelope/LfoConstant/LfoGroup), got: #{inspect(other)}"
   end
 
   defp evaluate_lane_modulation(
