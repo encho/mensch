@@ -2154,8 +2154,8 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  # Bend's absolute range is tiny (see `Mensch.NoteShape`'s
-  # `@vibrato_depth`), so it gets its own dynamic min/max instead of
+  # Bend's absolute range is intentionally tiny, so it gets its own
+  # dynamic min/max instead of
   # being squashed flat against a fixed +/-1.0 scale.
   defp value_range(frames) do
     values = for frame <- frames, note <- frame.notes, do: note.bend

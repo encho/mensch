@@ -10,9 +10,9 @@ defmodule Mensch.Machine.NotePlanItem do
 
   1. Sequencing stage creates `%NotePlanItem{}` values with pitch, ordering,
     and quantized timing fields.
-  2. Envelope/articulation stage enriches each item with `adsr`.
+  2. Articulation stage may enrich items with machine-specific modulation data.
   3. Frame rendering stage consumes the enriched item to emit per-frame note
-    states (`:pending`, active ADSR phases, and `:ended`).
+    states (active phases and eventual note-off).
 
   Design intent:
 
@@ -36,9 +36,7 @@ defmodule Mensch.Machine.NotePlanItem do
     the chord-entry duration.
   - `note_instance_id` and `degree_index` are non-negative.
   - `channel` may be `nil` until global channel allocation.
-  - `adsr` may be `nil` until envelope assignment.
-
-  Example item (pre-envelope):
+  Example item:
 
       %Mensch.Machine.NotePlanItem{
         note_name: :c,
@@ -54,12 +52,9 @@ defmodule Mensch.Machine.NotePlanItem do
         role_tags: [],
         machine_note_tags: [],
         start_mbeat: 540,
-        duration_mbeats: 1200,
-        adsr: nil
+        duration_mbeats: 1200
       }
   """
-
-  alias Mensch.Envelope.ADSR
 
   @harmonic_tags [
     :root,
@@ -138,7 +133,6 @@ defmodule Mensch.Machine.NotePlanItem do
             degree_index: nil,
             start_mbeat: nil,
             duration_mbeats: nil,
-            adsr: nil,
             harmonic_tags: [],
             role_tags: [],
             machine_note_tags: []
@@ -167,8 +161,6 @@ defmodule Mensch.Machine.NotePlanItem do
     e.g. `540`.
   - `duration_mbeats`: Planned note lifecycle length in mbeat units,
     e.g. `1200`.
-  - `adsr`: Envelope assigned in the articulation stage, e.g. `nil` before
-    assignment, then `%Mensch.Envelope.ADSR{...}`.
   """
   @type t :: %__MODULE__{
           note_name: atom(),
@@ -184,8 +176,7 @@ defmodule Mensch.Machine.NotePlanItem do
           role_tags: [role_tag()],
           machine_note_tags: [machine_note_tag()],
           start_mbeat: non_neg_integer(),
-          duration_mbeats: non_neg_integer(),
-          adsr: ADSR.t() | nil
+          duration_mbeats: non_neg_integer()
         }
 
   @doc """
@@ -198,17 +189,6 @@ defmodule Mensch.Machine.NotePlanItem do
   def new(attrs) when is_map(attrs) do
     struct!(__MODULE__, attrs)
     |> normalize_and_validate_tags!()
-  end
-
-  @doc """
-  Attaches an ADSR envelope to an existing note-plan item.
-
-  This keeps sequencing and articulation as separate stages while preserving the
-  same struct identity across the pipeline.
-  """
-  @spec with_adsr(t(), ADSR.t()) :: t()
-  def with_adsr(%__MODULE__{} = note_plan_item, %ADSR{} = adsr) do
-    %__MODULE__{note_plan_item | adsr: adsr}
   end
 
   defp normalize_and_validate_tags!(%__MODULE__{} = note_plan_item) do

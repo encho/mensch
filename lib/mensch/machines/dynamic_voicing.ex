@@ -5,17 +5,26 @@ defmodule Mensch.Machines.DynamicVoicing do
   Unlike an arpeggiator, unchanged tones continue to sound across inversion
   boundaries. At each boundary, one tone exits and one new tone enters one
   octave away, following `direction`.
+
+  Modulation model:
+
+  - pressure baseline is generated per-note from a dynamic `LfoEnvelope`
+  - `lfo_pressure` is applied over that baseline
+  - `lfo_slide` and `lfo_bend` are evaluated as dedicated modulation lanes
+
+  All modulation lanes use `%{lfo: lfo_term, mode: :add | :multiply}` and are
+  normalized through `Mensch.NewModulation`.
   """
 
   alias Mensch.ChordSpec
-  alias Mensch.Envelope.ADSR
   alias Mensch.Machine.NoteFrame
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
-  alias Mensch.LfoParams
-  alias Mensch.Modulation.Lfo
   alias Mensch.Machines.DynamicVoicingParams
+  alias Mensch.NewModulation
+  alias Mensch.NewModulation.Lfo
+  alias Mensch.NewModulation.LfoEnvelope
   alias Mensch.SampleContext
 
   defmodule RenderContext do
@@ -57,9 +66,9 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @spec controls() :: %{
           direction: :up,
-          lfo_bend: Mensch.LfoParams.t(),
-          lfo_pressure: Mensch.LfoParams.t(),
-          lfo_slide: Mensch.LfoParams.t(),
+          lfo_bend: DynamicVoicingParams.modulation_lane(),
+          lfo_pressure: DynamicVoicingParams.modulation_lane(),
+          lfo_slide: DynamicVoicingParams.modulation_lane(),
           number_of_inversions: 4
         }
   def controls do
@@ -113,11 +122,6 @@ defmodule Mensch.Machines.DynamicVoicing do
       )
 
     build_dynamic_note_plan(voicings, slot_boundaries)
-    |> assign_dynamic_adsr(
-      render_context.common.sample_context,
-      render_context.common.frame_mbeats,
-      render_context.common.absolute_chord_start_mbeat
-    )
   end
 
   defp build_voicing_sequence(
@@ -371,97 +375,69 @@ defmodule Mensch.Machines.DynamicVoicing do
     })
   end
 
-  defp assign_dynamic_adsr(
-         note_plan,
-         %SampleContext{} = sample_context,
-         frame_mbeats,
-         absolute_chord_start_mbeat
-       ) do
-    Enum.map(note_plan, fn plan_note ->
-      duration_mbeats = plan_note.duration_mbeats
-
-      attack_mbeats =
-        if absolute_chord_start_mbeat + plan_note.start_mbeat > 0 do
-          frame_mbeats
-        else
-          frame_mbeats * 2
-        end
-
-      adsr = dynamic_adsr(duration_mbeats, sample_context, frame_mbeats, attack_mbeats)
-
-      NotePlanItem.with_adsr(plan_note, adsr)
-    end)
-  end
-
-  defp dynamic_adsr(
-         duration_mbeats,
-         %SampleContext{} = sample_context,
-         frame_mbeats,
-         attack_mbeats
-       ) do
-    attack_mbeats = min(attack_mbeats, duration_mbeats)
-    remaining_after_attack = max(duration_mbeats - attack_mbeats, 0)
-    decay_mbeats = min(frame_mbeats * 2, remaining_after_attack)
-
-    ADSR.from_mbeats(duration_mbeats, sample_context, %{
-      attack_mbeats: attack_mbeats,
-      decay_mbeats: decay_mbeats,
-      release_mbeats: 0,
-      attack_curve: :linear,
-      decay_curve: :linear,
-      release_curve: :linear,
-      peak_level: 1.0,
-      sustain_level: 0.78
-    })
-  end
-
   @impl Pipeline
   @spec render_note_frame(NotePlanItem.t(), non_neg_integer(), RenderContext.t()) :: map()
   def render_note_frame(note, at_mbeat, %RenderContext{} = render_context) do
     local_elapsed_mbeats = at_mbeat - note.start_mbeat
-    phase = ADSR.phase_at_mbeat(note.adsr, local_elapsed_mbeats)
-    adsr_level = ADSR.level_at_mbeat(note.adsr, local_elapsed_mbeats)
+    phase = dynamic_phase(local_elapsed_mbeats, note.duration_mbeats, render_context, note)
 
     %SampleContext{} = sample_context = render_context.common.sample_context
     absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
-    %LfoParams{} = pressure_lfo = render_context.params.lfo_pressure
-    %LfoParams{} = slide_lfo = render_context.params.lfo_slide
-    %LfoParams{} = bend_lfo = render_context.params.lfo_bend
 
-    pressure_lfo_norm =
-      Lfo.value_at_mbeat(
-        pressure_lfo,
+    pressure_envelope =
+      dynamic_pressure_envelope(
+        note,
+        render_context.common.frame_mbeats,
+        absolute_chord_start_mbeat
+      )
+
+    baseline_pressure =
+      pressure_envelope
+      |> Lfo.evaluate(
+        at_mbeat,
+        sample_context,
+        absolute_chord_start_mbeat,
+        local_elapsed_mbeats
+      )
+      |> clamp_7bit()
+
+    pressure_modulation =
+      evaluate_lane_modulation(
+        render_context.params.lfo_pressure,
         at_mbeat,
         sample_context,
         absolute_chord_start_mbeat,
         local_elapsed_mbeats
       )
 
-    baseline_pressure = clamp_7bit(adsr_level * 127)
-    pressure = Lfo.apply_to_pressure(baseline_pressure, pressure_lfo_norm, pressure_lfo)
+    pressure =
+      NewModulation.apply_to_pressure(
+        baseline_pressure,
+        pressure_modulation,
+        render_context.params.lfo_pressure.mode
+      )
 
-    # Slide modulation is additive over baseline 0; polarity is configured in lfo_slide.
-    slide_lfo_norm =
-      Lfo.value_at_mbeat(
-        slide_lfo,
+    slide_modulation =
+      evaluate_lane_modulation(
+        render_context.params.lfo_slide,
         at_mbeat,
         sample_context,
         absolute_chord_start_mbeat,
         local_elapsed_mbeats
       )
 
-    slide = Lfo.apply_additive_to_7bit(0, slide_lfo_norm, slide_lfo)
+    slide = apply_to_7bit(0, slide_modulation, render_context.params.lfo_slide.mode)
 
-    bend_lfo_norm =
-      Lfo.value_at_mbeat(
-        bend_lfo,
+    bend_modulation =
+      evaluate_lane_modulation(
+        render_context.params.lfo_bend,
         at_mbeat,
         sample_context,
         absolute_chord_start_mbeat,
         local_elapsed_mbeats
       )
 
-    bend = Lfo.apply_additive_to_bend(0.0, bend_lfo_norm, bend_lfo)
+    bend = apply_to_bend(0.0, bend_modulation, render_context.params.lfo_bend.mode)
 
     NoteFrame.from_note_plan_item(note, %{
       phase: phase,
@@ -492,10 +468,117 @@ defmodule Mensch.Machines.DynamicVoicing do
 
     defaults
     |> Map.merge(current)
-    |> Map.update!(:lfo_pressure, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_pressure"))
-    |> Map.update!(:lfo_slide, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_slide"))
-    |> Map.update!(:lfo_bend, &Lfo.normalize!(&1, field_name: "dynamic_voicing lfo_bend"))
+    |> Map.update!(:lfo_pressure, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_pressure"))
+    |> Map.update!(:lfo_slide, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_slide"))
+    |> Map.update!(:lfo_bend, &normalize_modulation_lane!(&1, "dynamic_voicing lfo_bend"))
     |> then(&struct!(DynamicVoicingParams, &1))
+  end
+
+  defp normalize_modulation_lane!(%{lfo: _lfo, mode: _mode} = lane, field_name) do
+    NewModulation.normalize_lfo_pressure!(lane, field_name)
+  end
+
+  defp normalize_modulation_lane!(lane, field_name) when is_map(lane) do
+    legacy_mode = Map.get(lane, :mode, Map.get(lane, "mode", :additive))
+
+    normalized_mode =
+      case legacy_mode do
+        :additive -> :add
+        :multiplicative -> :multiply
+        :add -> :add
+        :multiply -> :multiply
+        other -> other
+      end
+
+    NewModulation.normalize_lfo_pressure!(
+      %{lfo: Map.drop(lane, [:__struct__, :mode, "mode"]), mode: normalized_mode},
+      field_name
+    )
+  end
+
+  defp normalize_modulation_lane!(other, field_name) do
+    NewModulation.normalize_lfo_pressure!(other, field_name)
+  end
+
+  defp evaluate_lane_modulation(
+         %{lfo: lfo},
+         at_mbeat,
+         sample_context,
+         absolute_chord_start_mbeat,
+         local_elapsed_mbeats
+       ) do
+    Lfo.evaluate(
+      lfo,
+      at_mbeat,
+      sample_context,
+      absolute_chord_start_mbeat,
+      local_elapsed_mbeats
+    )
+  end
+
+  defp dynamic_pressure_envelope(note, frame_mbeats, absolute_chord_start_mbeat) do
+    attack_mbeats =
+      if absolute_chord_start_mbeat + note.start_mbeat > 0 do
+        frame_mbeats
+      else
+        frame_mbeats * 2
+      end
+
+    attack_mbeats = min(attack_mbeats, note.duration_mbeats)
+    remaining_after_attack = max(note.duration_mbeats - attack_mbeats, 0)
+    decay_mbeats = min(frame_mbeats * 2, remaining_after_attack)
+    hold_mbeats = max(note.duration_mbeats - attack_mbeats - decay_mbeats, 0)
+
+    %LfoEnvelope{
+      start_value: 0.0,
+      peak_value: 127.0,
+      sustain_value: 0.78 * 127.0,
+      end_value: 0.0,
+      attack_mbeats: attack_mbeats * 1.0,
+      decay_mbeats: decay_mbeats * 1.0,
+      hold_mbeats: hold_mbeats * 1.0,
+      release_mbeats: 0.0,
+      interpolation_function: :linear,
+      shift_mbeats: 0.0,
+      anchor: :note
+    }
+  end
+
+  defp dynamic_phase(local_elapsed_mbeats, duration_mbeats, render_context, note) do
+    attack_mbeats =
+      if render_context.common.absolute_chord_start_mbeat + note.start_mbeat > 0 do
+        render_context.common.frame_mbeats
+      else
+        render_context.common.frame_mbeats * 2
+      end
+
+    attack_mbeats = min(attack_mbeats, duration_mbeats)
+    remaining_after_attack = max(duration_mbeats - attack_mbeats, 0)
+    decay_mbeats = min(render_context.common.frame_mbeats * 2, remaining_after_attack)
+
+    cond do
+      local_elapsed_mbeats < attack_mbeats -> :attack
+      local_elapsed_mbeats < attack_mbeats + decay_mbeats -> :decay
+      true -> :sustain
+    end
+  end
+
+  defp apply_to_7bit(baseline_7bit, modulation_value, :add) do
+    normalized = baseline_7bit / 127 + modulation_value
+    clamp_7bit(normalized * 127)
+  end
+
+  defp apply_to_7bit(baseline_7bit, modulation_value, :multiply) do
+    normalized = baseline_7bit / 127 * (1 + modulation_value)
+    clamp_7bit(normalized * 127)
+  end
+
+  defp apply_to_bend(baseline_bend, modulation_value, :add) do
+    clamp_bend(baseline_bend + modulation_value)
+  end
+
+  defp apply_to_bend(baseline_bend, modulation_value, :multiply) do
+    clamp_bend(baseline_bend * (1 + modulation_value))
   end
 
   defp normalize_direction!(:up), do: :up
@@ -548,30 +631,23 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp harmonic_tags_for_degree(_), do: [:tension]
 
   defp clamp_7bit(value), do: value |> round() |> max(0) |> min(127)
+  defp clamp_bend(value), do: value |> max(-1.0) |> min(1.0)
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
-  alias Mensch.Modulation.Lfo
   alias Mensch.Machines.DynamicVoicing
 
   def id(_machine), do: DynamicVoicing.id()
 
   def controls(%DynamicVoicing{params: params}) do
-    lfo_pressure =
-      Lfo.normalize!(Map.get(params, :lfo_pressure), field_name: "dynamic_voicing lfo_pressure")
-
-    lfo_slide =
-      Lfo.normalize!(Map.get(params, :lfo_slide), field_name: "dynamic_voicing lfo_slide")
-
-    lfo_bend =
-      Lfo.normalize!(Map.get(params, :lfo_bend), field_name: "dynamic_voicing lfo_bend")
+    normalized_params = DynamicVoicing.normalize_params(params)
 
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
-      lfo_pressure: lfo_pressure,
-      lfo_slide: lfo_slide,
-      lfo_bend: lfo_bend
+      lfo_pressure: normalized_params.lfo_pressure,
+      lfo_slide: normalized_params.lfo_slide,
+      lfo_bend: normalized_params.lfo_bend
     }
   end
 

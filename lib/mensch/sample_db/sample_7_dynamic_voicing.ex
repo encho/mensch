@@ -3,7 +3,6 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.LfoParams
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
@@ -28,13 +27,15 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 24,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 10.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }
@@ -49,13 +50,15 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 24,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 10.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }
@@ -70,13 +73,15 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 24,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 10.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }
@@ -91,13 +96,15 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 24,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 10.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 10.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }

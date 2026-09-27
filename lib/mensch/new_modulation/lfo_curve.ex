@@ -149,6 +149,10 @@ defmodule Mensch.NewModulation.LfoCurve do
       {"curve", value} -> {:curve, value}
       {"min_value", value} -> {:min_value, value}
       {"max_value", value} -> {:max_value, value}
+      {"scale", value} -> {:scale, value}
+      {:scale, value} -> {:scale, value}
+      {"polarity", value} -> {:polarity, value}
+      {:polarity, value} -> {:polarity, value}
       {"cycles_per_bar", value} -> {:cycles_per_bar, value}
       {"shift_mbeats", value} -> {:shift_mbeats, value}
       {"anchor", value} -> {:anchor, value}
@@ -162,26 +166,31 @@ defmodule Mensch.NewModulation.LfoCurve do
 
   # Backward compatibility for older maps still using scale/polarity.
   defp maybe_apply_legacy_scale_polarity(attrs) do
-    case {Map.get(attrs, :scale), Map.get(attrs, :polarity)} do
-      {nil, _} ->
-        attrs
+    attrs =
+      case {Map.get(attrs, :scale), Map.get(attrs, :polarity)} do
+        {nil, _} ->
+          attrs
 
-      {scale, polarity} when is_integer(scale) or is_float(scale) ->
-        scale_f = if(is_integer(scale), do: scale * 1.0, else: scale)
+        {scale, polarity} when is_integer(scale) or is_float(scale) ->
+          scale_f = if(is_integer(scale), do: scale * 1.0, else: scale)
 
-        {min_value, max_value} =
-          case polarity do
-            :unipolar -> {0.0, scale_f}
-            _ -> {-scale_f, scale_f}
-          end
+          {min_value, max_value} =
+            case polarity do
+              :unipolar -> {0.0, scale_f}
+              _ -> {-scale_f, scale_f}
+            end
 
-        attrs
-        |> Map.put_new(:min_value, min_value)
-        |> Map.put_new(:max_value, max_value)
+          attrs
+          |> Map.put_new(:min_value, min_value)
+          |> Map.put_new(:max_value, max_value)
 
-      _ ->
-        attrs
-    end
+        _ ->
+          attrs
+      end
+
+    attrs
+    |> Map.delete(:scale)
+    |> Map.delete(:polarity)
   end
 end
 

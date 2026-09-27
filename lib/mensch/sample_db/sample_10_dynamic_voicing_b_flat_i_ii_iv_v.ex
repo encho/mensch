@@ -3,7 +3,6 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.LfoParams
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
@@ -30,13 +29,15 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 20.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 20.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }
@@ -51,13 +52,15 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 20.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 20.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }
@@ -72,13 +75,15 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 20.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 20.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }
@@ -93,13 +98,15 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4,
-              lfo_pressure: %LfoParams{
-                curve: :sine,
-                scale: 0.25,
-                cycles_per_bar: 20.0,
-                shift_mbeats: 0.0,
-                time_base: :sample,
-                mode: :additive
+              lfo_pressure: %{
+                lfo: %{
+                  curve: :sine,
+                  scale: 0.25,
+                  cycles_per_bar: 20.0,
+                  shift_mbeats: 0.0,
+                  time_base: :sample
+                },
+                mode: :add
               }
             }
           }

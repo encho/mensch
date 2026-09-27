@@ -12,32 +12,39 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     so `4` means four visible states per leg. Must be >= 2 in cycle modes.
     If requested voicings do not fit the chord duration frame budget,
     validation fails with an error.
-  * `lfo_pressure`: Pressure LFO settings.
-  * `lfo_slide`: Slide (CC74) LFO settings. Applied additively to the
-    baseline slide value using a unipolar waveform (never below 0).
-  * `lfo_bend`: Bend LFO settings. Applied additively to the baseline bend
-    value (0.0). Supports bipolar polarity for signed modulation.
+  * `lfo_pressure`: Pressure modulation lane config represented as
+    `%{lfo: lfo_term, mode: :add | :multiply}`.
+    DynamicVoicing first computes a per-note pressure baseline using
+    `LfoEnvelope`, then applies this lane to that baseline.
+  * `lfo_slide`: Slide (CC74) modulation lane config represented as
+    `%{lfo: lfo_term, mode: :add | :multiply}`.
+  * `lfo_bend`: Bend modulation lane config represented as
+    `%{lfo: lfo_term, mode: :add | :multiply}`.
   """
 
-  alias Mensch.LfoParams
+  alias Mensch.NewModulation
+  alias Mensch.NewModulation.LfoCurve
+  alias Mensch.NewModulation.LfoGroup
 
   @type direction :: :up | :down | {:cycle_up, pos_integer()} | {:cycle_down, pos_integer()}
+
+  @type modulation_lane :: NewModulation.lfo_pressure()
 
   @type t :: %__MODULE__{
           direction: direction(),
           number_of_inversions: pos_integer(),
-          lfo_pressure: LfoParams.t(),
-          lfo_slide: LfoParams.t(),
-          lfo_bend: LfoParams.t()
+          lfo_pressure: modulation_lane(),
+          lfo_slide: modulation_lane(),
+          lfo_bend: modulation_lane()
         }
 
   @enforce_keys [:direction, :number_of_inversions]
   defstruct [
     :direction,
     :number_of_inversions,
-    lfo_pressure: %LfoParams{},
-    lfo_slide: %LfoParams{},
-    lfo_bend: %LfoParams{}
+    lfo_pressure: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add},
+    lfo_slide: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add},
+    lfo_bend: %{lfo: %LfoGroup{initial: %LfoCurve{}}, mode: :add}
   ]
 
   @doc "Default parameters for the dynamic voicing machine."
@@ -46,9 +53,9 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     %__MODULE__{
       direction: :up,
       number_of_inversions: 4,
-      lfo_pressure: LfoParams.default(),
-      lfo_slide: LfoParams.default(),
-      lfo_bend: LfoParams.default()
+      lfo_pressure: %{lfo: LfoGroup.default(), mode: :add},
+      lfo_slide: %{lfo: LfoGroup.default(), mode: :add},
+      lfo_bend: %{lfo: LfoGroup.default(), mode: :add}
     }
   end
 end

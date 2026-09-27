@@ -77,4 +77,6 @@ Implications:
 - `RootNote`: one root note, pressure baseline fixed to `0`; pressure comes
   from `lfo_pressure` modulation.
 - `DynamicVoicing`: inversion-transition lifecycles with per-note
-  `duration_mbeats` carried in `NotePlanItem`.
+  `duration_mbeats` carried in `NotePlanItem`; pressure baseline is generated
+  from a per-note envelope (`LfoEnvelope`) and then combined with lane
+  modulation (`lfo_pressure`, `lfo_slide`, `lfo_bend`).

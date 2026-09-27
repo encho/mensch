@@ -3,39 +3,44 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.LfoParams
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
-  @lfo_slide %LfoParams{
-    curve: :sine,
-    scale: 1,
-    cycles_per_bar: 6.0,
-    shift_mbeats: 0.0,
-    polarity: :unipolar,
-    time_base: :note,
-    mode: :additive
+  @lfo_slide %{
+    lfo: %{
+      curve: :sine,
+      scale: 1,
+      cycles_per_bar: 6.0,
+      shift_mbeats: 0.0,
+      polarity: :unipolar,
+      time_base: :note
+    },
+    mode: :add
   }
 
-  @lfo_bend %LfoParams{
-    curve: :sine,
-    scale: 0.001,
-    cycles_per_bar: 3.0,
-    shift_mbeats: 0.0,
-    polarity: :bipolar,
-    time_base: :note,
-    mode: :additive
+  @lfo_bend %{
+    lfo: %{
+      curve: :sine,
+      scale: 0.001,
+      cycles_per_bar: 3.0,
+      shift_mbeats: 0.0,
+      polarity: :bipolar,
+      time_base: :note
+    },
+    mode: :add
   }
 
-  @lfo_pressure %LfoParams{
-    curve: :sine,
-    scale: 5,
-    cycles_per_bar: 10.0,
-    shift_mbeats: 0.0,
-    time_base: :sample,
-    mode: :additive
+  @lfo_pressure %{
+    lfo: %{
+      curve: :sine,
+      scale: 5,
+      cycles_per_bar: 10.0,
+      shift_mbeats: 0.0,
+      time_base: :sample
+    },
+    mode: :add
   }
 
   @spec sample(pos_integer()) :: map()

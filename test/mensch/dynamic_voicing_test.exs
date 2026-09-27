@@ -3,7 +3,6 @@ defmodule Mensch.DynamicVoicingTest do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.LfoParams
   alias Mensch.Machine
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
@@ -163,20 +162,22 @@ defmodule Mensch.DynamicVoicingTest do
     additive_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :square,
-          scale: 1.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :chord,
-          mode: :additive
+          lfo: %{
+            curve: :square,
+            scale: 1.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :chord
+          },
+          mode: :add
         }
       })
 
     baseline = pressures_by_at_mbeat(baseline_machine)
     additive = pressures_by_at_mbeat(additive_machine)
 
-    assert additive[1000] == expected_lfo_pressure(baseline[1000], 1.0, :additive, 1.0)
-    assert additive[3000] == expected_lfo_pressure(baseline[3000], -1.0, :additive, 1.0)
+    assert additive[1000] == expected_lfo_pressure(baseline[1000], 1.0, :add, 1.0)
+    assert additive[3000] == expected_lfo_pressure(baseline[3000], -1.0, :add, 1.0)
   end
 
   test "pressure LFO multiplicative mode applies direct 7-bit modulation" do
@@ -185,12 +186,14 @@ defmodule Mensch.DynamicVoicingTest do
     multiplicative_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :square,
-          scale: 1.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :chord,
-          mode: :multiplicative
+          lfo: %{
+            curve: :square,
+            scale: 1.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :chord
+          },
+          mode: :multiply
         }
       })
 
@@ -198,10 +201,10 @@ defmodule Mensch.DynamicVoicingTest do
     multiplicative = pressures_by_at_mbeat(multiplicative_machine)
 
     assert multiplicative[1000] ==
-             expected_lfo_pressure(baseline[1000], 1.0, :multiplicative, 1.0)
+             expected_lfo_pressure(baseline[1000], 1.0, :multiply, 1.0)
 
     assert multiplicative[3000] ==
-             expected_lfo_pressure(baseline[3000], -1.0, :multiplicative, 1.0)
+             expected_lfo_pressure(baseline[3000], -1.0, :multiply, 1.0)
   end
 
   test "pressure LFO cycles-per-bar changes waveform speed" do
@@ -210,24 +213,28 @@ defmodule Mensch.DynamicVoicingTest do
     one_cycle_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :saw_up,
-          scale: 4.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :chord,
-          mode: :additive
+          lfo: %{
+            curve: :saw_up,
+            scale: 4.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :chord
+          },
+          mode: :add
         }
       })
 
     two_cycle_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :saw_up,
-          scale: 4.0,
-          cycles_per_bar: 2.0,
-          shift_mbeats: 0.0,
-          time_base: :chord,
-          mode: :additive
+          lfo: %{
+            curve: :saw_up,
+            scale: 4.0,
+            cycles_per_bar: 2.0,
+            shift_mbeats: 0.0,
+            time_base: :chord
+          },
+          mode: :add
         }
       })
 
@@ -235,8 +242,8 @@ defmodule Mensch.DynamicVoicingTest do
     one_cycle = pressures_by_at_mbeat(one_cycle_machine)
     two_cycle = pressures_by_at_mbeat(two_cycle_machine)
 
-    assert one_cycle[3000] == expected_lfo_pressure(baseline[3000], 0.75, :additive, 4.0)
-    assert two_cycle[3000] == expected_lfo_pressure(baseline[3000], 0.5, :additive, 4.0)
+    assert one_cycle[3000] == expected_lfo_pressure(baseline[3000], 0.75, :add, 4.0)
+    assert two_cycle[3000] == expected_lfo_pressure(baseline[3000], 0.5, :add, 4.0)
     refute one_cycle[3000] == two_cycle[3000]
   end
 
@@ -246,24 +253,28 @@ defmodule Mensch.DynamicVoicingTest do
     unshifted_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :saw_up,
-          scale: 3.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :chord,
-          mode: :additive
+          lfo: %{
+            curve: :saw_up,
+            scale: 3.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :chord
+          },
+          mode: :add
         }
       })
 
     shifted_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :saw_up,
-          scale: 3.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 1000.0,
-          time_base: :chord,
-          mode: :additive
+          lfo: %{
+            curve: :saw_up,
+            scale: 3.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 1000.0,
+            time_base: :chord
+          },
+          mode: :add
         }
       })
 
@@ -271,8 +282,8 @@ defmodule Mensch.DynamicVoicingTest do
     unshifted = pressures_by_at_mbeat(unshifted_machine)
     shifted = pressures_by_at_mbeat(shifted_machine)
 
-    assert unshifted[3000] == expected_lfo_pressure(baseline[3000], 0.75, :additive, 3.0)
-    assert shifted[3000] == expected_lfo_pressure(baseline[3000], 0.0, :additive, 3.0)
+    assert unshifted[3000] == expected_lfo_pressure(baseline[3000], 0.75, :add, 3.0)
+    assert shifted[3000] == expected_lfo_pressure(baseline[3000], 0.0, :add, 3.0)
     refute shifted[3000] == unshifted[3000]
   end
 
@@ -282,24 +293,28 @@ defmodule Mensch.DynamicVoicingTest do
     absolute_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :saw_up,
-          scale: 3.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :sample,
-          mode: :additive
+          lfo: %{
+            curve: :saw_up,
+            scale: 3.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :sample
+          },
+          mode: :add
         }
       })
 
     chord_machine =
       lfo_machine(%{
         lfo_pressure: %{
-          curve: :saw_up,
-          scale: 3.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :chord,
-          mode: :additive
+          lfo: %{
+            curve: :saw_up,
+            scale: 3.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :chord
+          },
+          mode: :add
         }
       })
 
@@ -308,10 +323,10 @@ defmodule Mensch.DynamicVoicingTest do
     chord_with_start_offset = pressures_by_at_mbeat(chord_machine, 1000)
 
     assert absolute_with_start_offset[3000] ==
-             expected_lfo_pressure(baseline[3000], 0.0, :additive, 3.0)
+             expected_lfo_pressure(baseline[3000], 0.0, :add, 3.0)
 
     assert chord_with_start_offset[3000] ==
-             expected_lfo_pressure(baseline[3000], 0.75, :additive, 3.0)
+             expected_lfo_pressure(baseline[3000], 0.75, :add, 3.0)
 
     refute absolute_with_start_offset[3000] == chord_with_start_offset[3000]
   end
@@ -322,7 +337,7 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{scale: 0.0}
+          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add}
         }
       }
 
@@ -356,15 +371,17 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{scale: 0.0},
+          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add},
           lfo_slide: %{
-            curve: :square,
-            scale: 0.5,
-            cycles_per_bar: 1.0,
-            shift_mbeats: 0.0,
-            polarity: :unipolar,
-            time_base: :chord,
-            mode: :additive
+            lfo: %{
+              curve: :square,
+              scale: 0.5,
+              cycles_per_bar: 1.0,
+              shift_mbeats: 0.0,
+              polarity: :unipolar,
+              time_base: :chord
+            },
+            mode: :add
           }
         }
       }
@@ -410,7 +427,7 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{scale: 0.0}
+          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add}
         }
       }
 
@@ -444,15 +461,17 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{scale: 0.0},
+          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add},
           lfo_bend: %{
-            curve: :square,
-            scale: 0.5,
-            cycles_per_bar: 1.0,
-            shift_mbeats: 0.0,
-            polarity: :bipolar,
-            time_base: :chord,
-            mode: :additive
+            lfo: %{
+              curve: :square,
+              scale: 0.5,
+              cycles_per_bar: 1.0,
+              shift_mbeats: 0.0,
+              polarity: :bipolar,
+              time_base: :chord
+            },
+            mode: :add
           }
         }
       }
@@ -493,7 +512,7 @@ defmodule Mensch.DynamicVoicingTest do
   end
 
   defp baseline_lfo_machine do
-    lfo_machine(%{lfo_pressure: %{scale: 0.0}})
+    lfo_machine(%{lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add}})
   end
 
   defp lfo_machine(overrides) do
@@ -501,21 +520,28 @@ defmodule Mensch.DynamicVoicingTest do
       %DynamicVoicingParams{
         direction: :up,
         number_of_inversions: 1,
-        lfo_pressure: %LfoParams{
-          curve: :sine,
-          scale: 0.0,
-          cycles_per_bar: 1.0,
-          shift_mbeats: 0.0,
-          time_base: :sample,
-          mode: :additive
+        lfo_pressure: %{
+          lfo: %{
+            curve: :sine,
+            scale: 0.0,
+            cycles_per_bar: 1.0,
+            shift_mbeats: 0.0,
+            time_base: :sample
+          },
+          mode: :add
         }
       }
 
     merged_lfo_pressure =
-      base_params.lfo_pressure
-      |> Map.from_struct()
-      |> Map.merge(Map.get(overrides, :lfo_pressure, %{}))
-      |> then(&struct!(LfoParams, &1))
+      Map.merge(base_params.lfo_pressure, Map.get(overrides, :lfo_pressure, %{}))
+
+    merged_lfo =
+      Map.merge(
+        Map.get(base_params.lfo_pressure, :lfo, %{}),
+        Map.get(merged_lfo_pressure, :lfo, %{})
+      )
+
+    merged_lfo_pressure = Map.put(merged_lfo_pressure, :lfo, merged_lfo)
 
     params =
       base_params
@@ -527,12 +553,19 @@ defmodule Mensch.DynamicVoicingTest do
   end
 
   defp expected_lfo_pressure(base_pressure, lfo_norm, mode, scale) do
-    _ = mode
+    case mode do
+      :add ->
+        (base_pressure + lfo_norm * scale)
+        |> round()
+        |> min(127)
+        |> max(0)
 
-    (base_pressure + lfo_norm * scale)
-    |> round()
-    |> min(127)
-    |> max(0)
+      :multiply ->
+        (base_pressure * (1 + lfo_norm * scale))
+        |> round()
+        |> min(127)
+        |> max(0)
+    end
   end
 
   defp transition_note_ons_by_mbeat(frames) do
