@@ -18,7 +18,12 @@ defmodule Mensch.Player do
 
   alias Mensch.Midi.Connection
 
-  defstruct status: :stopped, ref: nil, active: MapSet.new()
+  defstruct status: :stopped,
+            ref: nil,
+            active: MapSet.new(),
+            pending_frames: [],
+            next_timer_ref: nil,
+            last_frame_at_ms: nil
 
   # Client API
 
@@ -61,38 +66,86 @@ defmodule Mensch.Player do
 
   @impl true
   def handle_call({:play, data}, _from, state) do
+    state = normalize_state(state)
     state = stop_all(state)
     ref = make_ref()
+    frames = normalize_frames(data.frames)
 
-    Enum.each(data.frames, fn frame ->
-      Process.send_after(self(), {:frame, ref, frame.notes}, frame.at_ms)
-    end)
+    state =
+      %{
+        state
+        | status: :playing,
+          ref: ref,
+          pending_frames: frames,
+          next_timer_ref: nil,
+          last_frame_at_ms: nil
+      }
+      |> schedule_next_dispatch()
 
-    Process.send_after(self(), {:done, ref}, data.duration_ms + data.granularity_ms)
-
-    {:reply, :ok, %{state | status: :playing, ref: ref}}
+    {:reply, :ok, state}
   end
 
   def handle_call(:stop, _from, state) do
+    state = normalize_state(state)
     state = panic_all(state)
     schedule_panic_retries(state.ref)
     {:reply, :ok, state}
   end
 
   def handle_call(:panic, _from, state) do
+    state = normalize_state(state)
     state = panic_all(state)
     schedule_panic_retries(state.ref)
     {:reply, :ok, state}
   end
 
   def handle_call(:status, _from, state) do
+    state = normalize_state(state)
     {:reply, state.status, state}
   end
 
   @impl true
-  def handle_info({:frame, ref, notes}, %{ref: ref} = state) do
+  def handle_info(
+        {:dispatch_frame, ref},
+        %{ref: ref, status: :playing, pending_frames: [frame | rest]} = state
+      ) do
+    state = normalize_state(state)
+
+    state =
+      apply_frame(frame, state)
+      |> Map.put(:pending_frames, rest)
+      |> Map.put(:next_timer_ref, nil)
+      |> Map.put(:last_frame_at_ms, frame.at_ms)
+
+    case rest do
+      [] ->
+        {:noreply,
+         %{
+           state
+           | status: :stopped,
+             last_frame_at_ms: nil
+         }}
+
+      _ ->
+        {:noreply, schedule_next_dispatch(state)}
+    end
+  end
+
+  def handle_info({:dispatch_frame, _ref}, state), do: {:noreply, state}
+
+  def handle_info({:panic_retry, ref, retries_left}, %{ref: ref} = state)
+      when is_integer(retries_left) and retries_left > 0 do
+    state = normalize_state(state)
+    panic_burst(target_channels(state))
+    Process.send_after(self(), {:panic_retry, ref, retries_left - 1}, 30)
+    {:noreply, state}
+  end
+
+  def handle_info({:panic_retry, _ref, _retries_left}, state), do: {:noreply, state}
+
+  defp apply_frame(frame, state) do
     active =
-      Enum.reduce(notes, state.active, fn note, active ->
+      Enum.reduce(frame.notes, state.active, fn note, active ->
         note_id = {note.channel, note.midi_note}
 
         send_frame(note)
@@ -102,45 +155,44 @@ defmodule Mensch.Player do
         |> maybe_remove_active(note_id, note.note_off)
       end)
 
-    {:noreply, %{state | active: active}}
+    %{state | active: active}
   end
-
-  # A stale frame from a performance we've already stopped/replaced - ignore.
-  def handle_info({:frame, _ref, _notes}, state), do: {:noreply, state}
-
-  def handle_info({:done, ref}, %{ref: ref} = state) do
-    {:noreply, %{state | status: :stopped}}
-  end
-
-  def handle_info({:done, _ref}, state), do: {:noreply, state}
-
-  def handle_info({:panic_retry, ref, retries_left}, %{ref: ref} = state)
-      when is_integer(retries_left) and retries_left > 0 do
-    panic_burst(target_channels(state))
-    Process.send_after(self(), {:panic_retry, ref, retries_left - 1}, 30)
-    {:noreply, state}
-  end
-
-  def handle_info({:panic_retry, _ref, _retries_left}, state), do: {:noreply, state}
 
   defp send_frame(note) do
-    if note.note_on do
-      Connection.send_message(<<0x90 + note.channel, note.midi_note, note.note_on_velocity>>)
-    end
+    messages =
+      []
+      |> maybe_append_modulation(note)
+      |> maybe_append_note_on(note)
+      |> maybe_append_note_off(note)
 
-    if not note.note_off do
-      Connection.send_message(<<0xD0 + note.channel, note.pressure>>)
-
-      bend = (8192 + note.bend * 8192) |> round() |> max(0) |> min(16_383)
-      Connection.send_message(<<0xE0 + note.channel, rem(bend, 128), div(bend, 128)>>)
-
-      Connection.send_message(<<0xB0 + note.channel, 74, note.slide>>)
-    end
-
-    if note.note_off do
-      Connection.send_message(<<0x80 + note.channel, note.midi_note, 0>>)
-    end
+    Connection.send_messages(messages)
   end
+
+  defp maybe_append_note_on(messages, %{note_on: true} = note) do
+    messages ++ [<<0x90 + note.channel, note.midi_note, note.note_on_velocity>>]
+  end
+
+  defp maybe_append_note_on(messages, _note), do: messages
+
+  defp maybe_append_modulation(messages, %{note_off: true}), do: messages
+
+  defp maybe_append_modulation(messages, note) do
+    bend = (8192 + note.bend * 8192) |> round() |> max(0) |> min(16_383)
+    pressure = effective_pressure(note)
+
+    messages ++
+      [
+        <<0xD0 + note.channel, pressure>>,
+        <<0xE0 + note.channel, rem(bend, 128), div(bend, 128)>>,
+        <<0xB0 + note.channel, 74, note.slide>>
+      ]
+  end
+
+  defp maybe_append_note_off(messages, %{note_off: true} = note) do
+    messages ++ [<<0x80 + note.channel, note.midi_note, 0>>]
+  end
+
+  defp maybe_append_note_off(messages, _note), do: messages
 
   defp maybe_add_active(active, note_id, true), do: MapSet.put(active, note_id)
   defp maybe_add_active(active, _note_id, false), do: active
@@ -152,40 +204,76 @@ defmodule Mensch.Player do
   # already-scheduled frames from whatever was playing before (they'll
   # arrive tagged with the old `ref` and be ignored).
   defp stop_all(state) do
-    Enum.each(state.active, fn {channel, note} ->
-      Connection.send_message(<<0x80 + channel, note, 0>>)
-    end)
+    cancel_timer(state.next_timer_ref)
 
-    %{state | status: :stopped, ref: make_ref(), active: MapSet.new()}
+    messages =
+      Enum.flat_map(state.active, fn {channel, note} ->
+        [
+          <<0x80 + channel, note, 0>>,
+          <<0x90 + channel, note, 0>>
+        ]
+      end)
+
+    Connection.send_messages(messages)
+
+    %{
+      state
+      | status: :stopped,
+        ref: make_ref(),
+        active: MapSet.new(),
+        pending_frames: [],
+        next_timer_ref: nil,
+        last_frame_at_ms: nil
+    }
   end
 
   defp panic_all(state) do
+    cancel_timer(state.next_timer_ref)
     channels = target_channels(state)
     panic_burst(channels)
 
-    %{state | status: :stopped, ref: make_ref(), active: MapSet.new()}
+    %{
+      state
+      | status: :stopped,
+        ref: make_ref(),
+        active: MapSet.new(),
+        pending_frames: [],
+        next_timer_ref: nil,
+        last_frame_at_ms: nil
+    }
   end
 
   defp panic_burst(channels) do
-    Enum.each(channels, fn channel ->
-      # Channel pressure zero prevents hanging expression after note-off.
-      Connection.send_message(<<0xD0 + channel, 0>>)
-      # Reset pitch bend to center.
-      Connection.send_message(<<0xE0 + channel, 0, 64>>)
-      # Reset timbre/slide controller.
-      Connection.send_message(<<0xB0 + channel, 74, 0>>)
-      # Sustain off.
-      Connection.send_message(<<0xB0 + channel, 64, 0>>)
-      # Reset all controllers.
-      Connection.send_message(<<0xB0 + channel, 121, 0>>)
-      # Panic CCs: all sound off + all notes off.
-      Connection.send_message(<<0xB0 + channel, 120, 0>>)
-      Connection.send_message(<<0xB0 + channel, 123, 0>>)
+    messages =
+      Enum.flat_map(channels, fn channel ->
+        controller_resets = [
+          # Channel pressure zero prevents hanging expression after note-off.
+          <<0xD0 + channel, 0>>,
+          # Reset pitch bend to center.
+          <<0xE0 + channel, 0, 64>>,
+          # Reset timbre/slide controller.
+          <<0xB0 + channel, 74, 0>>,
+          # Sustain off.
+          <<0xB0 + channel, 64, 0>>,
+          # Reset all controllers.
+          <<0xB0 + channel, 121, 0>>,
+          # Panic CCs: all sound off + all notes off.
+          <<0xB0 + channel, 120, 0>>,
+          <<0xB0 + channel, 123, 0>>
+        ]
 
-      Enum.each(0..127, fn note ->
-        Connection.send_message(<<0x80 + channel, note, 0>>)
+        note_offs =
+          Enum.flat_map(0..127, fn note ->
+            [
+              <<0x80 + channel, note, 0>>,
+              <<0x90 + channel, note, 0>>
+            ]
+          end)
+
+        controller_resets ++ note_offs
       end)
-    end)
+
+    Connection.send_messages(messages)
   end
 
   defp schedule_panic_retries(ref) do
@@ -205,5 +293,61 @@ defmodule Mensch.Player do
       |> MapSet.union(active_channels)
 
     MapSet.to_list(target_channels)
+  end
+
+  defp cancel_timer(nil), do: :ok
+
+  defp cancel_timer(timer_ref) do
+    _ = Process.cancel_timer(timer_ref)
+    :ok
+  end
+
+  defp schedule_next_dispatch(
+         %{status: :playing, ref: ref, pending_frames: [next_frame | _]} = state
+       ) do
+    delay_ms =
+      case state.last_frame_at_ms do
+        nil -> 0
+        last_frame_at_ms -> max(next_frame.at_ms - last_frame_at_ms, 0)
+      end
+
+    next_timer_ref = Process.send_after(self(), {:dispatch_frame, ref}, delay_ms)
+    %{state | next_timer_ref: next_timer_ref}
+  end
+
+  defp schedule_next_dispatch(state), do: state
+
+  defp normalize_frames(frames) when is_list(frames) do
+    Enum.sort_by(frames, & &1.at_ms)
+  end
+
+  defp normalize_frames(_frames), do: []
+
+  # Some pressure-driven synths need a non-zero pressure value at note-on
+  # time to reliably start sound.
+  defp effective_pressure(%{note_on: true, pressure: pressure}) when pressure <= 0, do: 1
+  defp effective_pressure(note), do: note.pressure
+
+  # During hot code reload, an existing process may still hold an older
+  # struct shape. Normalize to the current struct keys before updates.
+  defp normalize_state(state) do
+    state_map =
+      cond do
+        is_struct(state) ->
+          Map.from_struct(state)
+
+        is_map(state) ->
+          Map.delete(state, :__struct__)
+
+        true ->
+          %{}
+      end
+
+    merged =
+      %__MODULE__{}
+      |> Map.from_struct()
+      |> Map.merge(state_map)
+
+    struct!(__MODULE__, merged)
   end
 end

@@ -26,7 +26,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24
+              number_of_inversions: 6
             }
           }
         },
@@ -39,7 +39,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24
+              number_of_inversions: 6
             }
           }
         },
@@ -52,7 +52,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24
+              number_of_inversions: 6
             }
           }
         },
@@ -65,7 +65,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 24
+              number_of_inversions: 6
             }
           }
         }

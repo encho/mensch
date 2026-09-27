@@ -52,7 +52,13 @@ defmodule Mensch.Midi.Connection do
   @doc "Sends a raw MIDI message (binary) to the connected output device."
   @spec send_message(binary()) :: :ok | {:error, :disconnected}
   def send_message(bytes) when is_binary(bytes) do
-    GenServer.call(__MODULE__, {:send, bytes})
+    send_messages([bytes])
+  end
+
+  @doc "Sends multiple raw MIDI messages to the connected output device."
+  @spec send_messages([binary()]) :: :ok | {:error, :disconnected}
+  def send_messages(messages) when is_list(messages) do
+    GenServer.call(__MODULE__, {:send_many, messages})
   end
 
   @doc "Returns `{:connected, port_name}` or `:disconnected`."
@@ -80,6 +86,18 @@ defmodule Mensch.Midi.Connection do
 
   def handle_call({:send, bytes}, _from, %__MODULE__{out_conn: out_conn} = state) do
     Midiex.send_msg(out_conn, bytes)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:send_many, _messages}, _from, %__MODULE__{out_conn: nil} = state) do
+    {:reply, {:error, :disconnected}, state}
+  end
+
+  def handle_call({:send_many, messages}, _from, %__MODULE__{out_conn: out_conn} = state) do
+    Enum.each(messages, fn bytes ->
+      Midiex.send_msg(out_conn, bytes)
+    end)
+
     {:reply, :ok, state}
   end
 
