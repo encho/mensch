@@ -6,6 +6,9 @@ defmodule Mensch.DynamicVoicingTest do
   alias Mensch.Machine
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
+  alias Mensch.Modulation.LfoCurve
+  alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoSaw
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -337,7 +340,7 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add}
+          lfo_pressure: %{lfo: zero_lfo_group(), mode: :add}
         }
       }
 
@@ -371,16 +374,9 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add},
+          lfo_pressure: %{lfo: zero_lfo_group(), mode: :add},
           lfo_slide: %{
-            lfo: %{
-              curve: :square,
-              scale: 0.5,
-              cycles_per_bar: 1.0,
-              shift_mbeats: 0.0,
-              polarity: :unipolar,
-              time_base: :chord
-            },
+            lfo: curve_group(:square, 0.0, 0.5, 1.0, 0.0, :chord),
             mode: :add
           }
         }
@@ -427,7 +423,7 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add}
+          lfo_pressure: %{lfo: zero_lfo_group(), mode: :add}
         }
       }
 
@@ -461,16 +457,9 @@ defmodule Mensch.DynamicVoicingTest do
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 1,
-          lfo_pressure: %{lfo: %{scale: 0.0}, mode: :add},
+          lfo_pressure: %{lfo: zero_lfo_group(), mode: :add},
           lfo_bend: %{
-            lfo: %{
-              curve: :square,
-              scale: 0.5,
-              cycles_per_bar: 1.0,
-              shift_mbeats: 0.0,
-              polarity: :bipolar,
-              time_base: :chord
-            },
+            lfo: curve_group(:square, -0.5, 0.5, 1.0, 0.0, :chord),
             mode: :add
           }
         }
@@ -521,13 +510,7 @@ defmodule Mensch.DynamicVoicingTest do
         direction: :up,
         number_of_inversions: 1,
         lfo_pressure: %{
-          lfo: %{
-            curve: :sine,
-            scale: 0.0,
-            cycles_per_bar: 1.0,
-            shift_mbeats: 0.0,
-            time_base: :sample
-          },
+          lfo: zero_lfo_group(),
           mode: :add
         }
       }
@@ -536,9 +519,9 @@ defmodule Mensch.DynamicVoicingTest do
       Map.merge(base_params.lfo_pressure, Map.get(overrides, :lfo_pressure, %{}))
 
     merged_lfo =
-      Map.merge(
-        Map.get(base_params.lfo_pressure, :lfo, %{}),
-        Map.get(merged_lfo_pressure, :lfo, %{})
+      merge_lfo_term(
+        Map.get(base_params.lfo_pressure, :lfo),
+        Map.get(merged_lfo_pressure, :lfo)
       )
 
     merged_lfo_pressure = Map.put(merged_lfo_pressure, :lfo, merged_lfo)
@@ -550,6 +533,100 @@ defmodule Mensch.DynamicVoicingTest do
       |> Map.put(:lfo_pressure, merged_lfo_pressure)
 
     %DynamicVoicing{params: struct!(DynamicVoicingParams, params)}
+  end
+
+  defp merge_lfo_term(base_lfo, nil), do: base_lfo
+
+  defp merge_lfo_term(base_lfo, override_lfo) when is_map(override_lfo) do
+    if typed_lfo_struct?(override_lfo) do
+      override_lfo
+    else
+      base_curve = lfo_curve_from_term(base_lfo)
+
+      curve = Map.get(override_lfo, :curve, base_curve.curve)
+      cycles_per_bar = Map.get(override_lfo, :cycles_per_bar, base_curve.cycles_per_bar)
+      shift_mbeats = Map.get(override_lfo, :shift_mbeats, base_curve.shift_mbeats)
+
+      anchor =
+        Map.get(override_lfo, :time_base, Map.get(override_lfo, :anchor, base_curve.anchor))
+
+      curve = normalize_curve(curve)
+
+      {min_value, max_value} =
+        case Map.fetch(override_lfo, :scale) do
+          {:ok, scale} ->
+            scale = scale * 1.0
+
+            case Map.get(override_lfo, :polarity, :bipolar) do
+              :unipolar -> {0.0, scale}
+              _ -> {-scale, scale}
+            end
+
+          :error ->
+            {
+              Map.get(override_lfo, :min_value, base_curve.min_value),
+              Map.get(override_lfo, :max_value, base_curve.max_value)
+            }
+        end
+
+      case curve do
+        saw when saw in [:saw, :saw_up, :saw_down] ->
+          peak_value = max(abs(min_value), abs(max_value))
+
+          polarity =
+            if min_value == 0.0 and max_value >= 0.0, do: :unipolar, else: :bipolar
+
+          saw_group(curve, peak_value, cycles_per_bar, shift_mbeats, polarity, anchor)
+
+        _ ->
+          curve_group(curve, min_value, max_value, cycles_per_bar, shift_mbeats, anchor)
+      end
+    end
+  end
+
+  defp typed_lfo_struct?(%LfoGroup{}), do: true
+  defp typed_lfo_struct?(%LfoCurve{}), do: true
+  defp typed_lfo_struct?(%LfoSaw{}), do: true
+  defp typed_lfo_struct?(_), do: false
+
+  defp lfo_curve_from_term(%LfoGroup{initial: %LfoCurve{} = curve}), do: curve
+  defp lfo_curve_from_term(%LfoGroup{initial: %LfoSaw{}}), do: LfoCurve.default()
+  defp lfo_curve_from_term(%LfoCurve{} = curve), do: curve
+
+  defp curve_group(curve, min_value, max_value, cycles_per_bar, shift_mbeats, anchor) do
+    %LfoGroup{
+      initial: %LfoCurve{
+        curve: curve,
+        min_value: min_value * 1.0,
+        max_value: max_value * 1.0,
+        cycles_per_bar: cycles_per_bar * 1.0,
+        shift_mbeats: shift_mbeats * 1.0,
+        anchor: anchor
+      },
+      operations: []
+    }
+  end
+
+  defp saw_group(curve, peak_value, cycles_per_bar, shift_mbeats, polarity, anchor) do
+    %LfoGroup{
+      initial: %LfoSaw{
+        curve: curve,
+        peak_value: peak_value * 1.0,
+        cycles_per_bar: cycles_per_bar * 1.0,
+        shift_mbeats: shift_mbeats * 1.0,
+        polarity: polarity,
+        anchor: anchor,
+        drop_phase: 1.0
+      },
+      operations: []
+    }
+  end
+
+  defp normalize_curve(:saw), do: :saw_up
+  defp normalize_curve(curve), do: curve
+
+  defp zero_lfo_group do
+    curve_group(:sine, 0.0, 0.0, 1.0, 0.0, :sample)
   end
 
   defp expected_lfo_pressure(base_pressure, lfo_norm, mode, scale) do
