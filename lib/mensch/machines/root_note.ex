@@ -77,9 +77,6 @@ defmodule Mensch.Machines.RootNote do
   @spec build_note_plan(t(), ChordSpec.t(), RenderContext.t()) :: [NotePlanItem.t()]
   def build_note_plan(%__MODULE__{}, %ChordSpec{} = chord_spec, %RenderContext{} = render_context) do
     root_midi_note = root_midi_note!(chord_spec, render_context.params.octave_offset)
-    pressure_lane = render_context.params.lfo_pressure
-    sample_context = render_context.common.sample_context
-    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
 
     {note_name, octave} = ChordSpec.note_name(root_midi_note)
 
@@ -100,23 +97,32 @@ defmodule Mensch.Machines.RootNote do
         start_mbeat: render_context.common.chord_start_mbeat,
         duration_mbeats: render_context.common.chord_duration_mbeats
       })
-      |> NotePlanItem.with_modulators(%{
-        pressure_modulator: fn at_mbeat, local_elapsed_mbeats ->
-          pressure_lfo_value =
-            Lfo.evaluate(
-              pressure_lane.lfo,
-              at_mbeat,
-              sample_context,
-              absolute_chord_start_mbeat,
-              local_elapsed_mbeats
-            )
-
-          Modulation.apply_to_pressure(0, pressure_lfo_value, pressure_lane.mode)
-        end,
-        slide_modulator: fn _at_mbeat, _local_elapsed_mbeats -> 0 end,
-        bend_modulator: fn _at_mbeat, _local_elapsed_mbeats -> 0.0 end
-      })
     ]
+  end
+
+  @impl Pipeline
+  @spec with_note_modulators(NotePlanItem.t(), RenderContext.t()) :: NotePlanItem.t()
+  def with_note_modulators(%NotePlanItem{} = note, %RenderContext{} = render_context) do
+    pressure_lane = render_context.params.lfo_pressure
+    sample_context = render_context.common.sample_context
+    absolute_chord_start_mbeat = render_context.common.absolute_chord_start_mbeat
+
+    NotePlanItem.with_modulators(note, %{
+      pressure_modulator: fn at_mbeat, local_elapsed_mbeats ->
+        pressure_lfo_value =
+          Lfo.evaluate(
+            pressure_lane.lfo,
+            at_mbeat,
+            sample_context,
+            absolute_chord_start_mbeat,
+            local_elapsed_mbeats
+          )
+
+        Modulation.apply_to_pressure(0, pressure_lfo_value, pressure_lane.mode)
+      end,
+      slide_modulator: fn _at_mbeat, _local_elapsed_mbeats -> 0 end,
+      bend_modulator: fn _at_mbeat, _local_elapsed_mbeats -> 0.0 end
+    })
   end
 
   @doc false

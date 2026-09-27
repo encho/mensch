@@ -131,14 +131,11 @@ defmodule Mensch.Machines.DynamicVoicing do
       )
 
     build_dynamic_note_plan(voicings, slot_boundaries)
-    |> attach_modulators(render_context)
   end
 
-  defp attach_modulators(note_plan, %RenderContext{} = render_context) do
-    Enum.map(note_plan, &with_note_modulators(&1, render_context))
-  end
-
-  defp with_note_modulators(%NotePlanItem{} = note, %RenderContext{} = render_context) do
+  @impl Pipeline
+  @spec with_note_modulators(NotePlanItem.t(), RenderContext.t()) :: NotePlanItem.t()
+  def with_note_modulators(%NotePlanItem{} = note, %RenderContext{} = render_context) do
     pressure_lane = render_context.params.lfo_pressure
     slide_lane = render_context.params.lfo_slide
     bend_lane = render_context.params.lfo_bend

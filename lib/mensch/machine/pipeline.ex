@@ -28,6 +28,11 @@ defmodule Mensch.Machine.Pipeline do
               render_context()
             ) :: [NotePlanItem.t()]
 
+  @callback with_note_modulators(
+              NotePlanItem.t(),
+              render_context()
+            ) :: NotePlanItem.t()
+
   @spec build_frame_sequence(
           module(),
           machine(),
@@ -52,6 +57,7 @@ defmodule Mensch.Machine.Pipeline do
 
     note_plan =
       module.build_note_plan(machine, chord_spec, render_context)
+      |> Enum.map(&module.with_note_modulators(&1, render_context))
 
     :ok = assert_invariants(note_plan, render_context)
 

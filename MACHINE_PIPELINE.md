@@ -9,12 +9,14 @@ pipeline.
 
 - `build_render_context/2`
 - `build_note_plan/3`
+- `with_note_modulators/2`
 
 `Pipeline.build_frame_sequence/6` orchestrates these phases and returns
 `MachineFrameSequence`.
 
 Pipeline-owned responsibilities (shared across machines):
 
+- call machine `with_note_modulators/2` for each planned note
 - render `NoteFrame` values from `NotePlanItem` modulators via `render_note_to_frame/2`
 - render note frame streams from note plans
 - stitch streams into dense chord-local frame timeline
@@ -55,16 +57,18 @@ Implications:
 
 1. Intake and normalize machine params.
 2. Build typed render context from shared common fields.
-3. Build `NotePlanItem` values (`start_mbeat`, `duration_mbeats`, tags/provenance,
-  and attached `pressure_modulator` / `slide_modulator` / `bend_modulator`
-  functions).
-4. Pipeline renders per-note frames through `render_note_to_frame/2`
+3. Build raw `NotePlanItem` values (`start_mbeat`, `duration_mbeats`,
+   tags/provenance).
+4. Attach modulation functions by calling machine `with_note_modulators/2`
+   for each note (`pressure_modulator` / `slide_modulator` /
+   `bend_modulator`).
+5. Pipeline renders per-note frames through `render_note_to_frame/2`
   (machine-agnostic).
-5. Pipeline stitches streams into dense frame timeline over
+6. Pipeline stitches streams into dense frame timeline over
    `chord_start_mbeat..(chord_start_mbeat + chord_duration_mbeats)`.
-6. Pipeline sorts notes per frame by `{note_instance_id, midi_note}`.
-7. Pipeline asserts end-alignment invariant.
-8. Return local `MachineFrameSequence`.
+7. Pipeline sorts notes per frame by `{note_instance_id, midi_note}`.
+8. Pipeline asserts end-alignment invariant.
+9. Return local `MachineFrameSequence`.
 
 ## Naming Conventions
 
@@ -78,13 +82,13 @@ Implications:
 ## Machine Notes
 
 - `RootNote`: one root note, pressure baseline fixed to `0`; pressure comes
-  from `lfo_pressure` modulation. The machine attaches per-note modulator
-  functions directly on `NotePlanItem`.
+  from `lfo_pressure` modulation. Modulators are attached in
+  `with_note_modulators/2`.
 - `DynamicVoicing`: inversion-transition lifecycles with per-note
   `duration_mbeats` carried in `NotePlanItem`; pressure baseline is generated
   from a per-note envelope (`LfoEnvelope`) and then combined with lane
-  modulation (`lfo_pressure`, `lfo_slide`, `lfo_bend`) inside per-note
-  modulator functions.
+  modulation (`lfo_pressure`, `lfo_slide`, `lfo_bend`) inside
+  `with_note_modulators/2`.
 
 ## Current Simplifications
 
