@@ -20,6 +20,7 @@ defmodule Mensch.DynamicVoicingTest do
     chord_spec = %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0}
 
     machine = %DynamicVoicing{
+      modulation_strategy: DynamicVoicing.default_modulation_strategy(),
       params: %DynamicVoicingParams{direction: :up, number_of_inversions: 0}
     }
 
@@ -40,6 +41,7 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
+        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
         params: %DynamicVoicingParams{direction: :up, number_of_inversions: 3}
       }
 
@@ -71,6 +73,7 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
+        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
         params: %DynamicVoicingParams{direction: :down, number_of_inversions: 3}
       }
 
@@ -102,6 +105,7 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
+        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
         params: %DynamicVoicingParams{direction: {:cycle_up, 1}, number_of_inversions: 3}
       }
 
@@ -125,6 +129,7 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
+        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
         params: %DynamicVoicingParams{direction: {:cycle_down, 2}, number_of_inversions: 2}
       }
 
@@ -148,6 +153,7 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
+        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
         params: %DynamicVoicingParams{direction: {:cycle_up, 2}, number_of_inversions: 24}
       }
 
@@ -158,6 +164,7 @@ defmodule Mensch.DynamicVoicingTest do
 
   test "pressure envelope rises and decays across the note lifecycle" do
     machine = %DynamicVoicing{
+      modulation_strategy: DynamicVoicing.default_modulation_strategy(),
       params: %DynamicVoicingParams{direction: :up, number_of_inversions: 1}
     }
 

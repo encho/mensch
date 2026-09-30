@@ -41,8 +41,8 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @behaviour Pipeline
 
-  @enforce_keys [:params]
-  defstruct [:params, modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"}]
+  @enforce_keys [:params, :modulation_strategy]
+  defstruct [:params, :modulation_strategy]
 
   def id, do: :dynamic_voicing
 
@@ -54,11 +54,10 @@ defmodule Mensch.Machines.DynamicVoicing do
     %EnvelopedPressure{error_prefix: "dynamic_voicing"}
   end
 
-  @spec new(DynamicVoicingParams.t()) :: t()
-  def new(%DynamicVoicingParams{} = params), do: %__MODULE__{params: params}
-
-  @spec new() :: t()
-  def new, do: %__MODULE__{params: default_params()}
+  @spec new(DynamicVoicingParams.t(), struct()) :: t()
+  def new(%DynamicVoicingParams{} = params, modulation_strategy)
+      when is_struct(modulation_strategy),
+      do: %__MODULE__{params: params, modulation_strategy: modulation_strategy}
 
   @spec controls() :: %{
           direction: :up,

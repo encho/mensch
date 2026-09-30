@@ -3,6 +3,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
@@ -12,6 +13,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %DynamicVoicing{
+        modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"},
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 3

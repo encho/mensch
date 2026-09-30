@@ -17,7 +17,10 @@ defmodule Mensch.RootNoteTest do
       duration_mbeats: 4000
     }
 
-    machine = %RootNote{params: RootNoteParams.default()}
+    machine = %RootNote{
+      params: RootNoteParams.default(),
+      modulation_strategy: RootNote.default_modulation_strategy()
+    }
 
     chord_inversion_0 = %ChordSpec{root: :c, modifier: :maj, octave: 3, inversion: 0}
     chord_inversion_2 = %ChordSpec{root: :c, modifier: :maj, octave: 3, inversion: 2}
@@ -59,7 +62,11 @@ defmodule Mensch.RootNoteTest do
 
     midi_note_for_offset = fn octave_offset ->
       params = %RootNoteParams{RootNoteParams.default() | octave_offset: octave_offset}
-      machine = %RootNote{params: params}
+
+      machine = %RootNote{
+        params: params,
+        modulation_strategy: RootNote.default_modulation_strategy()
+      }
 
       machine
       |> Machine.build_frame_sequence(chord_spec, sample_context, timeline_context, [])
@@ -83,7 +90,10 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{root: :f, modifier: :dom7, octave: 3, inversion: 3}
 
-    machine = %RootNote{params: RootNoteParams.default()}
+    machine = %RootNote{
+      params: RootNoteParams.default(),
+      modulation_strategy: RootNote.default_modulation_strategy()
+    }
 
     rendered =
       Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
@@ -128,8 +138,15 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 3, inversion: 1}
 
-    machine_low = %RootNote{params: %RootNoteParams{RootNoteParams.default() | pressure: 0}}
-    machine_high = %RootNote{params: %RootNoteParams{RootNoteParams.default() | pressure: 80}}
+    machine_low = %RootNote{
+      params: %RootNoteParams{RootNoteParams.default() | pressure: 0},
+      modulation_strategy: RootNote.default_modulation_strategy()
+    }
+
+    machine_high = %RootNote{
+      params: %RootNoteParams{RootNoteParams.default() | pressure: 80},
+      modulation_strategy: RootNote.default_modulation_strategy()
+    }
 
     rendered_low =
       Machine.build_frame_sequence(machine_low, chord_spec, sample_context, timeline_context, [])
@@ -168,7 +185,10 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 3, inversion: 0}
 
-    machine = %RootNote{params: %RootNoteParams{RootNoteParams.default() | pressure: 80}}
+    machine = %RootNote{
+      params: %RootNoteParams{RootNoteParams.default() | pressure: 80},
+      modulation_strategy: RootNote.default_modulation_strategy()
+    }
 
     rendered =
       Machine.build_frame_sequence(

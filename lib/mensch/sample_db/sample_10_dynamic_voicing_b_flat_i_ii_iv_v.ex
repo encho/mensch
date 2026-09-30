@@ -3,6 +3,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
@@ -26,6 +27,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"},
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4
@@ -39,6 +41,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"},
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4
@@ -52,6 +55,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"},
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4
@@ -65,6 +69,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"},
             params: %DynamicVoicingParams{
               direction: {:cycle_up, 2},
               number_of_inversions: 4

@@ -947,7 +947,7 @@ defmodule MenschWeb.HomeLive do
 
   defp cycle_frame_warning_for_entry(
          %{
-           machine: %DynamicVoicing{params: params},
+           machine: %DynamicVoicing{params: params, modulation_strategy: _modulation_strategy},
            timeline_context: %TimelineContext{} = timeline
          },
          entry_index,

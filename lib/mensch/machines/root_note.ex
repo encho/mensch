@@ -36,8 +36,8 @@ defmodule Mensch.Machines.RootNote do
 
   @behaviour Pipeline
 
-  @enforce_keys [:params]
-  defstruct [:params, modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"}]
+  @enforce_keys [:params, :modulation_strategy]
+  defstruct [:params, :modulation_strategy]
 
   def id, do: :root_note
 
@@ -49,11 +49,9 @@ defmodule Mensch.Machines.RootNote do
     %EnvelopedPressure{error_prefix: "root_note"}
   end
 
-  @spec new(RootNoteParams.t()) :: t()
-  def new(%RootNoteParams{} = params), do: %__MODULE__{params: params}
-
-  @spec new() :: t()
-  def new, do: %__MODULE__{params: default_params()}
+  @spec new(RootNoteParams.t(), struct()) :: t()
+  def new(%RootNoteParams{} = params, modulation_strategy) when is_struct(modulation_strategy),
+    do: %__MODULE__{params: params, modulation_strategy: modulation_strategy}
 
   def controls do
     params = default_params()

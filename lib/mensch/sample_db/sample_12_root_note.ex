@@ -3,6 +3,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
+  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.RootNote
   alias Mensch.Machines.RootNoteParams
   alias Mensch.SampleContext
@@ -24,6 +25,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"},
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1
@@ -37,6 +39,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"},
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1
@@ -50,6 +53,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"},
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1
@@ -63,6 +67,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"},
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1
@@ -76,6 +81,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             duration_mbeats: 4000
           },
           machine: %RootNote{
+            modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"},
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -1
