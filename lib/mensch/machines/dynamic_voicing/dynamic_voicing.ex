@@ -14,9 +14,9 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   alias Mensch.ChordSpec
   alias Mensch.Machine.NotePlanItem
-  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
+  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.DynamicVoicingParams
 
   defmodule RenderContext do

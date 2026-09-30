@@ -12,9 +12,9 @@ defmodule Mensch.Machines.RootNote do
 
   alias Mensch.ChordSpec
   alias Mensch.Machine.NotePlanItem
-  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
+  alias Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.RootNoteParams
 
   defmodule RenderContext do

@@ -3,8 +3,8 @@ defmodule Mensch.SampleDb.Sample12RootNote do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.RootNote
+  alias Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.RootNoteParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext

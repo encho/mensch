@@ -3,7 +3,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.Machine.NoteModulationStrategies.EnvelopedPressure
+  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext

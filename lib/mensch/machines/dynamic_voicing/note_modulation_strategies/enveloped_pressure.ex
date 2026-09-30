@@ -1,6 +1,6 @@
-defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
+defmodule Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure do
   @moduledoc """
-  Shared note-modulation strategy that combines:
+  DynamicVoicing-specific note-modulation strategy that combines:
 
   - a note-anchored pressure envelope
   - an additive sample-anchored pressure curve
@@ -44,7 +44,7 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
             pressure_curve_shift_mbeats: 0.0,
             pressure_curve_anchor: :sample,
             pressure_mode: :add,
-            error_prefix: "note_modulation"
+            error_prefix: "dynamic_voicing"
 
   @spec default() :: t()
   def default, do: %__MODULE__{}
