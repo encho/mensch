@@ -110,6 +110,7 @@ defmodule Mensch.Machines.RootNote do
     defaults
     |> Map.merge(current)
     |> then(&struct!(RootNoteParams, &1))
+    |> RootNoteParams.validate_modulation_strategy!()
   end
 
   defp root_midi_note!(%ChordSpec{} = chord_spec, octave_offset) when is_integer(octave_offset) do

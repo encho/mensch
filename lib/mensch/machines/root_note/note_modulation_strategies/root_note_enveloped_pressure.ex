@@ -1,4 +1,4 @@
-defmodule Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure do
+defmodule Mensch.Machines.RootNote.NoteModulationStrategies.RootNoteEnvelopedPressure do
   @moduledoc """
   RootNote-specific note-modulation strategy that combines:
 

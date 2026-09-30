@@ -3,7 +3,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure
+  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
@@ -30,7 +30,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
               number_of_inversions: 12,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 120.0
               }
@@ -47,7 +47,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
               number_of_inversions: 12,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 120.0
               }
@@ -64,7 +64,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
               number_of_inversions: 12,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 120.0
               }
@@ -81,7 +81,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
               number_of_inversions: 12,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 120.0
               }

@@ -1,4 +1,4 @@
-defmodule Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure do
+defmodule Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure do
   @moduledoc """
   DynamicVoicing-specific note-modulation strategy that combines:
 

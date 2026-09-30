@@ -13,7 +13,11 @@ defmodule Mensch.Machines.RootNoteParams do
   * `modulation_strategy`: Note modulation strategy struct used by this machine.
   """
 
-  alias Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure
+  alias Mensch.Machines.RootNote.NoteModulationStrategies.RootNoteEnvelopedPressure
+
+  @allowed_modulation_strategy_modules [
+    RootNoteEnvelopedPressure
+  ]
 
   @type t :: %__MODULE__{
           octave_offset: integer(),
@@ -32,7 +36,27 @@ defmodule Mensch.Machines.RootNoteParams do
       octave_offset: 0,
       velocity: 100,
       pressure: 0,
-      modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"}
+      modulation_strategy: %RootNoteEnvelopedPressure{error_prefix: "root_note"}
     }
+  end
+
+  @doc "Allowed note modulation strategy modules for RootNote."
+  @spec allowed_modulation_strategy_modules() :: [module()]
+  def allowed_modulation_strategy_modules, do: @allowed_modulation_strategy_modules
+
+  @doc "Validate that params use a RootNote-allowed modulation strategy module."
+  @spec validate_modulation_strategy!(t()) :: t()
+  def validate_modulation_strategy!(%__MODULE__{modulation_strategy: %module{}} = params)
+      when module in @allowed_modulation_strategy_modules,
+      do: params
+
+  def validate_modulation_strategy!(%__MODULE__{modulation_strategy: %module{}}) do
+    raise ArgumentError,
+          "root_note modulation_strategy must be one of #{inspect(@allowed_modulation_strategy_modules)}, got: #{inspect(module)}"
+  end
+
+  def validate_modulation_strategy!(%__MODULE__{modulation_strategy: other}) do
+    raise ArgumentError,
+          "root_note modulation_strategy must be a struct from #{inspect(@allowed_modulation_strategy_modules)}, got: #{inspect(other)}"
   end
 end

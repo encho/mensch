@@ -3,7 +3,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure
+  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
@@ -28,7 +28,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 8,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 50.0
               }
@@ -45,7 +45,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 8,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 50.0
               }
@@ -62,7 +62,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 8,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 50.0
               }
@@ -79,7 +79,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             params: %DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 8,
-              modulation_strategy: %EnvelopedPressure{
+              modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
                 pressure_attack_mbeats: 50.0
               }

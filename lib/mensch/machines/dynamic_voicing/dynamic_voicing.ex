@@ -387,6 +387,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     defaults
     |> Map.merge(current)
     |> then(&struct!(DynamicVoicingParams, &1))
+    |> DynamicVoicingParams.validate_modulation_strategy!()
   end
 
   defp normalize_direction!(:up), do: :up

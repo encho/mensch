@@ -4,7 +4,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
   alias Mensch.Machines.RootNote
-  alias Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure
+  alias Mensch.Machines.RootNote.NoteModulationStrategies.RootNoteEnvelopedPressure
   alias Mensch.Machines.RootNoteParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
@@ -28,7 +28,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -2,
-                modulation_strategy: %EnvelopedPressure{
+                modulation_strategy: %RootNoteEnvelopedPressure{
                   error_prefix: "root_note",
                   pressure_attack_mbeats: 0,
                   pressure_decay_mbeats: 0,
@@ -48,7 +48,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -2,
-                modulation_strategy: %EnvelopedPressure{
+                modulation_strategy: %RootNoteEnvelopedPressure{
                   error_prefix: "root_note",
                   pressure_attack_mbeats: 0,
                   pressure_decay_mbeats: 0,
@@ -68,7 +68,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -2,
-                modulation_strategy: %EnvelopedPressure{
+                modulation_strategy: %RootNoteEnvelopedPressure{
                   error_prefix: "root_note",
                   pressure_attack_mbeats: 0,
                   pressure_decay_mbeats: 0,
@@ -88,7 +88,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -2,
-                modulation_strategy: %EnvelopedPressure{
+                modulation_strategy: %RootNoteEnvelopedPressure{
                   error_prefix: "root_note",
                   pressure_attack_mbeats: 0,
                   pressure_decay_mbeats: 0,
@@ -108,7 +108,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             params: %RootNoteParams{
               RootNoteParams.default()
               | octave_offset: -2,
-                modulation_strategy: %EnvelopedPressure{
+                modulation_strategy: %RootNoteEnvelopedPressure{
                   error_prefix: "root_note",
                   pressure_attack_mbeats: 0,
                   pressure_decay_mbeats: 0,
