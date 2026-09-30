@@ -61,7 +61,7 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
       ) do
     common = Map.fetch!(render_context, :common)
     pressure_lane = pressure_lane(note, strategy)
-    slide_lane = slide_lane(strategy)
+    slide_lane = slide_lane(note, strategy)
     bend_lane = bend_lane(strategy)
     sample_context = common.sample_context
     absolute_chord_start_mbeat = common.absolute_chord_start_mbeat
@@ -156,7 +156,16 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
     )
   end
 
-  defp slide_lane(%__MODULE__{} = strategy) do
+  defp slide_lane(%NotePlanItem{} = note, %__MODULE__{} = strategy) do
+    note_duration_mbeats = note.duration_mbeats * 1.0
+    sleep_duration_mbeats = note_duration_mbeats * 0.6
+    saw_duration_mbeats = note_duration_mbeats * 0.4
+
+    if note_duration_mbeats <= 0.0 do
+      raise ArgumentError,
+            "#{strategy.error_prefix} slide lane requires positive note duration, got #{note_duration_mbeats} for note_instance_id #{note.note_instance_id}"
+    end
+
     Modulation.normalize_lfo_pressure!(
       %{
         lfo: %LfoGroup{
@@ -164,11 +173,11 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
             curve: :saw_up,
             peak_value: 125,
             baseline_value: 0,
-            cycles_per_bar: 1,
+            cycle_length_in_mbeats: note_duration_mbeats,
             shift_mbeats: 0,
             anchor: :note,
-            sleep_duration_cycle_perc: 0.6,
-            saw_duration_cycle_perc: 0.4
+            sleep_duration_mbeats: sleep_duration_mbeats,
+            saw_duration_mbeats: saw_duration_mbeats
           },
           operations: []
         },

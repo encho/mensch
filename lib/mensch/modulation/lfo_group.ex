@@ -119,7 +119,8 @@ defmodule Mensch.Modulation.LfoGroup do
   end
 
   defp saw_term_map?(attrs) do
-    Map.has_key?(attrs, :saw_duration_cycle_perc) or
+    Map.has_key?(attrs, :saw_duration_mbeats) or
+      Map.has_key?(attrs, :saw_duration_cycle_perc) or
       Map.has_key?(attrs, :drop_phase) or
       Map.get(attrs, :curve) in [:saw, :saw_up, :saw_down]
   end

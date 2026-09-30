@@ -9,18 +9,18 @@ defmodule Mensch.Modulation.LfoSaw do
   - `peak_value` (`number`): Absolute peak endpoint of the ramp.
   - `baseline_value` (`number`): Baseline endpoint used at reset/start. Defaults
     to `0`.
-  - `cycles_per_bar` (`number > 0`): Oscillation speed in cycles per bar.
+  - `cycle_length_in_mbeats` (`number > 0`): Duration of one full saw cycle in
+    millibeats.
   - `shift_mbeats` (`number`): Phase offset in millibeats.
-  - `sleep_duration_cycle_perc` (`0 <= number < 1`): Fraction of each cycle spent at
+  - `sleep_duration_mbeats` (`number >= 0`): Duration of each cycle spent at
     `baseline_value` before the saw starts moving.
   - `anchor` (`:sample | :chord | :note`): Time reference for phase:
     - `:sample` uses absolute sample timeline.
     - `:chord` resets phase at chord start.
     - `:note` resets phase per note lifecycle.
-  - `saw_duration_cycle_perc` (`0 < number <= 1`): Fraction of each cycle used for the
-    ramp before the abrupt reset. For example, `0.75` means ramp for 75% of
-    the cycle and reset during the remaining 25%. Must satisfy
-    `sleep_duration_cycle_perc + saw_duration_cycle_perc <= 1`.
+  - `saw_duration_mbeats` (`number > 0`): Ramp duration in each cycle before
+    the abrupt reset. Must satisfy
+    `sleep_duration_mbeats + saw_duration_mbeats <= cycle_length_in_mbeats`.
 
   Notes:
 
@@ -39,21 +39,21 @@ defmodule Mensch.Modulation.LfoSaw do
           curve: curve(),
           peak_value: float(),
           baseline_value: float(),
-          cycles_per_bar: float(),
+          cycle_length_in_mbeats: float(),
           shift_mbeats: number(),
-          sleep_duration_cycle_perc: float(),
+          sleep_duration_mbeats: float(),
           anchor: anchor(),
-          saw_duration_cycle_perc: float()
+          saw_duration_mbeats: float()
         }
 
   defstruct curve: :saw_up,
             peak_value: 0.0,
             baseline_value: 0.0,
-            cycles_per_bar: 1.0,
+            cycle_length_in_mbeats: 4000.0,
             shift_mbeats: 0.0,
-            sleep_duration_cycle_perc: 0.0,
+            sleep_duration_mbeats: 0.0,
             anchor: :sample,
-            saw_duration_cycle_perc: 1.0
+            saw_duration_mbeats: 4000.0
 
   @spec default() :: t()
   def default, do: %__MODULE__{}
@@ -70,17 +70,21 @@ defmodule Mensch.Modulation.LfoSaw do
       curve: normalize_curve!(lfo_saw.curve, field_name),
       peak_value: normalize_peak_value!(lfo_saw.peak_value, field_name),
       baseline_value: normalize_baseline_value!(lfo_saw.baseline_value, field_name),
-      cycles_per_bar: normalize_cycles_per_bar!(lfo_saw.cycles_per_bar, field_name),
+      cycle_length_in_mbeats:
+        normalize_cycle_length_in_mbeats!(
+          lfo_saw.cycle_length_in_mbeats,
+          field_name
+        ),
       shift_mbeats: normalize_shift_mbeats!(lfo_saw.shift_mbeats, field_name),
-      sleep_duration_cycle_perc:
-        normalize_sleep_duration_cycle_perc!(
-          lfo_saw.sleep_duration_cycle_perc,
+      sleep_duration_mbeats:
+        normalize_sleep_duration_mbeats!(
+          lfo_saw.sleep_duration_mbeats,
           field_name
         ),
       anchor: normalize_anchor!(lfo_saw.anchor, field_name),
-      saw_duration_cycle_perc:
-        normalize_saw_duration_cycle_perc!(
-          lfo_saw.saw_duration_cycle_perc,
+      saw_duration_mbeats:
+        normalize_saw_duration_mbeats!(
+          lfo_saw.saw_duration_mbeats,
           field_name
         )
     }
@@ -103,14 +107,12 @@ defmodule Mensch.Modulation.LfoSaw do
   def value_at_mbeat(
         %__MODULE__{} = lfo_saw,
         at_mbeat,
-        %SampleContext{} = sample_context,
+        %SampleContext{} = _sample_context,
         absolute_chord_start_mbeat,
         note_local_mbeat
       )
       when is_integer(at_mbeat) and is_integer(absolute_chord_start_mbeat) and
              is_integer(note_local_mbeat) do
-    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
-
     timeline_mbeat =
       case lfo_saw.anchor do
         :sample -> absolute_chord_start_mbeat + at_mbeat
@@ -119,51 +121,54 @@ defmodule Mensch.Modulation.LfoSaw do
       end
 
     shifted_mbeat = timeline_mbeat + lfo_saw.shift_mbeats
-    phase = shifted_mbeat / mbeats_per_bar * lfo_saw.cycles_per_bar
-    cycle_phase = phase - :math.floor(phase)
+
+    cycle_position_mbeats =
+      shifted_mbeat -
+        :math.floor(shifted_mbeat / lfo_saw.cycle_length_in_mbeats) *
+          lfo_saw.cycle_length_in_mbeats
 
     lfo_saw.curve
     |> waveform_value(
-      cycle_phase,
-      lfo_saw.sleep_duration_cycle_perc,
-      lfo_saw.saw_duration_cycle_perc
+      cycle_position_mbeats,
+      lfo_saw.sleep_duration_mbeats,
+      lfo_saw.saw_duration_mbeats
     )
     |> interpolate(lfo_saw.baseline_value, lfo_saw.peak_value)
   end
 
   defp waveform_value(
          :saw_up,
-         cycle_phase,
-         sleep_duration_cycle_perc,
-         saw_duration_cycle_perc
+         cycle_position_mbeats,
+         sleep_duration_mbeats,
+         saw_duration_mbeats
        )
-       when cycle_phase >= sleep_duration_cycle_perc and
-              cycle_phase < sleep_duration_cycle_perc + saw_duration_cycle_perc,
-       do: (cycle_phase - sleep_duration_cycle_perc) / saw_duration_cycle_perc
+       when cycle_position_mbeats >= sleep_duration_mbeats and
+              cycle_position_mbeats < sleep_duration_mbeats + saw_duration_mbeats,
+       do: (cycle_position_mbeats - sleep_duration_mbeats) / saw_duration_mbeats
 
   defp waveform_value(
          :saw_up,
-         _cycle_phase,
-         _sleep_duration_cycle_perc,
-         _saw_duration_cycle_perc
+         _cycle_position_mbeats,
+         _sleep_duration_mbeats,
+         _saw_duration_mbeats
        ),
        do: 0.0
 
   defp waveform_value(
          :saw_down,
-         cycle_phase,
-         sleep_duration_cycle_perc,
-         saw_duration_cycle_perc
+         cycle_position_mbeats,
+         sleep_duration_mbeats,
+         saw_duration_mbeats
        )
-       when cycle_phase >= sleep_duration_cycle_perc and
-              cycle_phase < sleep_duration_cycle_perc + saw_duration_cycle_perc,
-       do: 1.0 - (cycle_phase - sleep_duration_cycle_perc) / saw_duration_cycle_perc
+       when cycle_position_mbeats >= sleep_duration_mbeats and
+              cycle_position_mbeats < sleep_duration_mbeats + saw_duration_mbeats,
+       do: 1.0 - (cycle_position_mbeats - sleep_duration_mbeats) / saw_duration_mbeats
 
   defp waveform_value(
          :saw_down,
-         _cycle_phase,
-         _sleep_duration_cycle_perc,
-         _saw_duration_cycle_perc
+         _cycle_position_mbeats,
+         _sleep_duration_mbeats,
+         _saw_duration_mbeats
        ),
        do: 0.0
 
@@ -195,15 +200,17 @@ defmodule Mensch.Modulation.LfoSaw do
           "#{field_name}.baseline_value must be a number, got: #{inspect(other)}"
   end
 
-  defp normalize_cycles_per_bar!(value, _field_name) when is_integer(value) and value > 0,
-    do: value * 1.0
+  defp normalize_cycle_length_in_mbeats!(value, _field_name)
+       when is_integer(value) and value > 0,
+       do: value * 1.0
 
-  defp normalize_cycles_per_bar!(value, _field_name) when is_float(value) and value > 0,
-    do: value
+  defp normalize_cycle_length_in_mbeats!(value, _field_name)
+       when is_float(value) and value > 0,
+       do: value
 
-  defp normalize_cycles_per_bar!(other, field_name) do
+  defp normalize_cycle_length_in_mbeats!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.cycles_per_bar must be > 0, got: #{inspect(other)}"
+          "#{field_name}.cycle_length_in_mbeats must be > 0, got: #{inspect(other)}"
   end
 
   defp normalize_shift_mbeats!(value, _field_name) when is_integer(value), do: value * 1.0
@@ -214,16 +221,16 @@ defmodule Mensch.Modulation.LfoSaw do
           "#{field_name}.shift_mbeats must be a number, got: #{inspect(other)}"
   end
 
-  defp normalize_sleep_duration_cycle_perc!(value, _field_name) when is_integer(value),
-    do: normalize_sleep_duration_cycle_perc!(value * 1.0, "")
+  defp normalize_sleep_duration_mbeats!(value, _field_name) when is_integer(value),
+    do: normalize_sleep_duration_mbeats!(value * 1.0, "")
 
-  defp normalize_sleep_duration_cycle_perc!(value, _field_name)
-       when is_float(value) and value >= 0 and value < 1,
+  defp normalize_sleep_duration_mbeats!(value, _field_name)
+       when is_float(value) and value >= 0,
        do: value
 
-  defp normalize_sleep_duration_cycle_perc!(other, field_name) do
+  defp normalize_sleep_duration_mbeats!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.sleep_duration_cycle_perc must be >= 0 and < 1, got: #{inspect(other)}"
+          "#{field_name}.sleep_duration_mbeats must be >= 0, got: #{inspect(other)}"
   end
 
   defp normalize_anchor!(anchor, _field_name)
@@ -235,24 +242,25 @@ defmodule Mensch.Modulation.LfoSaw do
           "#{field_name}.anchor must be :sample, :chord, or :note, got: #{inspect(other)}"
   end
 
-  defp normalize_saw_duration_cycle_perc!(value, _field_name) when is_integer(value),
-    do: normalize_saw_duration_cycle_perc!(value * 1.0, "")
+  defp normalize_saw_duration_mbeats!(value, _field_name) when is_integer(value),
+    do: normalize_saw_duration_mbeats!(value * 1.0, "")
 
-  defp normalize_saw_duration_cycle_perc!(value, _field_name)
-       when is_float(value) and value > 0 and value <= 1,
+  defp normalize_saw_duration_mbeats!(value, _field_name)
+       when is_float(value) and value > 0,
        do: value
 
-  defp normalize_saw_duration_cycle_perc!(other, field_name) do
+  defp normalize_saw_duration_mbeats!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.saw_duration_cycle_perc must be > 0 and <= 1, got: #{inspect(other)}"
+          "#{field_name}.saw_duration_mbeats must be > 0, got: #{inspect(other)}"
   end
 
   defp validate_phase_window!(%__MODULE__{} = lfo_saw, field_name) do
-    if lfo_saw.sleep_duration_cycle_perc + lfo_saw.saw_duration_cycle_perc <= 1.0 do
+    if lfo_saw.sleep_duration_mbeats + lfo_saw.saw_duration_mbeats <=
+         lfo_saw.cycle_length_in_mbeats do
       lfo_saw
     else
       raise ArgumentError,
-            "#{field_name}.sleep_duration_cycle_perc + #{field_name}.saw_duration_cycle_perc must be <= 1, got: #{inspect(lfo_saw.sleep_duration_cycle_perc + lfo_saw.saw_duration_cycle_perc)}"
+            "#{field_name}.sleep_duration_mbeats + #{field_name}.saw_duration_mbeats must be <= #{field_name}.cycle_length_in_mbeats, got: #{inspect(lfo_saw.sleep_duration_mbeats + lfo_saw.saw_duration_mbeats)} > #{inspect(lfo_saw.cycle_length_in_mbeats)}"
     end
   end
 
@@ -266,21 +274,26 @@ defmodule Mensch.Modulation.LfoSaw do
       {"baseline_value", value} -> {:baseline_value, value}
       {"baseline", value} -> {:baseline_value, value}
       {:baseline, value} -> {:baseline_value, value}
-      {"cycles_per_bar", value} -> {:cycles_per_bar, value}
+      {"cycle_length_in_mbeats", value} -> {:cycle_length_in_mbeats, value}
+      {:cycle_length_in_mbeats, value} -> {:cycle_length_in_mbeats, value}
       {"shift_mbeats", value} -> {:shift_mbeats, value}
-      {"sleep_duration_cycle_perc", value} -> {:sleep_duration_cycle_perc, value}
-      {:sleep_duration_cycle_perc, value} -> {:sleep_duration_cycle_perc, value}
-      {"sleep_phase", value} -> {:sleep_duration_cycle_perc, value}
-      {:sleep_phase, value} -> {:sleep_duration_cycle_perc, value}
-      {"sleep", value} -> {:sleep_duration_cycle_perc, value}
-      {:sleep, value} -> {:sleep_duration_cycle_perc, value}
+      {"sleep_duration_mbeats", value} -> {:sleep_duration_mbeats, value}
+      {:sleep_duration_mbeats, value} -> {:sleep_duration_mbeats, value}
+      {"sleep_duration_cycle_perc", value} -> {:sleep_duration_mbeats, value}
+      {:sleep_duration_cycle_perc, value} -> {:sleep_duration_mbeats, value}
+      {"sleep_phase", value} -> {:sleep_duration_mbeats, value}
+      {:sleep_phase, value} -> {:sleep_duration_mbeats, value}
+      {"sleep", value} -> {:sleep_duration_mbeats, value}
+      {:sleep, value} -> {:sleep_duration_mbeats, value}
       {"anchor", value} -> {:anchor, value}
       {"time_base", value} -> {:anchor, value}
       {:time_base, value} -> {:anchor, value}
-      {"saw_duration_cycle_perc", value} -> {:saw_duration_cycle_perc, value}
-      {:saw_duration_cycle_perc, value} -> {:saw_duration_cycle_perc, value}
-      {"drop_phase", value} -> {:saw_duration_cycle_perc, value}
-      {:drop_phase, value} -> {:saw_duration_cycle_perc, value}
+      {"saw_duration_mbeats", value} -> {:saw_duration_mbeats, value}
+      {:saw_duration_mbeats, value} -> {:saw_duration_mbeats, value}
+      {"saw_duration_cycle_perc", value} -> {:saw_duration_mbeats, value}
+      {:saw_duration_cycle_perc, value} -> {:saw_duration_mbeats, value}
+      {"drop_phase", value} -> {:saw_duration_mbeats, value}
+      {:drop_phase, value} -> {:saw_duration_mbeats, value}
       pair -> pair
     end)
     |> Map.new()

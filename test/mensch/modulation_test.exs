@@ -93,7 +93,7 @@ defmodule Mensch.ModulationTest do
     assert value == 9.0
   end
 
-  test "lfo_saw saw_duration_cycle_perc controls when reset happens" do
+  test "lfo_saw saw_duration_mbeats controls when reset happens" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     saw =
@@ -101,10 +101,10 @@ defmodule Mensch.ModulationTest do
         curve: :saw_up,
         peak_value: 1.0,
         baseline_value: 2.0,
-        cycles_per_bar: 1.0,
+        cycle_length_in_mbeats: 4000.0,
         shift_mbeats: 0.0,
         anchor: :chord,
-        saw_duration_cycle_perc: 0.5
+        saw_duration_mbeats: 2000.0
       }
 
     # at 1000 mbeat of a 4000 mbeat bar: cycle_phase = 0.25 -> progress = 0.5
@@ -115,19 +115,19 @@ defmodule Mensch.ModulationTest do
     assert Lfo.evaluate(saw, 3000, sample_context, 0, 3000) == 2.0
   end
 
-  test "lfo_group normalizes saw term maps via saw_duration_cycle_perc key" do
+  test "lfo_group normalizes saw term maps via saw_duration_mbeats key" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     group =
       %LfoGroup{
-        initial: %{curve: :saw_up, peak_value: 1.0, saw_duration_cycle_perc: 0.5, anchor: :chord},
+        initial: %{curve: :saw_up, peak_value: 1.0, saw_duration_mbeats: 2000.0, anchor: :chord},
         operations: []
       }
 
     assert_in_delta Lfo.evaluate(group, 1000, sample_context, 0, 1000), 0.5, 1.0e-6
   end
 
-  test "lfo_saw sleep_duration_cycle_perc holds baseline before ramp" do
+  test "lfo_saw sleep_duration_mbeats holds baseline before ramp" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     saw =
@@ -135,10 +135,10 @@ defmodule Mensch.ModulationTest do
         curve: :saw_up,
         baseline_value: 2.0,
         peak_value: 6.0,
-        cycles_per_bar: 1.0,
+        cycle_length_in_mbeats: 4000.0,
         shift_mbeats: 0.0,
-        sleep_duration_cycle_perc: 0.25,
-        saw_duration_cycle_perc: 0.5,
+        sleep_duration_mbeats: 1000.0,
+        saw_duration_mbeats: 2000.0,
         anchor: :chord
       }
 
