@@ -71,9 +71,11 @@ defmodule MenschWeb.HomeLive do
     {render_data, sample_warning} =
       render_data_and_warning(sample_entries, sample_context)
 
+    midi_status = Mensch.Midi.Connection.status()
+
     socket =
       socket
-      |> assign(:midi_status, Mensch.Midi.Connection.status())
+      |> assign(:midi_status, midi_status)
       |> assign(:render_data, render_data)
       |> assign(:player_status, Player.status())
       |> assign(:play_started_at, nil)

@@ -67,7 +67,7 @@ defmodule Mensch.Player do
   @impl true
   def handle_call({:play, data}, _from, state) do
     state = normalize_state(state)
-    state = stop_all(state)
+    state = maybe_stop_all(state)
     ref = make_ref()
     frames = normalize_frames(data.frames)
 
@@ -87,8 +87,8 @@ defmodule Mensch.Player do
 
   def handle_call(:stop, _from, state) do
     state = normalize_state(state)
-    state = panic_all(state)
-    schedule_panic_retries(state.ref)
+    state = stop_all(state)
+    schedule_soft_stop_retries(state.ref)
     {:reply, :ok, state}
   end
 
@@ -141,14 +141,24 @@ defmodule Mensch.Player do
     {:noreply, state}
   end
 
+  def handle_info({:soft_stop_retry, ref, retries_left}, %{ref: ref} = state)
+      when is_integer(retries_left) and retries_left > 0 do
+    state = normalize_state(state)
+    soft_stop_retry_burst(target_channels(state))
+    Process.send_after(self(), {:soft_stop_retry, ref, retries_left - 1}, 30)
+    {:noreply, state}
+  end
+
   def handle_info({:panic_retry, _ref, _retries_left}, state), do: {:noreply, state}
+  def handle_info({:soft_stop_retry, _ref, _retries_left}, state), do: {:noreply, state}
 
   defp apply_frame(frame, state) do
+    messages = Enum.flat_map(frame.notes, &note_messages/1)
+    Connection.send_messages(messages)
+
     active =
       Enum.reduce(frame.notes, state.active, fn note, active ->
         note_id = {note.channel, note.midi_note}
-
-        send_frame(note)
 
         active
         |> maybe_add_active(note_id, note.note_on)
@@ -158,14 +168,11 @@ defmodule Mensch.Player do
     %{state | active: active}
   end
 
-  defp send_frame(note) do
-    messages =
-      []
-      |> maybe_append_modulation(note)
-      |> maybe_append_note_on(note)
-      |> maybe_append_note_off(note)
-
-    Connection.send_messages(messages)
+  defp note_messages(note) do
+    []
+    |> maybe_append_note_on(note)
+    |> maybe_append_modulation(note)
+    |> maybe_append_note_off(note)
   end
 
   defp maybe_append_note_on(messages, %{note_on: true} = note) do
@@ -205,16 +212,7 @@ defmodule Mensch.Player do
   # arrive tagged with the old `ref` and be ignored).
   defp stop_all(state) do
     cancel_timer(state.next_timer_ref)
-
-    messages =
-      Enum.flat_map(state.active, fn {channel, note} ->
-        [
-          <<0x80 + channel, note, 0>>,
-          <<0x90 + channel, note, 0>>
-        ]
-      end)
-
-    Connection.send_messages(messages)
+    soft_stop_burst(state)
 
     %{
       state
@@ -225,6 +223,28 @@ defmodule Mensch.Player do
         next_timer_ref: nil,
         last_frame_at_ms: nil
     }
+  end
+
+  defp maybe_stop_all(state) do
+    if stop_burst_needed?(state) do
+      stop_all(state)
+    else
+      %{
+        state
+        | status: :stopped,
+          ref: make_ref(),
+          active: MapSet.new(),
+          pending_frames: [],
+          next_timer_ref: nil,
+          last_frame_at_ms: nil
+      }
+    end
+  end
+
+  defp stop_burst_needed?(state) do
+    state.status == :playing or
+      not Enum.empty?(state.pending_frames) or
+      MapSet.size(state.active) > 0
   end
 
   defp panic_all(state) do
@@ -276,8 +296,52 @@ defmodule Mensch.Player do
     Connection.send_messages(messages)
   end
 
+  defp soft_stop_burst(state) do
+    channels = target_channels(state)
+
+    controller_resets =
+      Enum.flat_map(channels, fn channel ->
+        [
+          # Reset expressive lanes without issuing hard global mode reset.
+          <<0xD0 + channel, 0>>,
+          <<0xE0 + channel, 0, 64>>,
+          <<0xB0 + channel, 74, 0>>,
+          <<0xB0 + channel, 64, 0>>,
+          # All-notes-off only.
+          <<0xB0 + channel, 123, 0>>
+        ]
+      end)
+
+    active_note_offs =
+      Enum.flat_map(state.active, fn {channel, note} ->
+        [
+          <<0x80 + channel, note, 0>>,
+          <<0x90 + channel, note, 0>>
+        ]
+      end)
+
+    Connection.send_messages(controller_resets ++ active_note_offs)
+  end
+
+  defp soft_stop_retry_burst(channels) do
+    messages =
+      Enum.flat_map(channels, fn channel ->
+        [
+          <<0xD0 + channel, 0>>,
+          <<0xB0 + channel, 64, 0>>,
+          <<0xB0 + channel, 123, 0>>
+        ]
+      end)
+
+    Connection.send_messages(messages)
+  end
+
   defp schedule_panic_retries(ref) do
     Process.send_after(self(), {:panic_retry, ref, 2}, 30)
+  end
+
+  defp schedule_soft_stop_retries(ref) do
+    Process.send_after(self(), {:soft_stop_retry, ref, 1}, 30)
   end
 
   defp target_channels(state) do
@@ -287,9 +351,8 @@ defmodule Mensch.Player do
       |> MapSet.new()
 
     target_channels =
-      0..15
+      Connection.member_channels()
       |> MapSet.new()
-      |> MapSet.union(MapSet.new(Connection.member_channels()))
       |> MapSet.union(active_channels)
 
     MapSet.to_list(target_channels)
@@ -325,7 +388,7 @@ defmodule Mensch.Player do
 
   # Some pressure-driven synths need a non-zero pressure value at note-on
   # time to reliably start sound.
-  defp effective_pressure(%{note_on: true, pressure: pressure}) when pressure <= 0, do: 1
+  defp effective_pressure(%{note_on: true, pressure: pressure}) when pressure <= 0, do: 24
   defp effective_pressure(note), do: note.pressure
 
   # During hot code reload, an existing process may still hold an older

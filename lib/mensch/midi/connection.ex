@@ -35,8 +35,9 @@ defmodule Mensch.Midi.Connection do
   require Logger
 
   @default_member_channels Enum.to_list(1..13)
+  @required_osmose_port "Osmose 49 haken"
 
-  defstruct [:out_conn, :port_name, :port_pattern]
+  defstruct [:out_conn, :port_name, :port_pattern, :preferred_port_name]
 
   # Client API
 
@@ -69,6 +70,18 @@ defmodule Mensch.Midi.Connection do
   @doc "Retries locating and opening the configured MIDI output port."
   def reconnect do
     GenServer.call(__MODULE__, :reconnect)
+  end
+
+  @doc "Retries connecting to a specific output port name (exact match)."
+  @spec reconnect_to_port(String.t()) :: {:connected, String.t()} | :disconnected
+  def reconnect_to_port(port_name) when is_binary(port_name) do
+    GenServer.call(__MODULE__, {:reconnect_to_port, String.trim(port_name)})
+  end
+
+  @doc "Returns available MIDI output port names matching the configured pattern."
+  @spec available_output_ports() :: [String.t()]
+  def available_output_ports do
+    GenServer.call(__MODULE__, :available_output_ports)
   end
 
   # Server callbacks
@@ -106,8 +119,26 @@ defmodule Mensch.Midi.Connection do
   end
 
   def handle_call(:reconnect, _from, state) do
-    new_state = connect(state)
+    new_state = connect(%{state | preferred_port_name: nil})
     {:reply, connection_status(new_state), new_state}
+  end
+
+  def handle_call({:reconnect_to_port, port_name}, _from, state) do
+    preferred_port_name =
+      if port_name == @required_osmose_port do
+        port_name
+      else
+        @required_osmose_port
+      end
+
+    new_state = connect(%{state | preferred_port_name: preferred_port_name})
+    {:reply, connection_status(new_state), new_state}
+  end
+
+  def handle_call(:available_output_ports, _from, state) do
+    ports = Midiex.ports(state.port_pattern, :output)
+    filtered = Enum.filter(ports, &(&1.name == @required_osmose_port))
+    {:reply, Enum.map(filtered, & &1.name), state}
   end
 
   defp connection_status(%__MODULE__{out_conn: nil}), do: :disconnected
@@ -116,10 +147,19 @@ defmodule Mensch.Midi.Connection do
   defp connect(state) do
     case Midiex.ports(state.port_pattern, :output) do
       [_ | _] = ports ->
-        port = pick_preferred_port(ports)
-        out_conn = Midiex.open(port)
-        Logger.info("Mensch.Midi.Connection: connected to #{port.name}")
-        %{state | out_conn: out_conn, port_name: port.name}
+        case pick_port(ports, state.preferred_port_name) do
+          {:ok, port} ->
+            out_conn = Midiex.open(port)
+            Logger.info("Mensch.Midi.Connection: connected to #{port.name}")
+            %{state | out_conn: out_conn, port_name: port.name}
+
+          :error ->
+            Logger.warning(
+              "Mensch.Midi.Connection: requested MIDI output port #{inspect(state.preferred_port_name)} not found"
+            )
+
+            %{state | out_conn: nil, port_name: nil}
+        end
 
       [] ->
         Logger.warning(
@@ -134,22 +174,25 @@ defmodule Mensch.Midi.Connection do
     Application.get_env(
       :mensch,
       :midi_output_port_pattern,
-      ~r/osmose.*(haken|sound\s*engine|port\s*2)/i
+      ~r/^Osmose 49 haken$/i
     )
   end
 
-  # Prefer the true synthesis destination when multiple Osmose output ports
-  # match (firmware 2.3 can expose both "sound engine" and "haken").
-  defp pick_preferred_port(ports) do
-    Enum.max_by(ports, fn port ->
-      name = String.downcase(port.name)
+  # We require the exact output port known to work with this setup.
+  defp pick_port(ports, nil), do: pick_required_port(ports)
+  defp pick_port(ports, ""), do: pick_required_port(ports)
 
-      cond do
-        String.contains?(name, "haken") -> 3
-        String.contains?(name, "sound engine") -> 2
-        String.contains?(name, "port 2") -> 1
-        true -> 0
-      end
-    end)
+  defp pick_port(ports, preferred_port_name) do
+    case Enum.find(ports, &(&1.name == preferred_port_name)) do
+      nil -> :error
+      port -> {:ok, port}
+    end
+  end
+
+  defp pick_required_port(ports) do
+    case Enum.find(ports, &(&1.name == @required_osmose_port)) do
+      nil -> :error
+      port -> {:ok, port}
+    end
   end
 end
