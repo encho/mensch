@@ -23,6 +23,7 @@ defmodule Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure do
           pressure_decay_mbeats: float(),
           pressure_release_mbeats: float(),
           pressure_sustain_level: float(),
+          slide_peak_value: float(),
           pressure_curve: :sine | :triangle | :square,
           pressure_curve_min: float(),
           pressure_curve_max: float(),
@@ -37,6 +38,7 @@ defmodule Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure do
             pressure_decay_mbeats: 280.0,
             pressure_release_mbeats: 120.0,
             pressure_sustain_level: 0.68,
+            slide_peak_value: 125.0,
             pressure_curve: :sine,
             pressure_curve_min: 0.0,
             pressure_curve_max: 0.0,
@@ -171,7 +173,7 @@ defmodule Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure do
         lfo: %LfoGroup{
           initial: %LfoSaw{
             curve: :saw_up,
-            peak_value: 125,
+            peak_value: strategy.slide_peak_value,
             baseline_value: 0,
             cycle_length_in_mbeats: note_duration_mbeats,
             shift_mbeats: 0,

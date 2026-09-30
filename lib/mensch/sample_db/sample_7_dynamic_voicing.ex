@@ -27,10 +27,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 6,
+              number_of_inversions: 8,
               modulation_strategy: %EnvelopedPressure{
                 error_prefix: "dynamic_voicing",
-                pressure_attack_mbeats: 120.0
+                pressure_attack_mbeats: 50.0
               }
             }
           }
@@ -44,10 +44,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 6,
+              number_of_inversions: 8,
               modulation_strategy: %EnvelopedPressure{
                 error_prefix: "dynamic_voicing",
-                pressure_attack_mbeats: 120.0
+                pressure_attack_mbeats: 50.0
               }
             }
           }
@@ -61,10 +61,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 6,
+              number_of_inversions: 8,
               modulation_strategy: %EnvelopedPressure{
                 error_prefix: "dynamic_voicing",
-                pressure_attack_mbeats: 120.0
+                pressure_attack_mbeats: 50.0
               }
             }
           }
@@ -78,10 +78,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
               direction: :up,
-              number_of_inversions: 6,
+              number_of_inversions: 8,
               modulation_strategy: %EnvelopedPressure{
                 error_prefix: "dynamic_voicing",
-                pressure_attack_mbeats: 120.0
+                pressure_attack_mbeats: 50.0
               }
             }
           }

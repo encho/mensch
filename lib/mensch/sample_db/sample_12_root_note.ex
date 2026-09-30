@@ -27,10 +27,13 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
+              | octave_offset: -2,
                 modulation_strategy: %EnvelopedPressure{
                   error_prefix: "root_note",
-                  pressure_attack_mbeats: 120.0
+                  pressure_attack_mbeats: 0,
+                  pressure_decay_mbeats: 0,
+                  pressure_release_mbeats: 0,
+                  slide_peak_value: 100
                 }
             }
           }
@@ -44,10 +47,13 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
+              | octave_offset: -2,
                 modulation_strategy: %EnvelopedPressure{
                   error_prefix: "root_note",
-                  pressure_attack_mbeats: 120.0
+                  pressure_attack_mbeats: 0,
+                  pressure_decay_mbeats: 0,
+                  pressure_release_mbeats: 0,
+                  slide_peak_value: 100
                 }
             }
           }
@@ -61,10 +67,13 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
+              | octave_offset: -2,
                 modulation_strategy: %EnvelopedPressure{
                   error_prefix: "root_note",
-                  pressure_attack_mbeats: 120.0
+                  pressure_attack_mbeats: 0,
+                  pressure_decay_mbeats: 0,
+                  pressure_release_mbeats: 0,
+                  slide_peak_value: 100
                 }
             }
           }
@@ -78,10 +87,13 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
+              | octave_offset: -2,
                 modulation_strategy: %EnvelopedPressure{
                   error_prefix: "root_note",
-                  pressure_attack_mbeats: 120.0
+                  pressure_attack_mbeats: 0,
+                  pressure_decay_mbeats: 0,
+                  pressure_release_mbeats: 0,
+                  slide_peak_value: 100
                 }
             }
           }
@@ -95,10 +107,13 @@ defmodule Mensch.SampleDb.Sample12RootNote do
           machine: %RootNote{
             params: %RootNoteParams{
               RootNoteParams.default()
-              | octave_offset: -1,
+              | octave_offset: -2,
                 modulation_strategy: %EnvelopedPressure{
                   error_prefix: "root_note",
-                  pressure_attack_mbeats: 120.0
+                  pressure_attack_mbeats: 0,
+                  pressure_decay_mbeats: 0,
+                  pressure_release_mbeats: 0,
+                  slide_peak_value: 100
                 }
             }
           }
