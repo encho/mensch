@@ -93,37 +93,63 @@ defmodule Mensch.ModulationTest do
     assert value == 9.0
   end
 
-  test "lfo_saw drop_phase controls when reset happens" do
+  test "lfo_saw saw_duration_cycle_perc controls when reset happens" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     saw =
       %LfoSaw{
         curve: :saw_up,
         peak_value: 1.0,
+        baseline_value: 2.0,
         cycles_per_bar: 1.0,
         shift_mbeats: 0.0,
-        polarity: :bipolar,
         anchor: :chord,
-        drop_phase: 0.5
+        saw_duration_cycle_perc: 0.5
       }
 
-    # at 1000 mbeat of a 4000 mbeat bar: cycle_phase = 0.25 -> 0.25 / 0.5 = 0.5
-    assert_in_delta Lfo.evaluate(saw, 1000, sample_context, 0, 1000), 0.5, 1.0e-6
+    # at 1000 mbeat of a 4000 mbeat bar: cycle_phase = 0.25 -> progress = 0.5
+    # baseline=2.0 and peak=1.0 gives midpoint 1.5
+    assert_in_delta Lfo.evaluate(saw, 1000, sample_context, 0, 1000), 1.5, 1.0e-6
 
     # at 3000 mbeat: cycle_phase = 0.75 >= 0.5, so it has already dropped.
-    assert Lfo.evaluate(saw, 3000, sample_context, 0, 3000) == 0.0
+    assert Lfo.evaluate(saw, 3000, sample_context, 0, 3000) == 2.0
   end
 
-  test "lfo_group normalizes saw term maps via drop_phase key" do
+  test "lfo_group normalizes saw term maps via saw_duration_cycle_perc key" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     group =
       %LfoGroup{
-        initial: %{curve: :saw_up, peak_value: 1.0, drop_phase: 0.5, anchor: :chord},
+        initial: %{curve: :saw_up, peak_value: 1.0, saw_duration_cycle_perc: 0.5, anchor: :chord},
         operations: []
       }
 
     assert_in_delta Lfo.evaluate(group, 1000, sample_context, 0, 1000), 0.5, 1.0e-6
+  end
+
+  test "lfo_saw sleep_duration_cycle_perc holds baseline before ramp" do
+    sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
+
+    saw =
+      %LfoSaw{
+        curve: :saw_up,
+        baseline_value: 2.0,
+        peak_value: 6.0,
+        cycles_per_bar: 1.0,
+        shift_mbeats: 0.0,
+        sleep_duration_cycle_perc: 0.25,
+        saw_duration_cycle_perc: 0.5,
+        anchor: :chord
+      }
+
+    # 500/4000 = 0.125, still sleeping on baseline
+    assert_in_delta Lfo.evaluate(saw, 500, sample_context, 0, 500), 2.0, 1.0e-6
+
+    # 1500/4000 = 0.375, ramp has progressed 25%
+    assert_in_delta Lfo.evaluate(saw, 1500, sample_context, 0, 1500), 3.0, 1.0e-6
+
+    # 3500/4000 = 0.875, after ramp window, reset back to baseline
+    assert_in_delta Lfo.evaluate(saw, 3500, sample_context, 0, 3500), 2.0, 1.0e-6
   end
 
   test "lfo_ramp is non-cyclic and holds final value" do

@@ -13,7 +13,10 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %DynamicVoicing{
-        modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"},
+        modulation_strategy: %EnvelopedPressure{
+          error_prefix: "dynamic_voicing",
+          pressure_attack_mbeats: 120.0
+        },
         params: %DynamicVoicingParams{
           direction: :up,
           number_of_inversions: 3

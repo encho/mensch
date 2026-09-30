@@ -1,35 +1,59 @@
 defmodule Mensch.Modulation.LfoSaw do
   @moduledoc """
-  Saw-specific LFO source with configurable drop point.
+  Saw-specific LFO source with configurable cycle timing.
 
-  `drop_phase` controls when the abrupt reset happens in the cycle.
-  For example, `drop_phase: 0.75` means the ramp runs through 75% of the
-  cycle and then drops for the remaining 25%.
+  Parameters:
+
+  - `curve` (`:saw_up | :saw_down`): Saw direction. `:saw_up` ramps upward and
+    drops, `:saw_down` ramps downward and jumps back.
+  - `peak_value` (`number`): Absolute peak endpoint of the ramp.
+  - `baseline_value` (`number`): Baseline endpoint used at reset/start. Defaults
+    to `0`.
+  - `cycles_per_bar` (`number > 0`): Oscillation speed in cycles per bar.
+  - `shift_mbeats` (`number`): Phase offset in millibeats.
+  - `sleep_duration_cycle_perc` (`0 <= number < 1`): Fraction of each cycle spent at
+    `baseline_value` before the saw starts moving.
+  - `anchor` (`:sample | :chord | :note`): Time reference for phase:
+    - `:sample` uses absolute sample timeline.
+    - `:chord` resets phase at chord start.
+    - `:note` resets phase per note lifecycle.
+  - `saw_duration_cycle_perc` (`0 < number <= 1`): Fraction of each cycle used for the
+    ramp before the abrupt reset. For example, `0.75` means ramp for 75% of
+    the cycle and reset during the remaining 25%. Must satisfy
+    `sleep_duration_cycle_perc + saw_duration_cycle_perc <= 1`.
+
+  Notes:
+
+  - This module implements `Mensch.Modulation.Lfo` via the protocol impl at
+    the bottom of this file.
+  - `normalize!/2` accepts both struct and map inputs and validates all
+    parameters.
   """
 
   alias Mensch.SampleContext
 
   @type curve :: :saw_up | :saw_down
-  @type polarity :: :bipolar | :unipolar
   @type anchor :: :sample | :chord | :note
 
   @type t :: %__MODULE__{
           curve: curve(),
           peak_value: float(),
+          baseline_value: float(),
           cycles_per_bar: float(),
           shift_mbeats: number(),
-          polarity: polarity(),
+          sleep_duration_cycle_perc: float(),
           anchor: anchor(),
-          drop_phase: float()
+          saw_duration_cycle_perc: float()
         }
 
   defstruct curve: :saw_up,
             peak_value: 0.0,
+            baseline_value: 0.0,
             cycles_per_bar: 1.0,
             shift_mbeats: 0.0,
-            polarity: :bipolar,
+            sleep_duration_cycle_perc: 0.0,
             anchor: :sample,
-            drop_phase: 1.0
+            saw_duration_cycle_perc: 1.0
 
   @spec default() :: t()
   def default, do: %__MODULE__{}
@@ -45,12 +69,22 @@ defmodule Mensch.Modulation.LfoSaw do
     %__MODULE__{
       curve: normalize_curve!(lfo_saw.curve, field_name),
       peak_value: normalize_peak_value!(lfo_saw.peak_value, field_name),
+      baseline_value: normalize_baseline_value!(lfo_saw.baseline_value, field_name),
       cycles_per_bar: normalize_cycles_per_bar!(lfo_saw.cycles_per_bar, field_name),
       shift_mbeats: normalize_shift_mbeats!(lfo_saw.shift_mbeats, field_name),
-      polarity: normalize_polarity!(lfo_saw.polarity, field_name),
+      sleep_duration_cycle_perc:
+        normalize_sleep_duration_cycle_perc!(
+          lfo_saw.sleep_duration_cycle_perc,
+          field_name
+        ),
       anchor: normalize_anchor!(lfo_saw.anchor, field_name),
-      drop_phase: normalize_drop_phase!(lfo_saw.drop_phase, field_name)
+      saw_duration_cycle_perc:
+        normalize_saw_duration_cycle_perc!(
+          lfo_saw.saw_duration_cycle_perc,
+          field_name
+        )
     }
+    |> validate_phase_window!(field_name)
   end
 
   def normalize!(lfo_saw, opts) when is_map(lfo_saw) do
@@ -89,31 +123,53 @@ defmodule Mensch.Modulation.LfoSaw do
     cycle_phase = phase - :math.floor(phase)
 
     lfo_saw.curve
-    |> waveform_value(cycle_phase, lfo_saw.drop_phase)
-    |> apply_polarity(lfo_saw)
-    |> Kernel.*(lfo_saw.peak_value)
+    |> waveform_value(
+      cycle_phase,
+      lfo_saw.sleep_duration_cycle_perc,
+      lfo_saw.saw_duration_cycle_perc
+    )
+    |> interpolate(lfo_saw.baseline_value, lfo_saw.peak_value)
   end
 
-  defp waveform_value(:saw_up, cycle_phase, drop_phase) when cycle_phase < drop_phase,
-    do: cycle_phase / drop_phase
+  defp waveform_value(
+         :saw_up,
+         cycle_phase,
+         sleep_duration_cycle_perc,
+         saw_duration_cycle_perc
+       )
+       when cycle_phase >= sleep_duration_cycle_perc and
+              cycle_phase < sleep_duration_cycle_perc + saw_duration_cycle_perc,
+       do: (cycle_phase - sleep_duration_cycle_perc) / saw_duration_cycle_perc
 
-  defp waveform_value(:saw_up, _cycle_phase, _drop_phase), do: 0.0
+  defp waveform_value(
+         :saw_up,
+         _cycle_phase,
+         _sleep_duration_cycle_perc,
+         _saw_duration_cycle_perc
+       ),
+       do: 0.0
 
-  defp waveform_value(:saw_down, cycle_phase, drop_phase) when cycle_phase < drop_phase,
-    do: -(cycle_phase / drop_phase)
+  defp waveform_value(
+         :saw_down,
+         cycle_phase,
+         sleep_duration_cycle_perc,
+         saw_duration_cycle_perc
+       )
+       when cycle_phase >= sleep_duration_cycle_perc and
+              cycle_phase < sleep_duration_cycle_perc + saw_duration_cycle_perc,
+       do: 1.0 - (cycle_phase - sleep_duration_cycle_perc) / saw_duration_cycle_perc
 
-  defp waveform_value(:saw_down, _cycle_phase, _drop_phase), do: 0.0
+  defp waveform_value(
+         :saw_down,
+         _cycle_phase,
+         _sleep_duration_cycle_perc,
+         _saw_duration_cycle_perc
+       ),
+       do: 0.0
 
-  defp apply_polarity(value, %__MODULE__{polarity: :bipolar}), do: value
-
-  defp apply_polarity(value, %__MODULE__{polarity: :unipolar}) do
-    value
-    |> waveform_to_unipolar()
-    |> clamp_0_1()
+  defp interpolate(progress, min_value, max_value) do
+    min_value + progress * (max_value - min_value)
   end
-
-  defp waveform_to_unipolar(value), do: (value + 1.0) / 2.0
-  defp clamp_0_1(value), do: value |> max(0.0) |> min(1.0)
 
   defp normalize_curve!(curve, _field_name) when curve in [:saw_up, :saw_down], do: curve
   defp normalize_curve!(:saw, _field_name), do: :saw_up
@@ -129,6 +185,14 @@ defmodule Mensch.Modulation.LfoSaw do
   defp normalize_peak_value!(other, field_name) do
     raise ArgumentError,
           "#{field_name}.peak_value must be a number, got: #{inspect(other)}"
+  end
+
+  defp normalize_baseline_value!(value, _field_name) when is_integer(value), do: value * 1.0
+  defp normalize_baseline_value!(value, _field_name) when is_float(value), do: value
+
+  defp normalize_baseline_value!(other, field_name) do
+    raise ArgumentError,
+          "#{field_name}.baseline_value must be a number, got: #{inspect(other)}"
   end
 
   defp normalize_cycles_per_bar!(value, _field_name) when is_integer(value) and value > 0,
@@ -150,12 +214,16 @@ defmodule Mensch.Modulation.LfoSaw do
           "#{field_name}.shift_mbeats must be a number, got: #{inspect(other)}"
   end
 
-  defp normalize_polarity!(polarity, _field_name) when polarity in [:bipolar, :unipolar],
-    do: polarity
+  defp normalize_sleep_duration_cycle_perc!(value, _field_name) when is_integer(value),
+    do: normalize_sleep_duration_cycle_perc!(value * 1.0, "")
 
-  defp normalize_polarity!(other, field_name) do
+  defp normalize_sleep_duration_cycle_perc!(value, _field_name)
+       when is_float(value) and value >= 0 and value < 1,
+       do: value
+
+  defp normalize_sleep_duration_cycle_perc!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.polarity must be :bipolar or :unipolar, got: #{inspect(other)}"
+          "#{field_name}.sleep_duration_cycle_perc must be >= 0 and < 1, got: #{inspect(other)}"
   end
 
   defp normalize_anchor!(anchor, _field_name)
@@ -167,16 +235,25 @@ defmodule Mensch.Modulation.LfoSaw do
           "#{field_name}.anchor must be :sample, :chord, or :note, got: #{inspect(other)}"
   end
 
-  defp normalize_drop_phase!(value, _field_name) when is_integer(value),
-    do: normalize_drop_phase!(value * 1.0, "")
+  defp normalize_saw_duration_cycle_perc!(value, _field_name) when is_integer(value),
+    do: normalize_saw_duration_cycle_perc!(value * 1.0, "")
 
-  defp normalize_drop_phase!(value, _field_name)
+  defp normalize_saw_duration_cycle_perc!(value, _field_name)
        when is_float(value) and value > 0 and value <= 1,
        do: value
 
-  defp normalize_drop_phase!(other, field_name) do
+  defp normalize_saw_duration_cycle_perc!(other, field_name) do
     raise ArgumentError,
-          "#{field_name}.drop_phase must be > 0 and <= 1, got: #{inspect(other)}"
+          "#{field_name}.saw_duration_cycle_perc must be > 0 and <= 1, got: #{inspect(other)}"
+  end
+
+  defp validate_phase_window!(%__MODULE__{} = lfo_saw, field_name) do
+    if lfo_saw.sleep_duration_cycle_perc + lfo_saw.saw_duration_cycle_perc <= 1.0 do
+      lfo_saw
+    else
+      raise ArgumentError,
+            "#{field_name}.sleep_duration_cycle_perc + #{field_name}.saw_duration_cycle_perc must be <= 1, got: #{inspect(lfo_saw.sleep_duration_cycle_perc + lfo_saw.saw_duration_cycle_perc)}"
+    end
   end
 
   defp symbolize_map_keys(map) do
@@ -186,13 +263,24 @@ defmodule Mensch.Modulation.LfoSaw do
       {"peak_value", value} -> {:peak_value, value}
       {"scale", value} -> {:peak_value, value}
       {:scale, value} -> {:peak_value, value}
+      {"baseline_value", value} -> {:baseline_value, value}
+      {"baseline", value} -> {:baseline_value, value}
+      {:baseline, value} -> {:baseline_value, value}
       {"cycles_per_bar", value} -> {:cycles_per_bar, value}
       {"shift_mbeats", value} -> {:shift_mbeats, value}
-      {"polarity", value} -> {:polarity, value}
+      {"sleep_duration_cycle_perc", value} -> {:sleep_duration_cycle_perc, value}
+      {:sleep_duration_cycle_perc, value} -> {:sleep_duration_cycle_perc, value}
+      {"sleep_phase", value} -> {:sleep_duration_cycle_perc, value}
+      {:sleep_phase, value} -> {:sleep_duration_cycle_perc, value}
+      {"sleep", value} -> {:sleep_duration_cycle_perc, value}
+      {:sleep, value} -> {:sleep_duration_cycle_perc, value}
       {"anchor", value} -> {:anchor, value}
       {"time_base", value} -> {:anchor, value}
       {:time_base, value} -> {:anchor, value}
-      {"drop_phase", value} -> {:drop_phase, value}
+      {"saw_duration_cycle_perc", value} -> {:saw_duration_cycle_perc, value}
+      {:saw_duration_cycle_perc, value} -> {:saw_duration_cycle_perc, value}
+      {"drop_phase", value} -> {:saw_duration_cycle_perc, value}
+      {:drop_phase, value} -> {:saw_duration_cycle_perc, value}
       pair -> pair
     end)
     |> Map.new()

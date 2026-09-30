@@ -14,6 +14,7 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
   alias Mensch.Modulation.LfoCurve
   alias Mensch.Modulation.LfoEnvelope
   alias Mensch.Modulation.LfoGroup
+  alias Mensch.Modulation.LfoSaw
 
   @behaviour NoteModulationStrategy
 
@@ -49,29 +50,21 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
   def default, do: %__MODULE__{}
 
   @impl NoteModulationStrategy
-  def build_context(%__MODULE__{} = strategy, _note_plan, render_context) do
-    common = Map.fetch!(render_context, :common)
-
-    %{
-      sample_context: common.sample_context,
-      absolute_chord_start_mbeat: common.absolute_chord_start_mbeat,
-      slide_lane: slide_lane(strategy),
-      bend_lane: bend_lane(strategy)
-    }
-  end
+  def build_context(%__MODULE__{}, _note_plan, _render_context), do: %{}
 
   @impl NoteModulationStrategy
   def with_note_modulators(
         %__MODULE__{} = strategy,
         %NotePlanItem{} = note,
-        modulation_context,
-        _render_context
+        _modulation_context,
+        render_context
       ) do
+    common = Map.fetch!(render_context, :common)
     pressure_lane = pressure_lane(note, strategy)
-    slide_lane = modulation_context.slide_lane
-    bend_lane = modulation_context.bend_lane
-    sample_context = modulation_context.sample_context
-    absolute_chord_start_mbeat = modulation_context.absolute_chord_start_mbeat
+    slide_lane = slide_lane(strategy)
+    bend_lane = bend_lane(strategy)
+    sample_context = common.sample_context
+    absolute_chord_start_mbeat = common.absolute_chord_start_mbeat
 
     NotePlanItem.with_modulators(note, %{
       pressure_modulator: fn at_mbeat, local_elapsed_mbeats ->
@@ -167,13 +160,15 @@ defmodule Mensch.Machine.NoteModulationStrategies.EnvelopedPressure do
     Modulation.normalize_lfo_pressure!(
       %{
         lfo: %LfoGroup{
-          initial: %LfoCurve{
-            curve: :sine,
-            min_value: 0.0,
-            max_value: 100,
+          initial: %LfoSaw{
+            curve: :saw_up,
+            peak_value: 125,
+            baseline_value: 0,
             cycles_per_bar: 1,
-            shift_mbeats: 0.0,
-            anchor: :note
+            shift_mbeats: 0,
+            anchor: :note,
+            sleep_duration_cycle_perc: 0.6,
+            saw_duration_cycle_perc: 0.4
           },
           operations: []
         },
