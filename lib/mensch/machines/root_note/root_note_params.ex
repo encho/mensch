@@ -10,16 +10,20 @@ defmodule Mensch.Machines.RootNoteParams do
   * `velocity`: MIDI note-on velocity (`0..127`).
   * `pressure`: Legacy field kept for compatibility. RootNote rendering uses a
     fixed pressure baseline of `0`.
+  * `modulation_strategy`: Note modulation strategy struct used by this machine.
   """
+
+  alias Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure
 
   @type t :: %__MODULE__{
           octave_offset: integer(),
           velocity: non_neg_integer(),
-          pressure: non_neg_integer()
+          pressure: non_neg_integer(),
+          modulation_strategy: struct()
         }
 
-  @enforce_keys [:octave_offset, :velocity, :pressure]
-  defstruct [:octave_offset, :velocity, pressure: 0]
+  @enforce_keys [:octave_offset, :velocity, :pressure, :modulation_strategy]
+  defstruct [:octave_offset, :velocity, :modulation_strategy, pressure: 0]
 
   @doc "Default parameters for the root note machine."
   @spec default() :: t()
@@ -27,7 +31,8 @@ defmodule Mensch.Machines.RootNoteParams do
     %__MODULE__{
       octave_offset: 0,
       velocity: 100,
-      pressure: 0
+      pressure: 0,
+      modulation_strategy: %EnvelopedPressure{error_prefix: "root_note"}
     }
   end
 end

@@ -27,13 +27,13 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
-            modulation_strategy: %EnvelopedPressure{
-              error_prefix: "dynamic_voicing",
-              pressure_attack_mbeats: 120.0
-            },
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
-              number_of_inversions: 12
+              number_of_inversions: 12,
+              modulation_strategy: %EnvelopedPressure{
+                error_prefix: "dynamic_voicing",
+                pressure_attack_mbeats: 120.0
+              }
             }
           }
         },
@@ -44,13 +44,13 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
-            modulation_strategy: %EnvelopedPressure{
-              error_prefix: "dynamic_voicing",
-              pressure_attack_mbeats: 120.0
-            },
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
-              number_of_inversions: 12
+              number_of_inversions: 12,
+              modulation_strategy: %EnvelopedPressure{
+                error_prefix: "dynamic_voicing",
+                pressure_attack_mbeats: 120.0
+              }
             }
           }
         },
@@ -61,13 +61,13 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
-            modulation_strategy: %EnvelopedPressure{
-              error_prefix: "dynamic_voicing",
-              pressure_attack_mbeats: 120.0
-            },
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
-              number_of_inversions: 12
+              number_of_inversions: 12,
+              modulation_strategy: %EnvelopedPressure{
+                error_prefix: "dynamic_voicing",
+                pressure_attack_mbeats: 120.0
+              }
             }
           }
         },
@@ -78,13 +78,13 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
             duration_mbeats: 4000
           },
           machine: %DynamicVoicing{
-            modulation_strategy: %EnvelopedPressure{
-              error_prefix: "dynamic_voicing",
-              pressure_attack_mbeats: 120.0
-            },
             params: %DynamicVoicingParams{
               direction: {:cycle_down, 1},
-              number_of_inversions: 12
+              number_of_inversions: 12,
+              modulation_strategy: %EnvelopedPressure{
+                error_prefix: "dynamic_voicing",
+                pressure_attack_mbeats: 120.0
+              }
             }
           }
         }

@@ -12,26 +12,29 @@ defmodule Mensch.Machines.DynamicVoicingParams do
     so `4` means four visible states per leg. Must be >= 2 in cycle modes.
     If requested voicings do not fit the chord duration frame budget,
     validation fails with an error.
-  Pressure envelope timings and modulation lanes are not part of params for
-  this machine. They are computed in the note-modulation strategy stage.
+  * `modulation_strategy`: Note modulation strategy struct used by this machine.
   """
+
+  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure
 
   @type direction :: :up | :down | {:cycle_up, pos_integer()} | {:cycle_down, pos_integer()}
 
   @type t :: %__MODULE__{
           direction: direction(),
-          number_of_inversions: pos_integer()
+          number_of_inversions: pos_integer(),
+          modulation_strategy: struct()
         }
 
-  @enforce_keys [:direction, :number_of_inversions]
-  defstruct [:direction, :number_of_inversions]
+  @enforce_keys [:direction, :number_of_inversions, :modulation_strategy]
+  defstruct [:direction, :number_of_inversions, :modulation_strategy]
 
   @doc "Default parameters for the dynamic voicing machine."
   @spec default() :: t()
   def default do
     %__MODULE__{
       direction: :up,
-      number_of_inversions: 4
+      number_of_inversions: 4,
+      modulation_strategy: %EnvelopedPressure{error_prefix: "dynamic_voicing"}
     }
   end
 end

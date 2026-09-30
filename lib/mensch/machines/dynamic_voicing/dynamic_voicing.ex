@@ -16,7 +16,6 @@ defmodule Mensch.Machines.DynamicVoicing do
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
-  alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.DynamicVoicingParams
 
   defmodule RenderContext do
@@ -37,12 +36,12 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @note_on_velocity 100
 
-  @type t :: %__MODULE__{params: DynamicVoicingParams.t(), modulation_strategy: struct()}
+  @type t :: %__MODULE__{params: DynamicVoicingParams.t()}
 
   @behaviour Pipeline
 
-  @enforce_keys [:params, :modulation_strategy]
-  defstruct [:params, :modulation_strategy]
+  @enforce_keys [:params]
+  defstruct [:params]
 
   def id, do: :dynamic_voicing
 
@@ -50,14 +49,10 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   def default_params, do: DynamicVoicingParams.default()
 
-  def default_modulation_strategy do
-    %EnvelopedPressure{error_prefix: "dynamic_voicing"}
-  end
+  def default_modulation_strategy, do: default_params().modulation_strategy
 
-  @spec new(DynamicVoicingParams.t(), struct()) :: t()
-  def new(%DynamicVoicingParams{} = params, modulation_strategy)
-      when is_struct(modulation_strategy),
-      do: %__MODULE__{params: params, modulation_strategy: modulation_strategy}
+  @spec new(DynamicVoicingParams.t()) :: t()
+  def new(%DynamicVoicingParams{} = params), do: %__MODULE__{params: params}
 
   @spec controls() :: %{
           direction: :up,
@@ -115,8 +110,11 @@ defmodule Mensch.Machines.DynamicVoicing do
 
   @impl Pipeline
   @spec modulation_strategy(t(), RenderContext.t()) :: struct()
-  def modulation_strategy(%__MODULE__{modulation_strategy: strategy}, %RenderContext{}),
-    do: strategy
+  def modulation_strategy(
+        %__MODULE__{params: %DynamicVoicingParams{} = params},
+        %RenderContext{}
+      ),
+      do: params.modulation_strategy
 
   defp build_voicing_sequence(
          %ChordSpec{} = chord_spec,
@@ -446,16 +444,16 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
 
   def id(_machine), do: DynamicVoicing.id()
 
-  def controls(%DynamicVoicing{params: params, modulation_strategy: modulation_strategy}) do
+  def controls(%DynamicVoicing{params: params}) do
     %{
       direction: params.direction,
       number_of_inversions: params.number_of_inversions,
-      note_modulation_strategy: inspect(modulation_strategy.__struct__)
+      note_modulation_strategy: inspect(params.modulation_strategy.__struct__)
     }
   end
 
   def build_frame_sequence(
-        %DynamicVoicing{params: params, modulation_strategy: modulation_strategy},
+        %DynamicVoicing{params: params},
         chord_spec,
         sample_context,
         timeline_context,
@@ -465,7 +463,7 @@ defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do
 
     Mensch.Machine.Pipeline.build_frame_sequence(
       DynamicVoicing,
-      %DynamicVoicing{params: normalized_params, modulation_strategy: modulation_strategy},
+      %DynamicVoicing{params: normalized_params},
       chord_spec,
       sample_context,
       timeline_context,

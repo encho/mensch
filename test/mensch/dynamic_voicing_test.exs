@@ -20,8 +20,11 @@ defmodule Mensch.DynamicVoicingTest do
     chord_spec = %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0}
 
     machine = %DynamicVoicing{
-      modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-      params: %DynamicVoicingParams{direction: :up, number_of_inversions: 0}
+      params: %DynamicVoicingParams{
+        direction: :up,
+        number_of_inversions: 0,
+        modulation_strategy: DynamicVoicing.default_modulation_strategy()
+      }
     }
 
     assert_raise ArgumentError, ~r/number_of_inversions must be >= 1/, fn ->
@@ -41,8 +44,11 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
-        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-        params: %DynamicVoicingParams{direction: :up, number_of_inversions: 3}
+        params: %DynamicVoicingParams{
+          direction: :up,
+          number_of_inversions: 3,
+          modulation_strategy: DynamicVoicing.default_modulation_strategy()
+        }
       }
 
     rendered =
@@ -73,8 +79,11 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
-        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-        params: %DynamicVoicingParams{direction: :down, number_of_inversions: 3}
+        params: %DynamicVoicingParams{
+          direction: :down,
+          number_of_inversions: 3,
+          modulation_strategy: DynamicVoicing.default_modulation_strategy()
+        }
       }
 
     rendered =
@@ -105,8 +114,11 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
-        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-        params: %DynamicVoicingParams{direction: {:cycle_up, 1}, number_of_inversions: 3}
+        params: %DynamicVoicingParams{
+          direction: {:cycle_up, 1},
+          number_of_inversions: 3,
+          modulation_strategy: DynamicVoicing.default_modulation_strategy()
+        }
       }
 
     rendered =
@@ -129,8 +141,11 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
-        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-        params: %DynamicVoicingParams{direction: {:cycle_down, 2}, number_of_inversions: 2}
+        params: %DynamicVoicingParams{
+          direction: {:cycle_down, 2},
+          number_of_inversions: 2,
+          modulation_strategy: DynamicVoicing.default_modulation_strategy()
+        }
       }
 
     rendered =
@@ -153,8 +168,11 @@ defmodule Mensch.DynamicVoicingTest do
 
     machine =
       %DynamicVoicing{
-        modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-        params: %DynamicVoicingParams{direction: {:cycle_up, 2}, number_of_inversions: 24}
+        params: %DynamicVoicingParams{
+          direction: {:cycle_up, 2},
+          number_of_inversions: 24,
+          modulation_strategy: DynamicVoicing.default_modulation_strategy()
+        }
       }
 
     assert_raise ArgumentError, ~r/requested .* voicings but only .* frame slots/, fn ->
@@ -164,8 +182,11 @@ defmodule Mensch.DynamicVoicingTest do
 
   test "pressure envelope rises and decays across the note lifecycle" do
     machine = %DynamicVoicing{
-      modulation_strategy: DynamicVoicing.default_modulation_strategy(),
-      params: %DynamicVoicingParams{direction: :up, number_of_inversions: 1}
+      params: %DynamicVoicingParams{
+        direction: :up,
+        number_of_inversions: 1,
+        modulation_strategy: DynamicVoicing.default_modulation_strategy()
+      }
     }
 
     pressures = pressures_by_at_mbeat(machine)

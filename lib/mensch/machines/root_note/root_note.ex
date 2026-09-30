@@ -14,7 +14,6 @@ defmodule Mensch.Machines.RootNote do
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
-  alias Mensch.Machines.RootNote.NoteModulationStrategies.EnvelopedPressure
   alias Mensch.Machines.RootNoteParams
 
   defmodule RenderContext do
@@ -32,12 +31,12 @@ defmodule Mensch.Machines.RootNote do
           }
   end
 
-  @type t :: %__MODULE__{params: RootNoteParams.t(), modulation_strategy: struct()}
+  @type t :: %__MODULE__{params: RootNoteParams.t()}
 
   @behaviour Pipeline
 
-  @enforce_keys [:params, :modulation_strategy]
-  defstruct [:params, :modulation_strategy]
+  @enforce_keys [:params]
+  defstruct [:params]
 
   def id, do: :root_note
 
@@ -45,13 +44,10 @@ defmodule Mensch.Machines.RootNote do
 
   def default_params, do: RootNoteParams.default()
 
-  def default_modulation_strategy do
-    %EnvelopedPressure{error_prefix: "root_note"}
-  end
+  def default_modulation_strategy, do: default_params().modulation_strategy
 
-  @spec new(RootNoteParams.t(), struct()) :: t()
-  def new(%RootNoteParams{} = params, modulation_strategy) when is_struct(modulation_strategy),
-    do: %__MODULE__{params: params, modulation_strategy: modulation_strategy}
+  @spec new(RootNoteParams.t()) :: t()
+  def new(%RootNoteParams{} = params), do: %__MODULE__{params: params}
 
   def controls do
     params = default_params()
@@ -102,8 +98,8 @@ defmodule Mensch.Machines.RootNote do
 
   @impl Pipeline
   @spec modulation_strategy(t(), RenderContext.t()) :: struct()
-  def modulation_strategy(%__MODULE__{modulation_strategy: strategy}, %RenderContext{}),
-    do: strategy
+  def modulation_strategy(%__MODULE__{params: %RootNoteParams{} = params}, %RenderContext{}),
+    do: params.modulation_strategy
 
   @doc false
   @spec normalize_params(RootNoteParams.t()) :: RootNoteParams.t()
@@ -153,17 +149,17 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
 
   def id(_machine), do: RootNote.id()
 
-  def controls(%RootNote{params: params, modulation_strategy: modulation_strategy}) do
+  def controls(%RootNote{params: params}) do
     %{
       octave_offset: params.octave_offset,
       velocity: params.velocity,
       pressure: params.pressure,
-      note_modulation_strategy: inspect(modulation_strategy.__struct__)
+      note_modulation_strategy: inspect(params.modulation_strategy.__struct__)
     }
   end
 
   def build_frame_sequence(
-        %RootNote{params: params, modulation_strategy: modulation_strategy},
+        %RootNote{params: params},
         chord_spec,
         sample_context,
         timeline_context,
@@ -173,7 +169,7 @@ defimpl Mensch.Machine, for: Mensch.Machines.RootNote do
 
     Mensch.Machine.Pipeline.build_frame_sequence(
       RootNote,
-      %RootNote{params: normalized_params, modulation_strategy: modulation_strategy},
+      %RootNote{params: normalized_params},
       chord_spec,
       sample_context,
       timeline_context,
