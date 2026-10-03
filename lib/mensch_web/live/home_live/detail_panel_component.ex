@@ -51,7 +51,9 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
               phx-click="toggle_note_focus"
               phx-value-note={to_string(segment.midi_note)}
               phx-value-channel={to_string(segment.channel)}
-              title={"velocity #{Map.get(segment, :velocity, 0)}"}
+              title={
+                "on velocity #{Map.get(segment, :note_on_velocity, 0)} · off velocity #{Map.get(segment, :note_off_velocity, 0)}"
+              }
               class={[
                 "absolute inset-y-0 z-20 cursor-pointer transition-opacity duration-150",
                 segment.active && "opacity-100",
@@ -62,10 +64,26 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
               <span
                 class="pointer-events-none absolute -top-5 left-0 z-30 flex size-5 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 text-[6px] font-bold text-white"
                 style={
-                  Map.get(segment, :marker_style, "background-color: rgba(255, 255, 255, 0.35);")
+                  Map.get(
+                    segment,
+                    :note_on_marker_style,
+                    "background-color: rgba(255, 255, 255, 0.35);"
+                  )
                 }
               >
-                <span class="block leading-none">{Map.get(segment, :velocity, 0)}</span>
+                <span class="block leading-none">{Map.get(segment, :note_on_velocity, 0)}</span>
+              </span>
+              <span
+                class="pointer-events-none absolute -top-5 right-0 z-30 flex size-5 translate-x-1/2 items-center justify-center rounded-full border border-white/30 text-[6px] font-bold text-white"
+                style={
+                  Map.get(
+                    segment,
+                    :note_off_marker_style,
+                    "background-color: rgba(255, 255, 255, 0.35);"
+                  )
+                }
+              >
+                <span class="block leading-none">{Map.get(segment, :note_off_velocity, 0)}</span>
               </span>
             </div>
             <span class={[
@@ -149,7 +167,8 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 <th class="px-3 py-1.5 font-normal">ch</th>
                 <th class="px-3 py-1.5 font-normal">on</th>
                 <th class="px-3 py-1.5 font-normal">off</th>
-                <th class="px-3 py-1.5 font-normal">velocity</th>
+                <th class="px-3 py-1.5 font-normal">on vel</th>
+                <th class="px-3 py-1.5 font-normal">off vel</th>
                 <th class="px-3 py-1.5 font-normal">pressure</th>
                 <th class="px-3 py-1.5 font-normal">bend</th>
                 <th class="px-3 py-1.5 font-normal">slide</th>
@@ -172,6 +191,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
                 <td class="px-3 py-1.5">{row.note_on}</td>
                 <td class="px-3 py-1.5">{row.note_off}</td>
                 <td class="px-3 py-1.5">{if row.note_on, do: row.note_on_velocity, else: "-"}</td>
+                <td class="px-3 py-1.5">{if row.note_off, do: row.note_off_velocity, else: "-"}</td>
                 <td class="px-3 py-1.5">{row.pressure}</td>
                 <td class="px-3 py-1.5">{format_bend(row.bend)}</td>
                 <td class="px-3 py-1.5">{row.slide}</td>

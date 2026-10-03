@@ -34,6 +34,7 @@ defmodule Mensch.Machines.RootNote do
   @type t :: %__MODULE__{params: RootNoteParams.t()}
 
   @behaviour Pipeline
+  @note_off_velocity 77
 
   @enforce_keys [:params]
   defstruct [:params]
@@ -83,6 +84,7 @@ defmodule Mensch.Machines.RootNote do
         midi_note: root_midi_note,
         channel: nil,
         note_on_velocity: 0,
+        note_off_velocity: 0,
         machine_id: id(),
         chord_instance_id: 0,
         note_instance_id: 0,
@@ -105,7 +107,7 @@ defmodule Mensch.Machines.RootNote do
       )
       when is_list(note_plan) do
     Enum.map(note_plan, fn %NotePlanItem{} = note ->
-      %NotePlanItem{note | note_on_velocity: velocity}
+      %NotePlanItem{note | note_on_velocity: velocity, note_off_velocity: @note_off_velocity}
     end)
   end
 

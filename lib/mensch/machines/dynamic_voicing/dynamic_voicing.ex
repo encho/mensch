@@ -35,6 +35,7 @@ defmodule Mensch.Machines.DynamicVoicing do
   end
 
   @note_on_velocities [100, 50, 120, 70]
+  @note_off_velocity 77
 
   @type t :: %__MODULE__{params: DynamicVoicingParams.t()}
 
@@ -355,6 +356,7 @@ defmodule Mensch.Machines.DynamicVoicing do
       midi_note: plan.midi_note,
       channel: nil,
       note_on_velocity: 0,
+      note_off_velocity: 0,
       machine_id: id(),
       chord_instance_id: 0,
       note_instance_id: plan.note_instance_id,
@@ -377,7 +379,7 @@ defmodule Mensch.Machines.DynamicVoicing do
     Enum.with_index(note_plan)
     |> Enum.map(fn {%NotePlanItem{} = note, index} ->
       velocity = Enum.at(velocities, rem(index, velocity_count), 100)
-      %NotePlanItem{note | note_on_velocity: velocity}
+      %NotePlanItem{note | note_on_velocity: velocity, note_off_velocity: @note_off_velocity}
     end)
   end
 

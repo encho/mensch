@@ -1836,7 +1836,8 @@ defmodule MenschWeb.HomeLive do
                          start_mbeat: start_mbeat,
                          end_mbeat: end_mbeat,
                          label: label,
-                         velocity: velocity
+                         note_on_velocity: note_on_velocity,
+                         note_off_velocity: note_off_velocity
                        } ->
           left_pct = start_mbeat / total_mbeats * 100
           width_pct = max((end_mbeat - start_mbeat) / total_mbeats * 100, 0.5)
@@ -1851,12 +1852,18 @@ defmodule MenschWeb.HomeLive do
           style =
             "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
               "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
-              "background-color: #{note_matrix_velocity_color(Map.fetch!(colors, series_key), velocity, is_selected, in_active_chords)};"
+              "background-color: #{note_matrix_velocity_color(Map.fetch!(colors, series_key), note_on_velocity, is_selected, in_active_chords)};"
 
-          marker_style =
+          note_on_marker_style =
             note_matrix_velocity_marker_style(
               Map.fetch!(colors, series_key),
-              velocity
+              note_on_velocity
+            )
+
+          note_off_marker_style =
+            note_matrix_velocity_marker_style(
+              Map.fetch!(colors, series_key),
+              note_off_velocity
             )
 
           %{
@@ -1865,9 +1872,11 @@ defmodule MenschWeb.HomeLive do
             midi_note: midi_note_number,
             label: label,
             active: is_selected,
-            velocity: velocity,
+            note_on_velocity: note_on_velocity,
+            note_off_velocity: note_off_velocity,
             style: style,
-            marker_style: marker_style
+            note_on_marker_style: note_on_marker_style,
+            note_off_marker_style: note_off_marker_style
           }
         end)
       end)
@@ -1906,11 +1915,18 @@ defmodule MenschWeb.HomeLive do
                     channel: segment.channel,
                     midi_note: segment.midi_note,
                     active: segment.active,
-                    velocity: Map.get(segment, :velocity, 0),
-                    marker_style:
+                    note_on_velocity: Map.get(segment, :note_on_velocity, 0),
+                    note_off_velocity: Map.get(segment, :note_off_velocity, 0),
+                    note_on_marker_style:
                       Map.get(
                         segment,
-                        :marker_style,
+                        :note_on_marker_style,
+                        "background-color: rgba(255, 255, 255, 0.35);"
+                      ),
+                    note_off_marker_style:
+                      Map.get(
+                        segment,
+                        :note_off_marker_style,
                         "background-color: rgba(255, 255, 255, 0.35);"
                       )
                   }
@@ -1933,18 +1949,38 @@ defmodule MenschWeb.HomeLive do
       |> Enum.sort_by(fn {_note, at_mbeat} -> at_mbeat end)
       |> Enum.reduce({[], nil}, fn {note, at_mbeat}, {acc, open} ->
         label = "#{note.note_name}#{note.octave}"
-        velocity = note_matrix_velocity(note)
+        note_on_velocity = note_matrix_note_on_velocity(note)
 
         cond do
           note.note_on and is_nil(open) ->
-            {acc, %{start_mbeat: at_mbeat, label: label, velocity: velocity}}
+            {acc,
+             %{
+               start_mbeat: at_mbeat,
+               label: label,
+               note_on_velocity: note_on_velocity,
+               note_off_velocity: 0
+             }}
 
           note.note_on and not is_nil(open) ->
-            closed = Map.put(open, :end_mbeat, at_mbeat)
-            {[closed | acc], %{start_mbeat: at_mbeat, label: label, velocity: velocity}}
+            closed =
+              open
+              |> Map.put(:end_mbeat, at_mbeat)
+              |> Map.put(:note_off_velocity, 0)
+
+            {[closed | acc],
+             %{
+               start_mbeat: at_mbeat,
+               label: label,
+               note_on_velocity: note_on_velocity,
+               note_off_velocity: 0
+             }}
 
           note.note_off and not is_nil(open) ->
-            closed = Map.put(open, :end_mbeat, at_mbeat)
+            closed =
+              open
+              |> Map.put(:end_mbeat, at_mbeat)
+              |> Map.put(:note_off_velocity, note_matrix_note_off_velocity(note))
+
             {[closed | acc], nil}
 
           true ->
@@ -1956,7 +1992,12 @@ defmodule MenschWeb.HomeLive do
       if is_nil(open_segment) do
         segments
       else
-        [Map.put(open_segment, :end_mbeat, total_mbeats) | segments]
+        [
+          open_segment
+          |> Map.put(:end_mbeat, total_mbeats)
+          |> Map.put(:note_off_velocity, 0)
+          | segments
+        ]
       end
 
     segments
@@ -1964,9 +2005,15 @@ defmodule MenschWeb.HomeLive do
     |> Enum.filter(fn segment -> segment.end_mbeat >= segment.start_mbeat end)
   end
 
-  defp note_matrix_velocity(note) do
+  defp note_matrix_note_on_velocity(note) do
     note
     |> Map.get(:note_on_velocity, 0)
+    |> clamp_u7()
+  end
+
+  defp note_matrix_note_off_velocity(note) do
+    note
+    |> Map.get(:note_off_velocity, 0)
     |> clamp_u7()
   end
 

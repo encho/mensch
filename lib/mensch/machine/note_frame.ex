@@ -14,6 +14,7 @@ defmodule Mensch.Machine.NoteFrame do
     :midi_note,
     :channel,
     :note_on_velocity,
+    :note_off_velocity,
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
@@ -32,6 +33,7 @@ defmodule Mensch.Machine.NoteFrame do
     :midi_note,
     :channel,
     :note_on_velocity,
+    :note_off_velocity,
     :machine_id,
     :chord_instance_id,
     :note_instance_id,
@@ -53,6 +55,7 @@ defmodule Mensch.Machine.NoteFrame do
           midi_note: non_neg_integer(),
           channel: non_neg_integer() | nil,
           note_on_velocity: non_neg_integer() | nil,
+          note_off_velocity: non_neg_integer() | nil,
           machine_id: atom(),
           chord_instance_id: non_neg_integer(),
           note_instance_id: non_neg_integer(),
@@ -84,6 +87,7 @@ defmodule Mensch.Machine.NoteFrame do
       midi_note: note_plan_item.midi_note,
       channel: note_plan_item.channel,
       note_on_velocity: note_plan_item.note_on_velocity,
+      note_off_velocity: note_plan_item.note_off_velocity,
       machine_id: note_plan_item.machine_id,
       chord_instance_id: note_plan_item.chord_instance_id,
       note_instance_id: note_plan_item.note_instance_id,
@@ -103,6 +107,13 @@ defmodule Mensch.Machine.NoteFrame do
         Map.put(merged, :note_on_velocity, nil)
       end
 
+    merged =
+      if Map.get(merged, :note_off, false) do
+        merged
+      else
+        Map.put(merged, :note_off_velocity, nil)
+      end
+
     new(merged)
   end
 
@@ -119,6 +130,7 @@ defmodule Mensch.Machine.NoteFrame do
         midi_note: Map.fetch!(note, :midi_note),
         channel: Map.fetch!(note, :channel),
         note_on_velocity: Map.fetch!(note, :note_on_velocity),
+        note_off_velocity: Map.fetch!(note, :note_off_velocity),
         machine_id: Map.fetch!(note, :machine_id),
         chord_instance_id: Map.fetch!(note, :chord_instance_id),
         note_instance_id: Map.fetch!(note, :note_instance_id),

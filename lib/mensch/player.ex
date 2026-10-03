@@ -196,7 +196,7 @@ defmodule Mensch.Player do
   end
 
   defp maybe_append_note_off(messages, %{note_off: true} = note) do
-    messages ++ [<<0x80 + note.channel, note.midi_note, 0>>]
+    messages ++ [<<0x80 + note.channel, note.midi_note, note.note_off_velocity>>]
   end
 
   defp maybe_append_note_off(messages, _note), do: messages

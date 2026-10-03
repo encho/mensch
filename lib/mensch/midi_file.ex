@@ -130,6 +130,7 @@ defmodule Mensch.MidiFile do
         ch = clamp_u7(Map.get(note, :channel, 0))
         midi_note = clamp_u7(Map.get(note, :midi_note, 0))
         velocity = clamp_u7(Map.get(note, :note_on_velocity, 0))
+        note_off_velocity = clamp_u7(Map.get(note, :note_off_velocity, 0))
         note_instance_id = Map.get(note, :note_instance_id, 999)
 
         events =
@@ -181,7 +182,7 @@ defmodule Mensch.MidiFile do
             sort: {note_instance_id, ch, midi_note, 5},
             label: :note_off,
             midi_note: midi_note,
-            bytes: <<0x80 + ch, midi_note, 0>>
+            bytes: <<0x80 + ch, midi_note, note_off_velocity>>
           })
 
         events
@@ -389,8 +390,8 @@ defmodule Mensch.MidiFile do
   defp report_fields(:note_on, <<status, note, velocity>>),
     do: {status_channel(status), note, "note_on", velocity, ""}
 
-  defp report_fields(:note_off, <<status, note, _zero>>),
-    do: {status_channel(status), note, "note_off", 0, ""}
+  defp report_fields(:note_off, <<status, note, velocity>>),
+    do: {status_channel(status), note, "note_off", velocity, ""}
 
   defp report_fields(:pressure, <<status, pressure>>),
     do: {status_channel(status), "", "pressure", pressure, ""}
