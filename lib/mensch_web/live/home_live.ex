@@ -1181,7 +1181,23 @@ defmodule MenschWeb.HomeLive do
   defp preferred_note_spelling(sample_entries) when is_list(sample_entries) do
     roots = Enum.map(sample_entries, fn entry -> entry.chord_spec.root end)
 
-    has_flat_class_root? = Enum.any?(roots, &(&1 in [:a_sharp, :d_sharp, :g_sharp]))
+    has_flat_class_root? =
+      Enum.any?(
+        roots,
+        &(&1 in [
+            :a_sharp,
+            :d_sharp,
+            :g_sharp,
+            :b_flat,
+            :e_flat,
+            :a_flat,
+            :d_flat,
+            :g_flat,
+            :c_flat,
+            :f_flat
+          ])
+      )
+
     has_sharp_class_root? = Enum.any?(roots, &(&1 in [:c_sharp, :f_sharp]))
 
     if has_flat_class_root? and not has_sharp_class_root? do

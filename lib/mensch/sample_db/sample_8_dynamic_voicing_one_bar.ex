@@ -34,7 +34,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
         %{
           chord_spec: %ChordSpec{
             root: :a_sharp,
-            tones: ["1", "3", "5", "7"],
+            quality: :maj7,
             octave: 3,
             inversion: 0
           },

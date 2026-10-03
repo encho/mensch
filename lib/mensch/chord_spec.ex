@@ -10,6 +10,7 @@ defmodule Mensch.ChordSpec do
     * `inversion` signed integer voicing rotation for upper chord tones
     * `bass` optional slash bass note (e.g. `:a` for C/A)
     * `function` optional harmonic-function metadata (`"ii"`, `"V/vi"`, ...)
+    * `key` optional key metadata (e.g. `%{tonic: :b_flat, mode: :major}`)
 
   `to_midi_notes/1` expands this musical intent into concrete MIDI
   note numbers, with inversion applied to upper tones. If `bass` is set,
@@ -40,21 +41,51 @@ defmodule Mensch.ChordSpec do
           | :b
 
   @type tone :: String.t()
+  @type key_mode :: :major | :minor
+  @type quality ::
+          :maj
+          | :min
+          | :maj7
+          | :min7
+          | :dom7
+          | :sus2
+          | :sus4
+          | :maj9
+          | :min9
+          | :dom9
+          | :maj11
+          | :min11
+          | :dom13
+          | :six_nine
+          | :min6
+          | :dim
+          | :half_dim
+          | :dim7
+          | :aug
+          | :min7_add11
+
+  @type key_spec :: %{
+          tonic: pitch_class(),
+          mode: key_mode()
+        }
 
   @type t :: %__MODULE__{
           root: pitch_class(),
-          tones: [tone()],
+          tones: [tone()] | nil,
+          quality: quality() | nil,
           octave: integer(),
           inversion: integer(),
           bass: pitch_class() | nil,
-          function: String.t() | nil
+          function: String.t() | nil,
+          key: key_spec() | nil
         }
 
-  @enforce_keys [:root, :tones, :octave, :inversion]
-  defstruct [:root, :tones, :octave, :inversion, bass: nil, function: nil]
+  @enforce_keys [:root, :octave, :inversion]
+  defstruct [:root, :tones, :quality, :octave, :inversion, bass: nil, function: nil, key: nil]
 
   @sharp_note_names ~w(c c_sharp d d_sharp e f f_sharp g g_sharp a a_sharp b)a
   @flat_note_names ~w(c d_flat d e_flat e f g_flat g a_flat a b_flat b)a
+
   @tone_intervals %{
     "1" => 0,
     "b2" => 1,
@@ -91,6 +122,29 @@ defmodule Mensch.ChordSpec do
     sus4: ["1", "4", "5"]
   }
 
+  @quality_tones %{
+    maj: ["1", "3", "5"],
+    min: ["1", "b3", "5"],
+    maj7: ["1", "3", "5", "7"],
+    min7: ["1", "b3", "5", "b7"],
+    dom7: ["1", "3", "5", "b7"],
+    sus2: ["1", "2", "5"],
+    sus4: ["1", "4", "5"],
+    maj9: ["1", "3", "5", "7", "9"],
+    min9: ["1", "b3", "5", "b7", "9"],
+    dom9: ["1", "3", "5", "b7", "9"],
+    maj11: ["1", "3", "5", "7", "9", "11"],
+    min11: ["1", "b3", "5", "b7", "9", "11"],
+    dom13: ["1", "3", "5", "b7", "9", "13"],
+    six_nine: ["1", "3", "5", "6", "9"],
+    min6: ["1", "b3", "5", "6"],
+    dim: ["1", "b3", "b5"],
+    half_dim: ["1", "b3", "b5", "b7"],
+    dim7: ["1", "b3", "b5", "bb7"],
+    aug: ["1", "3", "#5"],
+    min7_add11: ["1", "b3", "5", "b7", "11"]
+  }
+
   @doc "Builds and validates a chord spec from a map."
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
@@ -119,10 +173,17 @@ defmodule Mensch.ChordSpec do
       not valid_pitch_class?(spec.root) ->
         {:error, {:invalid_root, spec.root}}
 
-      not is_list(spec.tones) or spec.tones == [] ->
+      is_nil(spec.tones) and is_nil(spec.quality) ->
+        {:error, {:missing_chord_content, :tones_or_quality_required}}
+
+      not is_nil(spec.quality) and not Map.has_key?(@quality_tones, spec.quality) ->
+        {:error, {:invalid_quality, spec.quality}}
+
+      not is_nil(spec.tones) and (not is_list(spec.tones) or spec.tones == []) ->
         {:error, {:invalid_tones, spec.tones}}
 
-      Enum.any?(spec.tones, &(not (is_binary(&1) and Map.has_key?(@tone_intervals, &1)))) ->
+      not is_nil(spec.tones) and
+          Enum.any?(spec.tones, &(not (is_binary(&1) and Map.has_key?(@tone_intervals, &1)))) ->
         {:error, {:invalid_tones, spec.tones}}
 
       not is_integer(spec.octave) ->
@@ -137,6 +198,9 @@ defmodule Mensch.ChordSpec do
       not is_nil(spec.function) and not is_binary(spec.function) ->
         {:error, {:invalid_function, spec.function}}
 
+      not is_nil(spec.key) and not valid_key_spec?(spec.key) ->
+        {:error, {:invalid_key, spec.key}}
+
       true ->
         :ok
     end
@@ -148,7 +212,7 @@ defmodule Mensch.ChordSpec do
     root_midi = midi_note_number(spec.root, spec.octave)
 
     upper_notes =
-      spec.tones
+      tones(spec)
       |> Enum.uniq()
       |> Enum.map(&(root_midi + Map.fetch!(@tone_intervals, &1)))
       |> Enum.sort()
@@ -161,6 +225,16 @@ defmodule Mensch.ChordSpec do
       bass ->
         bass_midi = anchored_bass_midi(bass, spec.octave, upper_notes)
         ([bass_midi] ++ upper_notes) |> Enum.uniq() |> Enum.sort()
+    end
+  end
+
+  @doc "Returns resolved chord tones. Prefers explicit `tones`; otherwise derives from `quality`."
+  @spec tones(t()) :: [tone()]
+  def tones(%__MODULE__{} = spec) do
+    cond do
+      is_list(spec.tones) and spec.tones != [] -> spec.tones
+      is_atom(spec.quality) -> Map.fetch!(@quality_tones, spec.quality)
+      true -> []
     end
   end
 
@@ -208,11 +282,17 @@ defmodule Mensch.ChordSpec do
     end
   end
 
+  @doc "Human-readable key label, e.g. `%{tonic: :b_flat, mode: :major}` -> `Bb major`."
+  @spec key_label(key_spec()) :: String.t()
+  def key_label(%{tonic: tonic, mode: mode}) when mode in [:major, :minor] do
+    "#{root_label(tonic)} #{Atom.to_string(mode)}"
+  end
+
   @doc "Compact human-readable chord symbol with optional slash bass."
   @spec symbol_label(t()) :: String.t()
   def symbol_label(%__MODULE__{} = spec) do
     root = root_label(spec.root)
-    tones = spec.tones |> Enum.uniq()
+    tones = spec |> tones() |> Enum.uniq()
     quality = symbol_quality_suffix(tones)
     explicit = "(#{tones |> Enum.map(&display_tone/1) |> Enum.join(",")})"
     bass = if is_nil(spec.bass), do: "", else: "/" <> root_label(spec.bass)
@@ -281,7 +361,16 @@ defmodule Mensch.ChordSpec do
 
   defp valid_pitch_class?(_root), do: false
 
+  defp valid_key_spec?(%{tonic: tonic, mode: mode}) when mode in [:major, :minor],
+    do: valid_pitch_class?(tonic)
+
+  defp valid_key_spec?(_key), do: false
+
   defp maybe_expand_legacy_modifier(%{tones: tones} = attrs) when is_list(tones), do: attrs
+
+  defp maybe_expand_legacy_modifier(%{quality: quality} = attrs) when is_atom(quality) do
+    if Map.has_key?(@quality_tones, quality), do: attrs, else: attrs
+  end
 
   defp maybe_expand_legacy_modifier(%{modifier: modifier} = attrs) do
     case Map.get(@legacy_tones, modifier) do

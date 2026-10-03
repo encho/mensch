@@ -9,6 +9,8 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
     assigns =
       assign(assigns,
         root_label: root_label(assigns.chord_spec.root),
+        quality_label: quality_label(assigns.chord_spec),
+        tone_labels: ChordSpec.tones(assigns.chord_spec),
         note_labels: midi_note_labels(assigns.chord_spec)
       )
 
@@ -19,10 +21,16 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
       <dl class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-zinc-200">
         <dt class="text-zinc-500">Root</dt>
         <dd>{@root_label}</dd>
+        <dt class="text-zinc-500">Quality</dt>
+        <dd>{@quality_label}</dd>
         <dt class="text-zinc-500">Tones</dt>
-        <dd>{Enum.join(Enum.map(@chord_spec.tones, &to_string/1), ", ")}</dd>
+        <dd>{Enum.join(@tone_labels, ", ")}</dd>
         <dt class="text-zinc-500">Bass</dt>
         <dd>{if is_nil(@chord_spec.bass), do: "-", else: root_label(@chord_spec.bass)}</dd>
+        <dt class="text-zinc-500">Key</dt>
+        <dd>{if is_nil(@chord_spec.key), do: "-", else: ChordSpec.key_label(@chord_spec.key)}</dd>
+        <dt class="text-zinc-500">Function</dt>
+        <dd>{Map.get(@chord_spec, :function, "-") || "-"}</dd>
         <dt class="text-zinc-500">Octave</dt>
         <dd>{@chord_spec.octave}</dd>
         <dt class="text-zinc-500">Inversion</dt>
@@ -46,4 +54,9 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   defp root_label(root) do
     ChordSpec.root_label(root)
   end
+
+  defp quality_label(%ChordSpec{quality: nil}), do: "-"
+
+  defp quality_label(%ChordSpec{quality: quality}) when is_atom(quality),
+    do: Atom.to_string(quality)
 end
