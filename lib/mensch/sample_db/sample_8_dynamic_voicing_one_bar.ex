@@ -32,7 +32,12 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
         %{
-          chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            root: :a_sharp,
+            tones: ["1", "3", "5", "7"],
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
             duration_mbeats: 4000

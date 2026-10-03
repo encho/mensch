@@ -20,7 +20,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
         %{
-          chord_spec: %ChordSpec{root: :c, modifier: :min7, octave: 2, inversion: 0},
+          chord_spec: %ChordSpec{root: :c, tones: ["1", "b3", "5", "b7"], octave: 2, inversion: 0},
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -37,7 +37,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :f, modifier: :dom7, octave: 2, inversion: 0},
+          chord_spec: %ChordSpec{root: :f, tones: ["1", "3", "5", "b7"], octave: 2, inversion: 0},
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 1, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -54,7 +54,12 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 2, inversion: 0},
+          chord_spec: %ChordSpec{
+            root: :a_sharp,
+            tones: ["1", "3", "5", "7"],
+            octave: 2,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 2, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -71,7 +76,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :g, modifier: :min7, octave: 2, inversion: 0},
+          chord_spec: %ChordSpec{root: :g, tones: ["1", "b3", "5", "b7"], octave: 2, inversion: 0},
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
             duration_mbeats: 4000

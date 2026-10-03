@@ -17,7 +17,7 @@ defmodule Mensch.StrumTest do
       duration_mbeats: 4000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     machine = %Strum{params: StrumParams.default()}
 

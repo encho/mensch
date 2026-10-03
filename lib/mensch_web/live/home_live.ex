@@ -1214,21 +1214,8 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp table_chord_label(%ChordSpec{} = chord_spec) do
-    root = chord_spec.root |> Atom.to_string() |> String.replace("_sharp", "#") |> String.upcase()
-    modifier = table_modifier_label(chord_spec.modifier)
-    "#{root} #{modifier} · o#{chord_spec.octave} i#{chord_spec.inversion}"
+    "#{ChordSpec.symbol_label(chord_spec)} · o#{chord_spec.octave} i#{chord_spec.inversion}"
   end
-
-  defp table_modifier_label(:major), do: "maj"
-  defp table_modifier_label(:minor), do: "min"
-  defp table_modifier_label(:dominant_seventh), do: "7"
-  defp table_modifier_label(:major_seventh), do: "maj7"
-  defp table_modifier_label(:minor_seventh), do: "m7"
-  defp table_modifier_label(:minor_major_seventh), do: "mMaj7"
-  defp table_modifier_label(:diminished), do: "dim"
-  defp table_modifier_label(:half_diminished), do: "m7b5"
-  defp table_modifier_label(:augmented), do: "aug"
-  defp table_modifier_label(modifier), do: Atom.to_string(modifier)
 
   defp machine_label(machine) do
     machine
@@ -1700,9 +1687,7 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp short_chord_label(%ChordSpec{} = chord_spec) do
-    root = chord_spec.root |> Atom.to_string() |> String.replace("_sharp", "#") |> String.upcase()
-    modifier = chord_spec.modifier |> Atom.to_string()
-    "#{root} #{modifier}"
+    ChordSpec.symbol_label(chord_spec)
   end
 
   defp timeline_xs(total_mbeats, step) do

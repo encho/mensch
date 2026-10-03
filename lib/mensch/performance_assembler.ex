@@ -126,7 +126,7 @@ defmodule Mensch.PerformanceAssembler do
   end
 
   @doc "The note name and octave for a MIDI note number, e.g. `64` -> `{:e, 4}`."
-  @spec note_name(integer()) :: {ChordSpec.root(), integer()}
+  @spec note_name(integer()) :: {ChordSpec.pitch_class(), integer()}
   def note_name(note_number), do: ChordSpec.note_name(note_number)
 
   defp render_entry(

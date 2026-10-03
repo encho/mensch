@@ -129,7 +129,7 @@ defmodule Mensch.Machines.RootNote do
   end
 
   defp root_midi_note!(%ChordSpec{} = chord_spec, octave_offset) when is_integer(octave_offset) do
-    midi_note = midi_note_number(chord_spec.root, chord_spec.octave) + octave_offset * 12
+    midi_note = ChordSpec.root_midi_note(chord_spec) + octave_offset * 12
 
     if midi_note < 0 or midi_note > 127 do
       raise ArgumentError,
@@ -137,26 +137,6 @@ defmodule Mensch.Machines.RootNote do
     end
 
     midi_note
-  end
-
-  defp midi_note_number(note, octave) do
-    semitone =
-      case note do
-        :c -> 0
-        :c_sharp -> 1
-        :d -> 2
-        :d_sharp -> 3
-        :e -> 4
-        :f -> 5
-        :f_sharp -> 6
-        :g -> 7
-        :g_sharp -> 8
-        :a -> 9
-        :a_sharp -> 10
-        :b -> 11
-      end
-
-    (octave + 1) * 12 + semitone
   end
 end
 

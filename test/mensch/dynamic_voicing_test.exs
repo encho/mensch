@@ -17,7 +17,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 4000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj7, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5", "7"], octave: 4, inversion: 0}
 
     machine = %DynamicVoicing{
       params: %DynamicVoicingParams{
@@ -40,7 +40,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 3000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     machine =
       %DynamicVoicing{
@@ -75,7 +75,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 3000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     machine =
       %DynamicVoicing{
@@ -110,7 +110,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 5000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     machine =
       %DynamicVoicing{
@@ -137,7 +137,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 5000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     machine =
       %DynamicVoicing{
@@ -164,7 +164,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 4000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     machine =
       %DynamicVoicing{
@@ -219,7 +219,7 @@ defmodule Mensch.DynamicVoicingTest do
       duration_mbeats: 4000
     }
 
-    chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
 
     rendered =
       Machine.build_frame_sequence(

@@ -19,8 +19,10 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
       <dl class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-zinc-200">
         <dt class="text-zinc-500">Root</dt>
         <dd>{@root_label}</dd>
-        <dt class="text-zinc-500">Modifier</dt>
-        <dd>{@chord_spec.modifier}</dd>
+        <dt class="text-zinc-500">Tones</dt>
+        <dd>{Enum.join(Enum.map(@chord_spec.tones, &to_string/1), ", ")}</dd>
+        <dt class="text-zinc-500">Bass</dt>
+        <dd>{if is_nil(@chord_spec.bass), do: "-", else: root_label(@chord_spec.bass)}</dd>
         <dt class="text-zinc-500">Octave</dt>
         <dd>{@chord_spec.octave}</dd>
         <dt class="text-zinc-500">Inversion</dt>
@@ -42,9 +44,6 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   end
 
   defp root_label(root) do
-    root
-    |> Atom.to_string()
-    |> String.replace("_sharp", "#")
-    |> String.upcase()
+    ChordSpec.root_label(root)
   end
 end
