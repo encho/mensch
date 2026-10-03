@@ -17,6 +17,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
       id: "sample-11-dynamic-voicing-e-major-i-ii-iv-v",
       folder: "Dynamic Voicing",
       name: "E Major (I-ii-IV-V) · cycle_down 1",
+      total_length_bars: 4,
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

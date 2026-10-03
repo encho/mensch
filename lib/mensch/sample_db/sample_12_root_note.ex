@@ -15,6 +15,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
       id: "sample-12-root-note",
       folder: "Root Note",
       name: "Root Note Offsets",
+      total_length_bars: 5,
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

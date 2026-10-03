@@ -34,10 +34,7 @@ defmodule Mensch.MidiFile do
       ] ++ setup_events ++ channel_events
 
     last_tick =
-      case channel_events do
-        [] -> 0
-        _ -> channel_events |> Enum.map(& &1.tick) |> Enum.max()
-      end
+      max(last_event_tick(channel_events), valid_trim_end_tick(Keyword.get(opts, :trim_end_tick)))
 
     track_data =
       midi_events
@@ -64,10 +61,7 @@ defmodule Mensch.MidiFile do
     setup_events = mpe_setup_events(channel_events)
 
     last_tick =
-      case channel_events do
-        [] -> 0
-        _ -> channel_events |> Enum.map(& &1.tick) |> Enum.max()
-      end
+      max(last_event_tick(channel_events), valid_trim_end_tick(Keyword.get(opts, :trim_end_tick)))
 
     channel_numbers =
       channel_events
@@ -261,11 +255,46 @@ defmodule Mensch.MidiFile do
         }
       end)
 
-    (Enum.reverse(trimmed_rev) ++ forced_offs)
+    trimmed_events =
+      (Enum.reverse(trimmed_rev) ++ forced_offs)
+      |> Enum.sort_by(fn %{tick: tick, sort: sort} -> {tick, sort} end)
+
+    append_trim_end_markers(trimmed_events, trim_end_tick)
     |> Enum.sort_by(fn %{tick: tick, sort: sort} -> {tick, sort} end)
   end
 
   defp maybe_trim_events(events, _trim_end_tick), do: events
+
+  defp append_trim_end_markers(events, trim_end_tick) do
+    channels =
+      events
+      |> Enum.map(fn event -> status_channel(event_status(event.bytes)) end)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    trim_markers =
+      channels
+      |> Enum.flat_map(fn channel ->
+        [
+          %{
+            tick: trim_end_tick,
+            at_ms: nil,
+            sort: {9_500, channel, 120, 0},
+            label: :trim_marker,
+            bytes: <<0xB0 + channel, 120, 0>>
+          },
+          %{
+            tick: trim_end_tick,
+            at_ms: nil,
+            sort: {9_500, channel, 123, 1},
+            label: :trim_marker,
+            bytes: <<0xB0 + channel, 123, 0>>
+          }
+        ]
+      end)
+
+    events ++ trim_markers
+  end
 
   defp encode_smf(format, ppq, tracks) do
     track_count = length(tracks)
@@ -283,6 +312,12 @@ defmodule Mensch.MidiFile do
   defp with_end_of_track(events, tick) do
     events ++ [%{tick: tick, sort: {9_999, 9_999, 9_999, 9_999}, bytes: end_of_track_meta()}]
   end
+
+  defp last_event_tick([]), do: 0
+  defp last_event_tick(events), do: events |> Enum.map(& &1.tick) |> Enum.max()
+
+  defp valid_trim_end_tick(value) when is_integer(value) and value >= 0, do: value
+  defp valid_trim_end_tick(_value), do: 0
 
   defp tempo_meta(bpm) do
     mpqn = round(60_000_000 / max(bpm, 1))

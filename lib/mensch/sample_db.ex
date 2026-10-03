@@ -8,6 +8,7 @@ defmodule Mensch.SampleDb do
   """
 
   alias Mensch.SampleContext
+  alias Mensch.TimelineContext
   alias Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv
   alias Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv
   alias Mensch.SampleDb.Sample12RootNote
@@ -28,10 +29,55 @@ defmodule Mensch.SampleDb do
     Sample13Strum.sample(@default_frame_mbeats)
   ]
 
+  @doc "Returns sample total length in mbeats, honoring optional `:total_length_bars` or `:total_length_mbeats`."
+  @spec sample_total_length_mbeats(map()) :: non_neg_integer()
+  def sample_total_length_mbeats(
+        %{sample_entries: entries, sample_context: %SampleContext{} = sample_context} = sample
+      )
+      when is_list(entries) do
+    natural_end_mbeat = natural_sample_end_mbeat(entries, sample_context)
+
+    configured_total_mbeats =
+      case Map.get(sample, :total_length_mbeats) do
+        value when is_integer(value) and value >= 0 -> value
+        _ -> configured_total_mbeats_from_bars(sample, sample_context)
+      end
+
+    max(natural_end_mbeat, configured_total_mbeats)
+  end
+
+  def sample_total_length_mbeats(_sample), do: 0
+
+  defp with_normalized_total_length(
+         %{sample_entries: _entries, sample_context: %SampleContext{}} = sample
+       ) do
+    Map.put(sample, :total_length_mbeats, sample_total_length_mbeats(sample))
+  end
+
+  defp with_normalized_total_length(sample), do: sample
+
+  defp configured_total_mbeats_from_bars(sample, %SampleContext{} = sample_context) do
+    case Map.get(sample, :total_length_bars) do
+      value when is_integer(value) and value >= 0 ->
+        value * SampleContext.mbeats_per_bar(sample_context)
+
+      _ ->
+        0
+    end
+  end
+
+  defp natural_sample_end_mbeat(entries, %SampleContext{} = sample_context) do
+    entries
+    |> Enum.map(fn %{timeline_context: timeline_context} ->
+      TimelineContext.end_mbeat(timeline_context, sample_context)
+    end)
+    |> Enum.max(fn -> 0 end)
+  end
+
   @doc "Returns default context used by sample-1 and ad hoc single-chord rendering."
   @spec default_sample_context() :: SampleContext.t()
   def default_sample_context do
-    @samples
+    default_samples()
     |> Enum.at(0, %{})
     |> Map.fetch!(:sample_context)
   end
@@ -39,12 +85,14 @@ defmodule Mensch.SampleDb do
   @doc "Returns sample-1 entries."
   @spec default_sample_entries() :: [map()]
   def default_sample_entries do
-    @samples
+    default_samples()
     |> Enum.at(0, %{})
     |> Map.fetch!(:sample_entries)
   end
 
   @doc "Returns all built-in samples for selection in the UI."
   @spec default_samples() :: [map()]
-  def default_samples, do: @samples
+  def default_samples do
+    Enum.map(@samples, &with_normalized_total_length/1)
+  end
 end

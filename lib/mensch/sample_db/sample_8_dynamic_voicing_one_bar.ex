@@ -27,6 +27,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
       id: "sample-8-dynamic-voicing-one-bar",
       folder: "Dynamic Voicing",
       name: "Bbmaj7 · One Bar",
+      total_length_bars: 1,
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

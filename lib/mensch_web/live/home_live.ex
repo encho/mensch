@@ -64,12 +64,13 @@ defmodule MenschWeb.HomeLive do
 
     active_sample = Enum.at(samples, active_sample_index, %{})
     sample_entries = Map.get(active_sample, :sample_entries, [])
+    sample_total_length_mbeats = SampleDb.sample_total_length_mbeats(active_sample)
 
     sample_context =
       Map.get(active_sample, :sample_context, SampleDb.default_sample_context())
 
     {render_data, sample_warning} =
-      render_data_and_warning(sample_entries, sample_context)
+      render_data_and_warning(sample_entries, sample_context, sample_total_length_mbeats)
 
     midi_status = Mensch.Midi.Connection.status()
 
@@ -98,10 +99,11 @@ defmodule MenschWeb.HomeLive do
       |> assign(:sample_entries, sample_entries)
       |> assign(:active_chord_indices, all_chord_indices(sample_entries))
       |> assign(:sample_context, sample_context)
+      |> assign(:sample_total_length_mbeats, sample_total_length_mbeats)
       |> assign(:sample_warning, sample_warning)
       |> assign(
         :sample_timeline_static,
-        sample_timeline_static_model(sample_entries, sample_context)
+        sample_timeline_static_model(sample_entries, sample_context, sample_total_length_mbeats)
       )
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
@@ -356,7 +358,8 @@ defmodule MenschWeb.HomeLive do
               <div class="font-mono text-[11px] text-zinc-300">
                 {sample_context_label(@sample_context)} · {sample_duration_label(
                   @sample_entries,
-                  @sample_context
+                  @sample_context,
+                  @sample_total_length_mbeats
                 )}
               </div>
             </div>
@@ -636,7 +639,8 @@ defmodule MenschWeb.HomeLive do
                       0
                     )}/{elem(sample.sample_context.time_signature, 1)} · {sample_duration_label(
                       Map.get(sample, :sample_entries, []),
-                      Map.get(sample, :sample_context, @sample_context)
+                      Map.get(sample, :sample_context, @sample_context),
+                      SampleDb.sample_total_length_mbeats(sample)
                     )}
                   </div>
                 </button>
@@ -821,10 +825,11 @@ defmodule MenschWeb.HomeLive do
 
   defp active_playback_render_data(socket) do
     active_entries =
-      compact_active_entries(
+      playback_entries(
         socket.assigns.sample_entries,
         socket.assigns.sample_context,
-        socket.assigns.active_chord_indices
+        socket.assigns.active_chord_indices,
+        socket.assigns.render_scope
       )
 
     case active_entries do
@@ -832,11 +837,36 @@ defmodule MenschWeb.HomeLive do
         {:empty, nil, active_entries}
 
       entries ->
-        case generate_sample_safe(entries, socket.assigns.sample_context) do
+        case generate_sample_safe(
+               entries,
+               socket.assigns.sample_context,
+               socket.assigns.sample_total_length_mbeats
+             ) do
           {:ok, render_data} -> {:ok, render_data, entries}
           {:error, message} -> {:error, message, entries}
         end
     end
+  end
+
+  defp playback_entries(sample_entries, _sample_context, active_chord_indices, :full_sample)
+       when is_list(sample_entries) and is_list(active_chord_indices) do
+    active_set = MapSet.new(active_chord_indices)
+
+    sample_entries
+    |> Enum.with_index()
+    |> Enum.filter(fn {_entry, index} -> MapSet.member?(active_set, index) end)
+    |> Enum.sort_by(fn {_entry, index} -> index end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp playback_entries(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         active_chord_indices,
+         _render_scope
+       )
+       when is_list(sample_entries) and is_list(active_chord_indices) do
+    compact_active_entries(sample_entries, sample_context, active_chord_indices)
   end
 
   defp compact_active_entries(
@@ -886,21 +916,28 @@ defmodule MenschWeb.HomeLive do
 
   defp assign_active_sample(socket, index) when is_integer(index) do
     case Enum.at(socket.assigns.samples, index) do
-      %{sample_entries: sample_entries, sample_context: sample_context} ->
+      %{sample_entries: sample_entries, sample_context: sample_context} = sample ->
         Player.stop()
 
+        sample_total_length_mbeats = SampleDb.sample_total_length_mbeats(sample)
+
         {render_data, sample_warning} =
-          render_data_and_warning(sample_entries, sample_context)
+          render_data_and_warning(sample_entries, sample_context, sample_total_length_mbeats)
 
         socket
         |> assign(:active_sample_index, index)
         |> assign(:sample_entries, sample_entries)
         |> assign(:active_chord_indices, all_chord_indices(sample_entries))
         |> assign(:sample_context, sample_context)
+        |> assign(:sample_total_length_mbeats, sample_total_length_mbeats)
         |> assign(:sample_warning, sample_warning)
         |> assign(
           :sample_timeline_static,
-          sample_timeline_static_model(sample_entries, sample_context)
+          sample_timeline_static_model(
+            sample_entries,
+            sample_context,
+            sample_total_length_mbeats
+          )
         )
         |> assign(:render_data, render_data)
         |> assign(:render_scope, :full_sample)
@@ -916,16 +953,27 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  defp generate_sample_safe(sample_entries, %SampleContext{} = sample_context) do
+  defp generate_sample_safe(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         sample_total_length_mbeats
+       ) do
     try do
-      {:ok, PerformanceAssembler.generate_sample(sample_entries, sample_context)}
+      {:ok,
+       PerformanceAssembler.generate_sample(sample_entries, sample_context,
+         total_length_mbeats: sample_total_length_mbeats
+       )}
     rescue
       error in [ArgumentError, RuntimeError] -> {:error, Exception.message(error)}
     end
   end
 
-  defp render_data_and_warning(sample_entries, %SampleContext{} = sample_context) do
-    case generate_sample_safe(sample_entries, sample_context) do
+  defp render_data_and_warning(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         sample_total_length_mbeats
+       ) do
+    case generate_sample_safe(sample_entries, sample_context, sample_total_length_mbeats) do
       {:ok, data} ->
         {data, cycle_frame_balance_warning(sample_entries, sample_context)}
 
@@ -1249,9 +1297,13 @@ defmodule MenschWeb.HomeLive do
     "#{musical} · #{duration_s_label}s"
   end
 
-  defp sample_duration_label(sample_entries, %SampleContext{} = sample_context)
+  defp sample_duration_label(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         sample_total_length_mbeats
+       )
        when is_list(sample_entries) do
-    duration_ms = sample_duration_ms(sample_entries, sample_context)
+    duration_ms = sample_duration_ms(sample_entries, sample_context, sample_total_length_mbeats)
     minutes = div(duration_ms, 60_000)
     seconds = div(rem(duration_ms, 60_000), 1000)
     millis = rem(duration_ms, 1000)
@@ -1259,7 +1311,11 @@ defmodule MenschWeb.HomeLive do
     "#{minutes}m #{seconds}s #{millis}ms"
   end
 
-  defp sample_duration_ms(sample_entries, %SampleContext{} = sample_context)
+  defp sample_duration_ms(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         sample_total_length_mbeats
+       )
        when is_list(sample_entries) do
     max_end_mbeat =
       case sample_entries do
@@ -1277,7 +1333,9 @@ defmodule MenschWeb.HomeLive do
           |> Enum.max()
       end
 
-    SampleContext.mbeats_to_ms(sample_context, max_end_mbeat)
+    total_mbeats = max(max_end_mbeat, max(sample_total_length_mbeats || 0, 0))
+
+    SampleContext.mbeats_to_ms(sample_context, total_mbeats)
   end
 
   defp local_timeline_start_label do
@@ -1325,7 +1383,11 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  defp sample_timeline_static_model(sample_entries, %SampleContext{} = sample_context) do
+  defp sample_timeline_static_model(
+         sample_entries,
+         %SampleContext{} = sample_context,
+         sample_total_length_mbeats
+       ) do
     svg_width = 1000
     lane_height = 22
     lane_gap = 8
@@ -1357,7 +1419,7 @@ defmodule MenschWeb.HomeLive do
         _ -> entries |> Enum.map(& &1.end_mbeat) |> Enum.max()
       end
 
-    total_mbeats = max(max_end_mbeat, 1)
+    total_mbeats = max(max(max_end_mbeat, sample_total_length_mbeats || 0), 1)
     bar_count = total_mbeats / mbeats_per_bar
     beat_count = total_mbeats / mbeats_per_beat
     total_mbeats = max(total_mbeats, 1)
@@ -2164,12 +2226,18 @@ defmodule MenschWeb.HomeLive do
           detail_total_mbeats(frames, duration_ms, socket.assigns.sample_context)
 
         {window_start_mbeat, window_end_mbeat} =
-          selected_scope_mbeats(
-            socket.assigns.sample_entries,
-            socket.assigns.sample_context,
-            socket.assigns.active_chord_indices,
-            full_total_mbeats
-          )
+          case socket.assigns.render_scope do
+            :full_sample ->
+              {0, full_total_mbeats}
+
+            _other_scope ->
+              selected_scope_mbeats(
+                socket.assigns.sample_entries,
+                socket.assigns.sample_context,
+                socket.assigns.active_chord_indices,
+                full_total_mbeats
+              )
+          end
 
         scoped_frames = scope_frames(frames, window_start_mbeat, window_end_mbeat)
         scoped_total_mbeats = max(window_end_mbeat - window_start_mbeat, 1)

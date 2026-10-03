@@ -28,39 +28,40 @@ defmodule Mensch.SampleDb.Sample13Strum do
     %{
       id: "sample-13-strum",
       folder: "Strum",
-      name: "Strum Sustain Progression",
+      name: "Bb Strum Progression With Rests",
+      total_length_bars: 16,
       sample_context:
-        SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
+        SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
         %{
-          chord_spec: %ChordSpec{root: :c, modifier: :maj7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{root: :a_sharp, modifier: :maj7, octave: 3, inversion: 0},
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
-            duration_mbeats: 4000
+            duration_mbeats: 8000
           },
           machine: machine
         },
         %{
-          chord_spec: %ChordSpec{root: :a, modifier: :min7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{root: :g, modifier: :min7, octave: 3, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 1, beat: 0, mbeat: 0},
-            duration_mbeats: 4000
+            start_beat: %BeatPosition{bar: 4, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: machine
         },
         %{
-          chord_spec: %ChordSpec{root: :f, modifier: :maj7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{root: :c, modifier: :min7, octave: 3, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 2, beat: 0, mbeat: 0},
-            duration_mbeats: 4000
+            start_beat: %BeatPosition{bar: 8, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: machine
         },
         %{
-          chord_spec: %ChordSpec{root: :g, modifier: :dom7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{root: :f, modifier: :dom7, octave: 3, inversion: 0},
           timeline_context: %TimelineContext{
-            start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
-            duration_mbeats: 4000
+            start_beat: %BeatPosition{bar: 12, beat: 0, mbeat: 0},
+            duration_mbeats: 8000
           },
           machine: machine
         }

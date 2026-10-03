@@ -17,6 +17,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
       id: "sample-10-dynamic-voicing-bb-i-ii-iv-v",
       folder: "Dynamic Voicing",
       name: "Bb Major (I-ii-IV-V) · cycle_up 2",
+      total_length_bars: 4,
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [

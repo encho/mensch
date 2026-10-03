@@ -25,8 +25,9 @@ defmodule Mensch.PerformanceAssembler do
   end
 
   @doc "Assembles and aggregates a full sample timeline from entry maps."
-  @spec generate_sample([map()], SampleContext.t()) :: Performance.t()
-  def generate_sample(entries, %SampleContext{} = sample_context) when is_list(entries) do
+  @spec generate_sample([map()], SampleContext.t(), keyword()) :: Performance.t()
+  def generate_sample(entries, %SampleContext{} = sample_context, opts \\ [])
+      when is_list(entries) and is_list(opts) do
     sample_context = SampleContext.validate!(sample_context)
 
     entries
@@ -46,6 +47,40 @@ defmodule Mensch.PerformanceAssembler do
     end)
     |> build_global_performance(sample_context)
     |> rechannelize_performance()
+    |> maybe_extend_duration(sample_context, opts)
+  end
+
+  defp maybe_extend_duration(
+         %Performance{} = performance,
+         %SampleContext{} = sample_context,
+         opts
+       ) do
+    case Keyword.get(opts, :total_length_mbeats) do
+      total_length_mbeats when is_integer(total_length_mbeats) and total_length_mbeats >= 0 ->
+        last_frame_mbeat =
+          performance.frames
+          |> List.last()
+          |> then(&if(&1, do: &1.at_mbeat, else: 0))
+
+        if total_length_mbeats > last_frame_mbeat do
+          trailing_frame = %{
+            at_mbeat: total_length_mbeats,
+            at_ms: SampleContext.mbeats_to_ms(sample_context, total_length_mbeats),
+            notes: []
+          }
+
+          %Performance{
+            performance
+            | frames: performance.frames ++ [trailing_frame],
+              duration_ms: trailing_frame.at_ms
+          }
+        else
+          performance
+        end
+
+      _ ->
+        performance
+    end
   end
 
   @doc "Returns sample-1 entries from `Mensch.SampleDb`."

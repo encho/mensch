@@ -4,13 +4,14 @@ defmodule MenschWeb.ExportController do
   alias Mensch.MidiFile
   alias Mensch.PerformanceAssembler
   alias Mensch.SampleDb
-  alias Mensch.TimelineContext
 
   def mpe_report(conn, %{"index" => index_str}) do
     with {index, ""} <- Integer.parse(index_str),
          {:ok, sample} <- sample_by_index(index) do
       performance =
-        PerformanceAssembler.generate_sample(sample.sample_entries, sample.sample_context)
+        PerformanceAssembler.generate_sample(sample.sample_entries, sample.sample_context,
+          total_length_mbeats: SampleDb.sample_total_length_mbeats(sample)
+        )
 
       report = MidiFile.mpe_report(performance)
       filename = "#{sample_slug(sample.name)}-mpe-events.txt"
@@ -25,11 +26,13 @@ defmodule MenschWeb.ExportController do
     with {index, ""} <- Integer.parse(index_str),
          {:ok, sample} <- sample_by_index(index) do
       performance =
-        PerformanceAssembler.generate_sample(sample.sample_entries, sample.sample_context)
+        PerformanceAssembler.generate_sample(sample.sample_entries, sample.sample_context,
+          total_length_mbeats: SampleDb.sample_total_length_mbeats(sample)
+        )
 
       midi_bytes =
         MidiFile.from_performance_bitwig(performance, sample.sample_context,
-          trim_end_tick: sample_end_mbeat(sample)
+          trim_end_tick: SampleDb.sample_total_length_mbeats(sample)
         )
 
       filename = "#{sample_slug(sample.name)}-bitwig-mpe.mid"
@@ -54,14 +57,5 @@ defmodule MenschWeb.ExportController do
     |> String.downcase()
     |> String.replace(~r/[^a-z0-9]+/, "-")
     |> String.trim("-")
-  end
-
-  defp sample_end_mbeat(%{sample_entries: entries, sample_context: sample_context})
-       when is_list(entries) do
-    entries
-    |> Enum.map(fn %{timeline_context: timeline_context} ->
-      TimelineContext.end_mbeat(timeline_context, sample_context)
-    end)
-    |> Enum.max(fn -> 0 end)
   end
 end

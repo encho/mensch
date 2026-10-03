@@ -15,6 +15,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
       id: "sample-7-dynamic-voicing",
       folder: "Dynamic Voicing",
       name: "Bb Major Jazz Cycle (ii-V-I-vi)",
+      total_length_bars: 4,
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
