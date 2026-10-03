@@ -1770,22 +1770,42 @@ defmodule MenschWeb.HomeLive do
 
         entries
         |> lifecycle_segments(total_mbeats)
-        |> Enum.map(fn %{start_mbeat: start_mbeat, end_mbeat: end_mbeat, label: label} ->
+        |> Enum.map(fn %{
+                         start_mbeat: start_mbeat,
+                         end_mbeat: end_mbeat,
+                         label: label,
+                         velocity: velocity
+                       } ->
           left_pct = start_mbeat / total_mbeats * 100
           width_pct = max((end_mbeat - start_mbeat) / total_mbeats * 100, 0.5)
+          is_selected = note_selected?({channel, midi_note_number}, selected_note_key)
+
+          in_active_chords =
+            note_in_active_chords?(
+              series_key,
+              active_chord_indices
+            )
 
           style =
             "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
               "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
-              "background-color: #{Map.fetch!(colors, series_key)};"
+              "background-color: #{note_matrix_velocity_color(Map.fetch!(colors, series_key), velocity, is_selected, in_active_chords)};"
+
+          marker_style =
+            note_matrix_velocity_marker_style(
+              Map.fetch!(colors, series_key),
+              velocity
+            )
 
           %{
             series_key: series_key,
             channel: channel,
             midi_note: midi_note_number,
             label: label,
-            active: note_selected?({channel, midi_note_number}, selected_note_key),
-            style: style
+            active: is_selected,
+            velocity: velocity,
+            style: style,
+            marker_style: marker_style
           }
         end)
       end)
@@ -1823,7 +1843,14 @@ defmodule MenschWeb.HomeLive do
                     style: segment.style,
                     channel: segment.channel,
                     midi_note: segment.midi_note,
-                    active: segment.active
+                    active: segment.active,
+                    velocity: Map.get(segment, :velocity, 0),
+                    marker_style:
+                      Map.get(
+                        segment,
+                        :marker_style,
+                        "background-color: rgba(255, 255, 255, 0.35);"
+                      )
                   }
                 end)
 
@@ -1844,14 +1871,15 @@ defmodule MenschWeb.HomeLive do
       |> Enum.sort_by(fn {_note, at_mbeat} -> at_mbeat end)
       |> Enum.reduce({[], nil}, fn {note, at_mbeat}, {acc, open} ->
         label = "#{note.note_name}#{note.octave}"
+        velocity = note_matrix_velocity(note)
 
         cond do
           note.note_on and is_nil(open) ->
-            {acc, %{start_mbeat: at_mbeat, label: label}}
+            {acc, %{start_mbeat: at_mbeat, label: label, velocity: velocity}}
 
           note.note_on and not is_nil(open) ->
             closed = Map.put(open, :end_mbeat, at_mbeat)
-            {[closed | acc], %{start_mbeat: at_mbeat, label: label}}
+            {[closed | acc], %{start_mbeat: at_mbeat, label: label, velocity: velocity}}
 
           note.note_off and not is_nil(open) ->
             closed = Map.put(open, :end_mbeat, at_mbeat)
@@ -1872,6 +1900,42 @@ defmodule MenschWeb.HomeLive do
     segments
     |> Enum.reverse()
     |> Enum.filter(fn segment -> segment.end_mbeat >= segment.start_mbeat end)
+  end
+
+  defp note_matrix_velocity(note) do
+    note
+    |> Map.get(:note_on_velocity, 0)
+    |> clamp_u7()
+  end
+
+  defp note_matrix_velocity_color(base_color, velocity, is_selected, in_active_chords) do
+    {red, green, blue} = color_rgb_tuple(base_color)
+    velocity_ratio = velocity / 127
+
+    focus_alpha =
+      cond do
+        not in_active_chords -> 0.16
+        is_selected -> 0.92
+        true -> 0.64
+      end
+
+    velocity_alpha = 0.35 + velocity_ratio * 0.65
+    alpha = Float.round(focus_alpha * velocity_alpha, 2)
+
+    "rgba(#{red}, #{green}, #{blue}, #{alpha})"
+  end
+
+  defp note_matrix_velocity_marker_style(base_color, velocity) do
+    {red, green, blue} = color_rgb_tuple(base_color)
+    darken_factor = 0.4
+    dark_red = round(red * darken_factor)
+    dark_green = round(green * darken_factor)
+    dark_blue = round(blue * darken_factor)
+
+    ratio = velocity / 127
+    filled_degrees = Float.round(ratio * 360, 1)
+
+    "background: conic-gradient(rgb(#{red}, #{green}, #{blue}) 0deg #{filled_degrees}deg, rgb(#{dark_red}, #{dark_green}, #{dark_blue}) #{filled_degrees}deg 360deg);"
   end
 
   # Assigns each distinct logical note-event key a stable color shared by both
@@ -2028,6 +2092,39 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp color_with_alpha(color, _alpha), do: color
+
+  defp color_rgb_tuple("#" <> <<r::binary-size(2), g::binary-size(2), b::binary-size(2)>>) do
+    {r_i, _} = Integer.parse(r, 16)
+    {g_i, _} = Integer.parse(g, 16)
+    {b_i, _} = Integer.parse(b, 16)
+    {r_i, g_i, b_i}
+  end
+
+  defp color_rgb_tuple("rgba(" <> rest) do
+    [r, g, b | _] =
+      rest
+      |> String.trim_trailing(")")
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+
+    {String.to_integer(r), String.to_integer(g), String.to_integer(b)}
+  end
+
+  defp color_rgb_tuple("rgb(" <> rest) do
+    [r, g, b] =
+      rest
+      |> String.trim_trailing(")")
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+
+    {String.to_integer(r), String.to_integer(g), String.to_integer(b)}
+  end
+
+  defp color_rgb_tuple(_color), do: {160, 160, 160}
+
+  defp clamp_u7(value) when is_integer(value), do: value |> max(0) |> min(127)
+  defp clamp_u7(value) when is_float(value), do: value |> round() |> clamp_u7()
+  defp clamp_u7(_value), do: 0
 
   defp chart_points(points, min_v, max_v) do
     range = max(max_v - min_v, 0.0001)

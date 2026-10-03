@@ -51,6 +51,7 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
               phx-click="toggle_note_focus"
               phx-value-note={to_string(segment.midi_note)}
               phx-value-channel={to_string(segment.channel)}
+              title={"velocity #{Map.get(segment, :velocity, 0)}"}
               class={[
                 "absolute inset-y-0 z-20 cursor-pointer transition-opacity duration-150",
                 segment.active && "opacity-100",
@@ -58,6 +59,14 @@ defmodule MenschWeb.HomeLive.DetailPanelComponent do
               ]}
               style={segment.style}
             >
+              <span
+                class="pointer-events-none absolute -top-5 left-0 z-30 flex size-5 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 text-[6px] font-bold text-white"
+                style={
+                  Map.get(segment, :marker_style, "background-color: rgba(255, 255, 255, 0.35);")
+                }
+              >
+                <span class="block leading-none">{Map.get(segment, :velocity, 0)}</span>
+              </span>
             </div>
             <span class={[
               "relative z-10 px-1 font-mono text-[5px] uppercase",

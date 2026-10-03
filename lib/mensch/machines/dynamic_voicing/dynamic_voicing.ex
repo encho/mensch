@@ -34,7 +34,7 @@ defmodule Mensch.Machines.DynamicVoicing do
           }
   end
 
-  @note_on_velocity 100
+  @note_on_velocities [100, 50, 120, 70]
 
   @type t :: %__MODULE__{params: DynamicVoicingParams.t()}
 
@@ -371,8 +371,13 @@ defmodule Mensch.Machines.DynamicVoicing do
   @spec assign_note_velocities(t(), [NotePlanItem.t()], RenderContext.t()) :: [NotePlanItem.t()]
   def assign_note_velocities(%__MODULE__{}, note_plan, %RenderContext{})
       when is_list(note_plan) do
-    Enum.map(note_plan, fn %NotePlanItem{} = note ->
-      %NotePlanItem{note | note_on_velocity: @note_on_velocity}
+    velocities = @note_on_velocities
+    velocity_count = length(velocities)
+
+    Enum.with_index(note_plan)
+    |> Enum.map(fn {%NotePlanItem{} = note, index} ->
+      velocity = Enum.at(velocities, rem(index, velocity_count), 100)
+      %NotePlanItem{note | note_on_velocity: velocity}
     end)
   end
 
