@@ -354,7 +354,7 @@ defmodule Mensch.Machines.DynamicVoicing do
       octave: octave,
       midi_note: plan.midi_note,
       channel: nil,
-      note_on_velocity: @note_on_velocity,
+      note_on_velocity: 0,
       machine_id: id(),
       chord_instance_id: 0,
       note_instance_id: plan.note_instance_id,
@@ -365,6 +365,15 @@ defmodule Mensch.Machines.DynamicVoicing do
       start_mbeat: plan.start_mbeat,
       duration_mbeats: plan.duration_mbeats
     })
+  end
+
+  @impl Pipeline
+  @spec assign_note_velocities(t(), [NotePlanItem.t()], RenderContext.t()) :: [NotePlanItem.t()]
+  def assign_note_velocities(%__MODULE__{}, note_plan, %RenderContext{})
+      when is_list(note_plan) do
+    Enum.map(note_plan, fn %NotePlanItem{} = note ->
+      %NotePlanItem{note | note_on_velocity: @note_on_velocity}
+    end)
   end
 
   defp effective_voicing_count(requested_voicing_count, chord_duration_mbeats, frame_mbeats) do

@@ -29,6 +29,12 @@ defmodule Mensch.Machine.Pipeline do
               render_context()
             ) :: [NotePlanItem.t()]
 
+  @callback assign_note_velocities(
+              machine(),
+              [NotePlanItem.t()],
+              render_context()
+            ) :: [NotePlanItem.t()]
+
   @callback modulation_strategy(
               machine(),
               render_context()
@@ -57,6 +63,8 @@ defmodule Mensch.Machine.Pipeline do
       module.build_render_context(machine, common_fields)
 
     note_plan = module.build_note_plan(machine, chord_spec, render_context)
+
+    note_plan = module.assign_note_velocities(machine, note_plan, render_context)
 
     modulation_strategy = module.modulation_strategy(machine, render_context)
 
