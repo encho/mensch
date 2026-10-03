@@ -11,6 +11,7 @@ defmodule Mensch.SampleDb do
   alias Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv
   alias Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv
   alias Mensch.SampleDb.Sample12RootNote
+  alias Mensch.SampleDb.Sample13Chord
   alias Mensch.SampleDb.Sample7DynamicVoicing
   alias Mensch.SampleDb.Sample8DynamicVoicingOneBar
   alias Mensch.SampleDb.Sample9DynamicVoicingCMajor
@@ -23,7 +24,8 @@ defmodule Mensch.SampleDb do
     Sample8DynamicVoicingOneBar.sample(@default_frame_mbeats),
     Sample10DynamicVoicingBFlatIIiivv.sample(@default_frame_mbeats),
     Sample11DynamicVoicingEMajorIIiivv.sample(@default_frame_mbeats),
-    Sample12RootNote.sample(@default_frame_mbeats)
+    Sample12RootNote.sample(@default_frame_mbeats),
+    Sample13Chord.sample(@default_frame_mbeats)
   ]
 
   @doc "Returns default context used by sample-1 and ad hoc single-chord rendering."
