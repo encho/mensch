@@ -1,11 +1,11 @@
-defmodule Mensch.ChordTest do
+defmodule Mensch.StrumTest do
   use ExUnit.Case, async: true
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
   alias Mensch.Machine
-  alias Mensch.Machines.Chord
-  alias Mensch.Machines.ChordParams
+  alias Mensch.Machines.Strum
+  alias Mensch.Machines.StrumParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -19,7 +19,7 @@ defmodule Mensch.ChordTest do
 
     chord_spec = %ChordSpec{root: :c, modifier: :maj, octave: 4, inversion: 0}
 
-    machine = %Chord{params: ChordParams.default()}
+    machine = %Strum{params: StrumParams.default()}
 
     rendered =
       Machine.build_frame_sequence(

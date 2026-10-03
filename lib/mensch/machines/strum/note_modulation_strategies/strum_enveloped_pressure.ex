@@ -1,6 +1,6 @@
-defmodule Mensch.Machines.Chord.NoteModulationStrategies.ChordEnvelopedPressure do
+defmodule Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure do
   @moduledoc """
-  Chord-specific note-modulation strategy that combines:
+  Strum-specific note-modulation strategy that combines:
 
   - a note-anchored pressure envelope
   - an additive sample-anchored pressure curve
@@ -46,7 +46,7 @@ defmodule Mensch.Machines.Chord.NoteModulationStrategies.ChordEnvelopedPressure 
             pressure_curve_shift_mbeats: 0.0,
             pressure_curve_anchor: :sample,
             pressure_mode: :add,
-            error_prefix: "chord"
+            error_prefix: "strum"
 
   @spec default() :: t()
   def default, do: %__MODULE__{}

@@ -1,6 +1,6 @@
-defmodule Mensch.Machines.Chord do
+defmodule Mensch.Machines.Strum do
   @moduledoc """
-  Machine that plays all notes of a chord together for the full chord duration.
+  Machine that strums all notes of a chord together for the full chord duration.
 
   All chord tones start at chord start and release at chord end.
 
@@ -14,40 +14,40 @@ defmodule Mensch.Machines.Chord do
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
-  alias Mensch.Machines.ChordParams
+  alias Mensch.Machines.StrumParams
 
   defmodule RenderContext do
     @moduledoc false
 
     alias Mensch.Machine.RenderContextCommon
-    alias Mensch.Machines.ChordParams
+    alias Mensch.Machines.StrumParams
 
     @enforce_keys [:params, :common]
     defstruct [:params, :common]
 
     @type t :: %__MODULE__{
-            params: ChordParams.t(),
+            params: StrumParams.t(),
             common: RenderContextCommon.t()
           }
   end
 
-  @type t :: %__MODULE__{params: ChordParams.t()}
+  @type t :: %__MODULE__{params: StrumParams.t()}
 
   @behaviour Pipeline
 
   @enforce_keys [:params]
   defstruct [:params]
 
-  def id, do: :chord
+  def id, do: :strum
 
-  def params_module, do: ChordParams
+  def params_module, do: StrumParams
 
-  def default_params, do: ChordParams.default()
+  def default_params, do: StrumParams.default()
 
   def default_modulation_strategy, do: default_params().modulation_strategy
 
-  @spec new(ChordParams.t()) :: t()
-  def new(%ChordParams{} = params), do: %__MODULE__{params: params}
+  @spec new(StrumParams.t()) :: t()
+  def new(%StrumParams{} = params), do: %__MODULE__{params: params}
 
   def controls do
     params = default_params()
@@ -98,19 +98,19 @@ defmodule Mensch.Machines.Chord do
 
   @impl Pipeline
   @spec modulation_strategy(t(), RenderContext.t()) :: struct()
-  def modulation_strategy(%__MODULE__{params: %ChordParams{} = params}, %RenderContext{}),
+  def modulation_strategy(%__MODULE__{params: %StrumParams{} = params}, %RenderContext{}),
     do: params.modulation_strategy
 
   @doc false
-  @spec normalize_params(ChordParams.t()) :: ChordParams.t()
-  def normalize_params(%ChordParams{} = params) do
+  @spec normalize_params(StrumParams.t()) :: StrumParams.t()
+  def normalize_params(%StrumParams{} = params) do
     defaults = default_params() |> Map.from_struct()
     current = params |> Map.from_struct()
 
     defaults
     |> Map.merge(current)
-    |> then(&struct!(ChordParams, &1))
-    |> ChordParams.validate_modulation_strategy!()
+    |> then(&struct!(StrumParams, &1))
+    |> StrumParams.validate_modulation_strategy!()
   end
 
   defp harmonic_tags_for_degree(0), do: [:root]
@@ -120,12 +120,12 @@ defmodule Mensch.Machines.Chord do
   defp harmonic_tags_for_degree(_), do: [:tension]
 end
 
-defimpl Mensch.Machine, for: Mensch.Machines.Chord do
-  alias Mensch.Machines.Chord
+defimpl Mensch.Machine, for: Mensch.Machines.Strum do
+  alias Mensch.Machines.Strum
 
-  def id(_machine), do: Chord.id()
+  def id(_machine), do: Strum.id()
 
-  def controls(%Chord{params: params}) do
+  def controls(%Strum{params: params}) do
     %{
       velocity: params.velocity,
       note_modulation_strategy: inspect(params.modulation_strategy.__struct__)
@@ -133,17 +133,17 @@ defimpl Mensch.Machine, for: Mensch.Machines.Chord do
   end
 
   def build_frame_sequence(
-        %Chord{params: params},
+        %Strum{params: params},
         chord_spec,
         sample_context,
         timeline_context,
         opts
       ) do
-    normalized_params = Chord.normalize_params(params)
+    normalized_params = Strum.normalize_params(params)
 
     Mensch.Machine.Pipeline.build_frame_sequence(
-      Chord,
-      %Chord{params: normalized_params},
+      Strum,
+      %Strum{params: normalized_params},
       chord_spec,
       sample_context,
       timeline_context,

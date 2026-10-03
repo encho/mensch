@@ -1,6 +1,6 @@
-defmodule Mensch.Machines.ChordParams do
+defmodule Mensch.Machines.StrumParams do
   @moduledoc """
-  Typed parameters for `Mensch.Machines.Chord`.
+  Typed parameters for `Mensch.Machines.Strum`.
 
   Parameter reference:
 
@@ -8,10 +8,10 @@ defmodule Mensch.Machines.ChordParams do
   * `modulation_strategy`: Note modulation strategy struct used by this machine.
   """
 
-  alias Mensch.Machines.Chord.NoteModulationStrategies.ChordEnvelopedPressure
+  alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
 
   @allowed_modulation_strategy_modules [
-    ChordEnvelopedPressure
+    StrumEnvelopedPressure
   ]
 
   @type t :: %__MODULE__{
@@ -22,20 +22,20 @@ defmodule Mensch.Machines.ChordParams do
   @enforce_keys [:velocity, :modulation_strategy]
   defstruct [:velocity, :modulation_strategy]
 
-  @doc "Default parameters for the chord machine."
+  @doc "Default parameters for the strum machine."
   @spec default() :: t()
   def default do
     %__MODULE__{
       velocity: 100,
-      modulation_strategy: %ChordEnvelopedPressure{error_prefix: "chord"}
+      modulation_strategy: %StrumEnvelopedPressure{error_prefix: "strum"}
     }
   end
 
-  @doc "Allowed note modulation strategy modules for Chord."
+  @doc "Allowed note modulation strategy modules for Strum."
   @spec allowed_modulation_strategy_modules() :: [module()]
   def allowed_modulation_strategy_modules, do: @allowed_modulation_strategy_modules
 
-  @doc "Validate that params use a Chord-allowed modulation strategy module."
+  @doc "Validate that params use a Strum-allowed modulation strategy module."
   @spec validate_modulation_strategy!(t()) :: t()
   def validate_modulation_strategy!(%__MODULE__{modulation_strategy: %module{}} = params)
       when module in @allowed_modulation_strategy_modules,
@@ -43,11 +43,11 @@ defmodule Mensch.Machines.ChordParams do
 
   def validate_modulation_strategy!(%__MODULE__{modulation_strategy: %module{}}) do
     raise ArgumentError,
-          "chord modulation_strategy must be one of #{inspect(@allowed_modulation_strategy_modules)}, got: #{inspect(module)}"
+          "strum modulation_strategy must be one of #{inspect(@allowed_modulation_strategy_modules)}, got: #{inspect(module)}"
   end
 
   def validate_modulation_strategy!(%__MODULE__{modulation_strategy: other}) do
     raise ArgumentError,
-          "chord modulation_strategy must be a struct from #{inspect(@allowed_modulation_strategy_modules)}, got: #{inspect(other)}"
+          "strum modulation_strategy must be a struct from #{inspect(@allowed_modulation_strategy_modules)}, got: #{inspect(other)}"
   end
 end

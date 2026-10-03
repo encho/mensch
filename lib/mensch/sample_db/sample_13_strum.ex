@@ -1,22 +1,22 @@
-defmodule Mensch.SampleDb.Sample13Chord do
+defmodule Mensch.SampleDb.Sample13Strum do
   @moduledoc false
 
   alias Mensch.BeatPosition
   alias Mensch.ChordSpec
-  alias Mensch.Machines.Chord
-  alias Mensch.Machines.Chord.NoteModulationStrategies.ChordEnvelopedPressure
-  alias Mensch.Machines.ChordParams
+  alias Mensch.Machines.Strum
+  alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
+  alias Mensch.Machines.StrumParams
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
   @spec sample(pos_integer()) :: map()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
-      %Chord{
-        params: %ChordParams{
+      %Strum{
+        params: %StrumParams{
           velocity: 100,
-          modulation_strategy: %ChordEnvelopedPressure{
-            error_prefix: "chord",
+          modulation_strategy: %StrumEnvelopedPressure{
+            error_prefix: "strum",
             pressure_attack_mbeats: 80.0,
             pressure_decay_mbeats: 200.0,
             pressure_release_mbeats: 120.0,
@@ -26,9 +26,9 @@ defmodule Mensch.SampleDb.Sample13Chord do
       }
 
     %{
-      id: "sample-13-chord",
-      folder: "Chord",
-      name: "Chord Sustain Progression",
+      id: "sample-13-strum",
+      folder: "Strum",
+      name: "Strum Sustain Progression",
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
