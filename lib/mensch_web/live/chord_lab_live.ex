@@ -99,6 +99,19 @@ defmodule MenschWeb.ChordLabLive do
 
   @impl true
   def render(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :keyboard_keys,
+        piano_keys(
+          result_final_notes(assigns.result),
+          result_foreign_bass(assigns.result),
+          result_resolved_notes(assigns.result),
+          result_inverted_notes(assigns.result),
+          result_voiced_notes(assigns.result)
+        )
+      )
+
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
       <section class="mx-auto w-full max-w-7xl space-y-6">
@@ -247,6 +260,131 @@ defmodule MenschWeb.ChordLabLive do
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-mono text-sm text-zinc-200">Final Notes Keyboard</h2>
+            <p class="font-mono text-[11px] text-zinc-400">
+              Highlighted: {highlighted_count(@result)} / 88
+            </p>
+          </div>
+
+          <div class="flex items-center gap-4 font-mono text-[11px] text-zinc-300">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block size-2 rounded-full bg-[#ff7a1a]"></span> Resolved chord tones
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block size-2 rounded-full bg-[#75b8ff]"></span> After inversion
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block size-2 rounded-full bg-[#2fd5c8]"></span> After voicing
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block size-2 rounded-sm bg-[#9bf25a]"></span> Final notes key highlight
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block size-2 rounded-sm bg-[#6ea83f]"></span> Foreign bass key highlight
+            </span>
+          </div>
+
+          <div class="w-full overflow-x-auto">
+            <div class="relative h-40 min-w-[1320px] rounded-md border border-zinc-700/70 bg-zinc-950">
+              <%= for key <- @keyboard_keys do %>
+                <div
+                  :if={key.kind == :white}
+                  title={key.label}
+                  class={[
+                    "absolute bottom-0 top-0 border-r border-zinc-900 transition-colors duration-150",
+                    key.foreign_bass && "bg-[#6ea83f]",
+                    !key.foreign_bass && key.active && "bg-[#9bf25a]",
+                    !key.active && "bg-zinc-100"
+                  ]}
+                  style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
+                >
+                  <span
+                    :if={key.resolved_tone}
+                    class="pointer-events-none absolute left-[32%] top-1 inline-block size-2 rounded-full bg-[#ff7a1a]"
+                  >
+                  </span>
+                  <span
+                    :if={key.inverted_tone}
+                    class="pointer-events-none absolute left-[58%] top-1 inline-block size-2 rounded-full bg-[#75b8ff]"
+                  >
+                  </span>
+                  <span
+                    :if={key.voiced_tone}
+                    class="pointer-events-none absolute left-[76%] top-1 inline-block size-2 rounded-full bg-[#2fd5c8]"
+                  >
+                  </span>
+                  <span
+                    :if={key.foreign_bass}
+                    class="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold text-zinc-900"
+                  >
+                    B
+                  </span>
+                  <span
+                    class={[
+                      "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                      key.active && "text-zinc-900",
+                      !key.active && "text-zinc-500"
+                    ]}
+                  >
+                    {key.midi}
+                  </span>
+                </div>
+              <% end %>
+
+              <%= for key <- @keyboard_keys do %>
+                <div
+                  :if={key.kind == :black}
+                  title={key.label}
+                  class={[
+                    "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
+                    key.foreign_bass && "bg-[#6ea83f]",
+                    !key.foreign_bass && key.active && "bg-[#9bf25a]",
+                    !key.active && "bg-zinc-900"
+                  ]}
+                  style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
+                >
+                  <span
+                    :if={key.resolved_tone}
+                    class="pointer-events-none absolute left-[26%] top-1 inline-block size-1.5 rounded-full bg-[#ff7a1a]"
+                  >
+                  </span>
+                  <span
+                    :if={key.inverted_tone}
+                    class="pointer-events-none absolute left-[58%] top-1 inline-block size-1.5 rounded-full bg-[#75b8ff]"
+                  >
+                  </span>
+                  <span
+                    :if={key.voiced_tone}
+                    class="pointer-events-none absolute left-[78%] top-1 inline-block size-1.5 rounded-full bg-[#2fd5c8]"
+                  >
+                  </span>
+                  <span
+                    :if={key.foreign_bass}
+                    class={[
+                      "pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold",
+                      key.active && "text-zinc-900",
+                      !key.active && "text-zinc-100"
+                    ]}
+                  >
+                    B
+                  </span>
+                  <span
+                    class={[
+                      "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                      key.active && "text-zinc-900",
+                      !key.active && "text-zinc-300"
+                    ]}
+                  >
+                    {key.midi}
+                  </span>
+                </div>
+              <% end %>
             </div>
           </div>
         </div>
@@ -417,4 +555,90 @@ defmodule MenschWeb.ChordLabLive do
       "foreign_bass_octave" => ""
     }
   end
+
+  defp result_final_notes(nil), do: []
+  defp result_final_notes(result), do: Map.get(result, :final_notes, [])
+
+  defp result_foreign_bass(nil), do: nil
+  defp result_foreign_bass(result), do: Map.get(result, :foreign_bass_note)
+
+  defp result_resolved_notes(nil), do: []
+  defp result_resolved_notes(result), do: Map.get(result, :resolved_chord_tones, [])
+
+  defp result_inverted_notes(nil), do: []
+  defp result_inverted_notes(result), do: Map.get(result, :inverted_chord_tones, [])
+
+  defp result_voiced_notes(nil), do: []
+  defp result_voiced_notes(result), do: Map.get(result, :voiced_chord_tones, [])
+
+  defp highlighted_count(nil), do: 0
+
+  defp highlighted_count(result) do
+    result
+    |> result_final_notes()
+    |> Enum.uniq()
+    |> Enum.count(&(&1 >= 21 and &1 <= 108))
+  end
+
+    defp piano_keys(active_notes, foreign_bass_note, resolved_notes, inverted_notes, voiced_notes)
+      when is_list(active_notes) and is_list(resolved_notes) and is_list(inverted_notes) and
+          is_list(voiced_notes) do
+    min_midi = 21
+    max_midi = 108
+
+    white_midis = Enum.filter(min_midi..max_midi, &(not black_key?(&1)))
+    total_whites = length(white_midis)
+    white_width = 100.0 / total_whites
+    black_width = white_width * 0.62
+    active_set = MapSet.new(active_notes)
+    resolved_set = MapSet.new(resolved_notes)
+    inverted_set = MapSet.new(inverted_notes)
+    voiced_set = MapSet.new(voiced_notes)
+
+    Enum.map(min_midi..max_midi, fn midi ->
+      white_before_or_at =
+        Enum.count(min_midi..midi, &(not black_key?(&1)))
+
+      if black_key?(midi) do
+        %{
+          midi: midi,
+          kind: :black,
+          active: MapSet.member?(active_set, midi),
+          resolved_tone: MapSet.member?(resolved_set, midi),
+          inverted_tone: MapSet.member?(inverted_set, midi),
+          voiced_tone: MapSet.member?(voiced_set, midi),
+          foreign_bass: midi == foreign_bass_note,
+          left_pct: white_before_or_at * white_width - black_width / 2,
+          width_pct: black_width,
+          label: note_label(midi),
+          show_octave_label: false
+        }
+      else
+        left_pct = (white_before_or_at - 1) * white_width
+
+        %{
+          midi: midi,
+          kind: :white,
+          active: MapSet.member?(active_set, midi),
+          resolved_tone: MapSet.member?(resolved_set, midi),
+          inverted_tone: MapSet.member?(inverted_set, midi),
+          voiced_tone: MapSet.member?(voiced_set, midi),
+          foreign_bass: midi == foreign_bass_note,
+          left_pct: left_pct,
+          width_pct: white_width,
+          label: note_label(midi),
+          show_octave_label: show_c_label?(midi)
+        }
+      end
+    end)
+  end
+
+  defp note_label(midi_note) when is_integer(midi_note) do
+    {name, octave} = LegacyChordSpec.note_name(midi_note)
+    "#{ChordSpec.root_label(name)}#{octave}"
+  end
+
+  defp show_c_label?(midi_note), do: rem(midi_note, 12) == 0
+
+  defp black_key?(midi_note), do: rem(midi_note, 12) in [1, 3, 6, 8, 10]
 end
