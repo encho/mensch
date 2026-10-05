@@ -18,6 +18,7 @@ defmodule MenschWeb.Router do
     pipe_through :browser
 
     live "/", HomeLive
+    live "/chord-lab", ChordLabLive
     get "/exports/sample/:index/bitwig-mpe.mid", ExportController, :bitwig_mpe_midi
     get "/exports/sample/:index/mpe-events.txt", ExportController, :mpe_report
   end

@@ -58,6 +58,12 @@ defmodule MenschWeb.Layouts do
             <img src={~p"/images/logo.svg"} width="20" />
             <span class="text-base font-bold text-white">mensch</span>
           </a>
+          <.link
+            navigate={~p"/chord-lab"}
+            class="ui-radius-btn border border-white/20 px-2.5 py-1 text-[11px] font-mono uppercase tracking-wide text-white/75 transition-colors duration-150 hover:border-white/40 hover:text-white"
+          >
+            Chord Lab
+          </.link>
         </div>
         <div class="flex items-center justify-center">{render_slot(@navbar_center)}</div>
         <div class="flex items-center gap-3">
