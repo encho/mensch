@@ -14,6 +14,7 @@ defmodule Mensch.SampleDb do
   alias Mensch.SampleDb.Sample12RootNote
   alias Mensch.SampleDb.Sample13Strum
   alias Mensch.SampleDb.Sample14StrumCMajorSixteenChords
+  alias Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression
   alias Mensch.SampleDb.Sample7DynamicVoicing
   alias Mensch.SampleDb.Sample8DynamicVoicingOneBar
   alias Mensch.SampleDb.Sample9DynamicVoicingCMajor
@@ -28,7 +29,8 @@ defmodule Mensch.SampleDb do
     Sample11DynamicVoicingEMajorIIiivv.sample(@default_frame_mbeats),
     Sample12RootNote.sample(@default_frame_mbeats),
     Sample13Strum.sample(@default_frame_mbeats),
-    Sample14StrumCMajorSixteenChords.sample(@default_frame_mbeats)
+    Sample14StrumCMajorSixteenChords.sample(@default_frame_mbeats),
+    Sample15StrumCMajorIViIiVProgression.sample(@default_frame_mbeats)
   ]
 
   @doc "Returns sample total length in mbeats, honoring optional `:total_length_bars` or `:total_length_mbeats`."
