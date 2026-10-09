@@ -134,4 +134,73 @@
    font-size: var(--ui-chart-tick-label-font-size);
 }
 
+.register-range-input {
+   width: 100%;
+   height: 100%;
+   background: transparent;
+   -webkit-appearance: none;
+   appearance: none;
+   pointer-events: none;
+}
+
+.register-range-input:focus {
+   outline: none;
+}
+
+.register-range-input::-webkit-slider-runnable-track {
+   height: 0;
+   background: transparent;
+}
+
+.register-range-input::-moz-range-track {
+   height: 0;
+   background: transparent;
+   border: none;
+}
+
+.register-range-input::-webkit-slider-thumb {
+   -webkit-appearance: none;
+   appearance: none;
+   width: 12px;
+   height: 12px;
+   margin-top: -6px;
+   border-radius: 9999px;
+   border: 1px solid #111827;
+   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+   pointer-events: auto;
+   cursor: ew-resize;
+}
+
+.register-range-input::-moz-range-thumb {
+   width: 12px;
+   height: 12px;
+   border-radius: 9999px;
+   border: 1px solid #111827;
+   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+   pointer-events: auto;
+   cursor: ew-resize;
+}
+
+.register-range-min::-webkit-slider-thumb,
+.register-range-max::-webkit-slider-thumb {
+   background: #a7f3d0;
+}
+
+.register-range-min::-moz-range-thumb,
+.register-range-max::-moz-range-thumb {
+   background: #a7f3d0;
+}
+
+.register-range-center::-webkit-slider-thumb {
+   background: #22c55e;
+   width: 13px;
+   height: 13px;
+}
+
+.register-range-center::-moz-range-thumb {
+   background: #22c55e;
+   width: 13px;
+   height: 13px;
+}
+
 /* This file is for your main application CSS */

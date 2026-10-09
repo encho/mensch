@@ -149,6 +149,17 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
+  def handle_event("set_keyboard_register_controls", params, socket) do
+    values =
+      socket.assigns.values
+      |> Map.put("center_note", Map.get(params, "center_note", socket.assigns.values["center_note"]))
+      |> Map.put("range_min", Map.get(params, "range_min", socket.assigns.values["range_min"]))
+      |> Map.put("range_max", Map.get(params, "range_max", socket.assigns.values["range_max"]))
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
   end
@@ -250,9 +261,47 @@ defmodule MenschWeb.ChordLabLive do
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
-                <.input field={@form[:octave]} type="number" min="-1" max="9" label="Octave" />
-                <.input field={@form[:inversion]} type="number" min="-24" max="24" label="Inversion" />
+              <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between">
+                    <label for={@form[:octave].id} class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                      Octave
+                    </label>
+                    <span class="font-mono text-xs text-zinc-200">{@values["octave"]}</span>
+                  </div>
+                  <input
+                    id={@form[:octave].id}
+                    name={@form[:octave].name}
+                    type="range"
+                    min="-1"
+                    max="9"
+                    step="1"
+                    value={@values["octave"]}
+                    class="w-full accent-emerald-400"
+                  />
+                </div>
+
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between">
+                    <label
+                      for={@form[:inversion].id}
+                      class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                    >
+                      Inversion
+                    </label>
+                    <span class="font-mono text-xs text-zinc-200">{@values["inversion"]}</span>
+                  </div>
+                  <input
+                    id={@form[:inversion].id}
+                    name={@form[:inversion].name}
+                    type="range"
+                    min="-24"
+                    max="24"
+                    step="1"
+                    value={@values["inversion"]}
+                    class="w-full accent-emerald-400"
+                  />
+                </div>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
@@ -282,29 +331,21 @@ defmodule MenschWeb.ChordLabLive do
                 />
               </div>
 
-              <div class="grid grid-cols-3 gap-2">
-                <.input
-                  field={@form[:center_note]}
-                  type="number"
-                  min="0"
-                  max="127"
-                  label="Center Note"
-                />
-                <.input
-                  field={@form[:range_min]}
-                  type="number"
-                  min="0"
-                  max="127"
-                  label="Range Min"
-                />
-                <.input
-                  field={@form[:range_max]}
-                  type="number"
-                  min="0"
-                  max="127"
-                  label="Range Max"
-                />
-              </div>
+              <input
+                type="hidden"
+                name={@form[:center_note].name}
+                value={@values["center_note"]}
+              />
+              <input
+                type="hidden"
+                name={@form[:range_min].name}
+                value={@values["range_min"]}
+              />
+              <input
+                type="hidden"
+                name={@form[:range_max].name}
+                value={@values["range_max"]}
+              />
 
               <div class="grid grid-cols-2 gap-2">
                 <.input
@@ -427,7 +468,156 @@ defmodule MenschWeb.ChordLabLive do
             </p>
           </div>
 
-          <div class="flex items-center gap-4 font-mono text-[11px] text-zinc-300">
+          <div class="w-full overflow-x-auto">
+            <div class="min-w-[1320px] space-y-3">
+              <form phx-change="set_keyboard_register_controls" class="space-y-2">
+                <div class="grid grid-cols-[86px_1fr_220px] items-center gap-2">
+                  <label for="range-min-slider" class="font-mono text-[11px] text-zinc-300">Register</label>
+
+                  <div class="register-slider-shell relative h-8">
+                    <div class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded bg-zinc-700/70"></div>
+                    <div
+                      class="pointer-events-none absolute top-1/2 h-2 -translate-y-1/2 rounded bg-emerald-300/55"
+                      style={
+                        "left: #{slider_note_percent(@values, "range_min", 21)}%; width: #{slider_range_width_percent(@values)}%;"
+                      }
+                    >
+                    </div>
+                    <div
+                      class="pointer-events-none absolute top-1/2 z-10 h-4 w-1.5 -translate-y-1/2 rounded bg-emerald-500"
+                      style={"left: calc(#{slider_note_percent(@values, "center_note", 60)}% - 0.1875rem);"}
+                    >
+                    </div>
+
+                    <input
+                      id="range-min-slider"
+                      name="range_min"
+                      type="range"
+                      min="21"
+                      max="108"
+                      step="1"
+                      value={slider_note_value(@values, "range_min", 21)}
+                      class="register-range-input register-range-min absolute inset-0"
+                    />
+                    <input
+                      id="center-note-slider"
+                      name="center_note"
+                      type="range"
+                      min="21"
+                      max="108"
+                      step="1"
+                      value={slider_note_value(@values, "center_note", 60)}
+                      class="register-range-input register-range-center absolute inset-0"
+                    />
+                    <input
+                      id="range-max-slider"
+                      name="range_max"
+                      type="range"
+                      min="21"
+                      max="108"
+                      step="1"
+                      value={slider_note_value(@values, "range_max", 108)}
+                      class="register-range-input register-range-max absolute inset-0"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-1 text-right font-mono text-[11px] text-zinc-300">
+                    <span>{slider_note_text(@values, "range_min", 21)}</span>
+                    <span>{slider_note_text(@values, "center_note", 60)}</span>
+                    <span>{slider_note_text(@values, "range_max", 108)}</span>
+                  </div>
+                </div>
+              </form>
+
+              <div class="relative h-40 rounded-md border border-zinc-700/70 bg-zinc-950">
+                <%= for key <- @keyboard_keys do %>
+                  <div
+                    :if={key.kind == :white}
+                    title={key.label}
+                    class={[
+                      "absolute bottom-0 top-0 border-r border-zinc-900 transition-colors duration-150",
+                      key.foreign_bass && "bg-[#6ea83f]",
+                      !key.foreign_bass && key.active && "bg-[#9bf25a]",
+                      !key.active && "bg-zinc-100"
+                    ]}
+                    style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
+                  >
+                    <span
+                      :if={key.resolved_tone}
+                      class="pointer-events-none absolute left-[32%] top-1 inline-block size-2 rounded-full bg-[#ff7a1a]"
+                    ></span>
+                    <span
+                      :if={key.inverted_tone}
+                      class="pointer-events-none absolute left-[58%] top-1 inline-block size-2 rounded-full bg-[#75b8ff]"
+                    ></span>
+                    <span
+                      :if={key.voiced_tone}
+                      class="pointer-events-none absolute left-[76%] top-1 inline-block size-2 rounded-full bg-[#2fd5c8]"
+                    ></span>
+                    <span
+                      :if={key.foreign_bass}
+                      class="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold text-zinc-900"
+                    >
+                      B
+                    </span>
+                    <span class={[
+                      "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                      key.active && "text-zinc-900",
+                      !key.active && "text-zinc-500"
+                    ]}>
+                      {key.midi}
+                    </span>
+                  </div>
+                <% end %>
+
+                <%= for key <- @keyboard_keys do %>
+                  <div
+                    :if={key.kind == :black}
+                    title={key.label}
+                    class={[
+                      "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
+                      key.foreign_bass && "bg-[#6ea83f]",
+                      !key.foreign_bass && key.active && "bg-[#9bf25a]",
+                      !key.active && "bg-zinc-900"
+                    ]}
+                    style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
+                  >
+                    <span
+                      :if={key.resolved_tone}
+                      class="pointer-events-none absolute left-[26%] top-1 inline-block size-1.5 rounded-full bg-[#ff7a1a]"
+                    ></span>
+                    <span
+                      :if={key.inverted_tone}
+                      class="pointer-events-none absolute left-[58%] top-1 inline-block size-1.5 rounded-full bg-[#75b8ff]"
+                    ></span>
+                    <span
+                      :if={key.voiced_tone}
+                      class="pointer-events-none absolute left-[78%] top-1 inline-block size-1.5 rounded-full bg-[#2fd5c8]"
+                    ></span>
+                    <span
+                      :if={key.foreign_bass}
+                      class={[
+                        "pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold",
+                        key.active && "text-zinc-900",
+                        !key.active && "text-zinc-100"
+                      ]}
+                    >
+                      B
+                    </span>
+                    <span class={[
+                      "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                      key.active && "text-zinc-900",
+                      !key.active && "text-zinc-300"
+                    ]}>
+                      {key.midi}
+                    </span>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-4 font-mono text-[11px] text-zinc-300">
             <span class="inline-flex items-center gap-1.5">
               <span class="inline-block size-2 rounded-full bg-[#ff7a1a]"></span> Resolved chord tones
             </span>
@@ -445,94 +635,6 @@ defmodule MenschWeb.ChordLabLive do
               <span class="inline-block size-2 rounded-sm bg-[#6ea83f]"></span>
               Foreign bass key highlight
             </span>
-          </div>
-
-          <div class="w-full overflow-x-auto">
-            <div class="relative h-40 min-w-[1320px] rounded-md border border-zinc-700/70 bg-zinc-950">
-              <%= for key <- @keyboard_keys do %>
-                <div
-                  :if={key.kind == :white}
-                  title={key.label}
-                  class={[
-                    "absolute bottom-0 top-0 border-r border-zinc-900 transition-colors duration-150",
-                    key.foreign_bass && "bg-[#6ea83f]",
-                    !key.foreign_bass && key.active && "bg-[#9bf25a]",
-                    !key.active && "bg-zinc-100"
-                  ]}
-                  style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
-                >
-                  <span
-                    :if={key.resolved_tone}
-                    class="pointer-events-none absolute left-[32%] top-1 inline-block size-2 rounded-full bg-[#ff7a1a]"
-                  ></span>
-                  <span
-                    :if={key.inverted_tone}
-                    class="pointer-events-none absolute left-[58%] top-1 inline-block size-2 rounded-full bg-[#75b8ff]"
-                  ></span>
-                  <span
-                    :if={key.voiced_tone}
-                    class="pointer-events-none absolute left-[76%] top-1 inline-block size-2 rounded-full bg-[#2fd5c8]"
-                  ></span>
-                  <span
-                    :if={key.foreign_bass}
-                    class="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold text-zinc-900"
-                  >
-                    B
-                  </span>
-                  <span class={[
-                    "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                    key.active && "text-zinc-900",
-                    !key.active && "text-zinc-500"
-                  ]}>
-                    {key.midi}
-                  </span>
-                </div>
-              <% end %>
-
-              <%= for key <- @keyboard_keys do %>
-                <div
-                  :if={key.kind == :black}
-                  title={key.label}
-                  class={[
-                    "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
-                    key.foreign_bass && "bg-[#6ea83f]",
-                    !key.foreign_bass && key.active && "bg-[#9bf25a]",
-                    !key.active && "bg-zinc-900"
-                  ]}
-                  style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
-                >
-                  <span
-                    :if={key.resolved_tone}
-                    class="pointer-events-none absolute left-[26%] top-1 inline-block size-1.5 rounded-full bg-[#ff7a1a]"
-                  ></span>
-                  <span
-                    :if={key.inverted_tone}
-                    class="pointer-events-none absolute left-[58%] top-1 inline-block size-1.5 rounded-full bg-[#75b8ff]"
-                  ></span>
-                  <span
-                    :if={key.voiced_tone}
-                    class="pointer-events-none absolute left-[78%] top-1 inline-block size-1.5 rounded-full bg-[#2fd5c8]"
-                  ></span>
-                  <span
-                    :if={key.foreign_bass}
-                    class={[
-                      "pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold",
-                      key.active && "text-zinc-900",
-                      !key.active && "text-zinc-100"
-                    ]}
-                  >
-                    B
-                  </span>
-                  <span class={[
-                    "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                    key.active && "text-zinc-900",
-                    !key.active && "text-zinc-300"
-                  ]}>
-                    {key.midi}
-                  </span>
-                </div>
-              <% end %>
-            </div>
           </div>
         </div>
       </section>
@@ -575,6 +677,37 @@ defmodule MenschWeb.ChordLabLive do
   defp root_keyboard_keys, do: @root_keyboard_keys
 
   defp quality_tiles, do: @quality_tiles
+
+  defp slider_note_value(values, key, default_value) when is_map(values) and is_binary(key) do
+    case Map.get(values, key) do
+      nil -> default_value
+      "" -> default_value
+      value when is_integer(value) -> value
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {parsed, ""} -> parsed
+          _ -> default_value
+        end
+
+      _ -> default_value
+    end
+  end
+
+  defp slider_note_text(values, key, default_value) do
+    note_label(slider_note_value(values, key, default_value))
+  end
+
+  defp slider_note_percent(values, key, default_value) do
+    note = slider_note_value(values, key, default_value)
+    ((note - 21) / 87) * 100
+  end
+
+  defp slider_range_width_percent(values) do
+    left = slider_note_percent(values, "range_min", 21)
+    right = slider_note_percent(values, "range_max", 108)
+
+    max(right - left, 0.5)
+  end
 
   defp selected_root_keyboard_key(values) when is_map(values) do
     root_param = Map.get(values, "root")
