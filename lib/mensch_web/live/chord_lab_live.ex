@@ -62,6 +62,21 @@ defmodule MenschWeb.ChordLabLive do
     :min7_add11
   ]
 
+  @root_keyboard_keys [
+    %{root: "c", kind: :white, left: 0.0, width: 14.2857, label: "C"},
+    %{root: "d_flat", kind: :black, left: 9.5, width: 9.0, label: "Db"},
+    %{root: "d", kind: :white, left: 14.2857, width: 14.2857, label: "D"},
+    %{root: "e_flat", kind: :black, left: 23.8, width: 9.0, label: "Eb"},
+    %{root: "e", kind: :white, left: 28.5714, width: 14.2857, label: "E"},
+    %{root: "f", kind: :white, left: 42.8571, width: 14.2857, label: "F"},
+    %{root: "g_flat", kind: :black, left: 52.3, width: 9.0, label: "Gb"},
+    %{root: "g", kind: :white, left: 57.1428, width: 14.2857, label: "G"},
+    %{root: "a_flat", kind: :black, left: 66.6, width: 9.0, label: "Ab"},
+    %{root: "a", kind: :white, left: 71.4285, width: 14.2857, label: "A"},
+    %{root: "b_flat", kind: :black, left: 80.9, width: 9.0, label: "Bb"},
+    %{root: "b", kind: :white, left: 85.7142, width: 14.2857, label: "B"}
+  ]
+
   @pitch_class_from_param Map.new(@pitch_classes, fn pc -> {Atom.to_string(pc), pc} end)
   @quality_from_param Map.new(@qualities, fn quality -> {Atom.to_string(quality), quality} end)
 
@@ -85,11 +100,16 @@ defmodule MenschWeb.ChordLabLive do
   def handle_event("validate", %{"chord" => params}, socket) do
     values = Map.merge(default_values(), params)
 
-    {:noreply,
-     socket
-     |> assign(:values, values)
-     |> assign(:form, to_form(values, as: :chord))
-     |> resolve_preview(values)}
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_root", %{"root" => root}, socket) do
+    values =
+      socket.assigns.values
+      |> Map.put("root", root)
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
   end
 
   @impl true
@@ -100,8 +120,8 @@ defmodule MenschWeb.ChordLabLive do
   @impl true
   def render(assigns) do
     assigns =
-      assign(
-        assigns,
+      assigns
+      |> assign(
         :keyboard_keys,
         piano_keys(
           result_final_notes(assigns.result),
@@ -111,6 +131,8 @@ defmodule MenschWeb.ChordLabLive do
           result_voiced_notes(assigns.result)
         )
       )
+      |> assign(:root_keyboard_keys, root_keyboard_keys())
+      |> assign(:selected_root_keyboard_key, selected_root_keyboard_key(assigns.values))
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
@@ -125,19 +147,54 @@ defmodule MenschWeb.ChordLabLive do
         <div class="grid gap-6 lg:grid-cols-[minmax(320px,420px)_1fr]">
           <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
+              <input type="hidden" name={@form[:root].name} value={@values["root"]} />
+
+              <div class="space-y-1">
+                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Root</label>
+                <div class="relative h-24 w-full max-w-[360px] rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
+                  <button
+                    :for={key <- @root_keyboard_keys}
+                    type="button"
+                    phx-click="set_root"
+                    phx-value-root={key.root}
+                    title={key.label}
+                    class={[
+                      "absolute rounded-sm border transition-colors duration-150",
+                      key.kind == :white && "bottom-1",
+                      key.kind == :white && "h-[86%]",
+                      key.kind == :white && @selected_root_keyboard_key == key.root &&
+                        "border-emerald-300 bg-emerald-200 text-emerald-950",
+                      key.kind == :white && @selected_root_keyboard_key != key.root &&
+                        "border-zinc-700 bg-zinc-100 text-zinc-800",
+                      key.kind == :black && "top-1 z-10 h-[56%]",
+                      key.kind == :black && @selected_root_keyboard_key == key.root &&
+                        "border-emerald-200 bg-emerald-400 text-zinc-950",
+                      key.kind == :black && @selected_root_keyboard_key != key.root &&
+                        "border-black/70 bg-zinc-900 text-zinc-100"
+                    ]}
+                    style={"left: #{key.left}%; width: #{key.width}%;"}
+                  >
+                    <span class={[
+                      "pointer-events-none text-[10px] font-mono font-semibold",
+                      key.kind == :black && @selected_root_keyboard_key == key.root && "text-zinc-950",
+                      key.kind == :black && @selected_root_keyboard_key != key.root && "text-zinc-100",
+                      key.kind == :white && @selected_root_keyboard_key == key.root && "text-emerald-950",
+                      key.kind == :white && @selected_root_keyboard_key != key.root && "text-zinc-800"
+                    ]}>
+                      {key.label}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div class="grid grid-cols-2 gap-2">
-                <.input
-                  field={@form[:root]}
-                  type="select"
-                  label="Root"
-                  options={pitch_class_options()}
-                />
                 <.input
                   field={@form[:quality]}
                   type="select"
                   label="Quality"
                   options={quality_options()}
                 />
+                <div></div>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
@@ -282,7 +339,7 @@ defmodule MenschWeb.ChordLabLive do
                 <thead>
                   <tr class="border-b border-zinc-700/70 text-zinc-400">
                     <th class="px-3 py-2 font-normal">Sequence Inversion</th>
-                    <th class="px-3 py-2 font-normal">Final MIDI Notes</th>
+                    <th class="px-3 py-2 font-normal">MIDI Notes</th>
                     <th class="px-3 py-2 font-normal">Named Notes</th>
                   </tr>
                 </thead>
@@ -454,6 +511,54 @@ defmodule MenschWeb.ChordLabLive do
       |> assign(:inversion_sequence, [])
       |> assign(:error_message, Exception.message(error))
   end
+
+  defp assign_form_values_and_preview(socket, values) do
+    socket
+    |> assign(:values, values)
+    |> assign(:form, to_form(values, as: :chord))
+    |> resolve_preview(values)
+  end
+
+  defp root_keyboard_keys, do: @root_keyboard_keys
+
+  defp selected_root_keyboard_key(values) when is_map(values) do
+    root_param = Map.get(values, "root")
+
+    root_param
+    |> keyboard_root_from_param()
+    |> case do
+      nil -> "c"
+      root -> root
+    end
+  end
+
+  defp keyboard_root_from_param(root_param) when is_binary(root_param) do
+    case Map.get(@pitch_class_from_param, root_param) do
+      nil ->
+        nil
+
+      pitch_class ->
+        pitch_class
+        |> ChordSpec.pitch_class_to_semitone()
+        |> keyboard_root_from_semitone()
+    end
+  end
+
+  defp keyboard_root_from_param(_root_param), do: nil
+
+  defp keyboard_root_from_semitone(0), do: "c"
+  defp keyboard_root_from_semitone(1), do: "d_flat"
+  defp keyboard_root_from_semitone(2), do: "d"
+  defp keyboard_root_from_semitone(3), do: "e_flat"
+  defp keyboard_root_from_semitone(4), do: "e"
+  defp keyboard_root_from_semitone(5), do: "f"
+  defp keyboard_root_from_semitone(6), do: "g_flat"
+  defp keyboard_root_from_semitone(7), do: "g"
+  defp keyboard_root_from_semitone(8), do: "a_flat"
+  defp keyboard_root_from_semitone(9), do: "a"
+  defp keyboard_root_from_semitone(10), do: "b_flat"
+  defp keyboard_root_from_semitone(11), do: "b"
+  defp keyboard_root_from_semitone(_), do: nil
 
   defp parse_spec(values) do
     with {:ok, root} <- parse_pitch_class(values["root"]),
