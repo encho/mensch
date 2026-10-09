@@ -77,6 +77,29 @@ defmodule MenschWeb.ChordLabLive do
     %{root: "b", kind: :white, left: 85.7142, width: 14.2857, label: "B"}
   ]
 
+  @quality_tiles [
+    %{value: "maj", label: "Maj", position: "col-start-1 row-start-1"},
+    %{value: "min", label: "Min", position: "col-start-2 row-start-1"},
+    %{value: "dim", label: "Dim", position: "col-start-7 row-start-1"},
+    %{value: "aug", label: "Aug", position: "col-start-8 row-start-1"},
+    %{value: "sus2", label: "Sus2", position: "col-start-1 row-start-2"},
+    %{value: "sus4", label: "Sus4", position: "col-start-2 row-start-2"},
+    %{value: "min6", label: "Min6", position: "col-start-3 row-start-2"},
+    %{value: "six_nine", label: "6/9", position: "col-start-4 row-start-2"},
+    %{value: "maj7", label: "Maj7", position: "col-start-6 row-start-2"},
+    %{value: "dom7", label: "Dom7", position: "col-start-7 row-start-2"},
+    %{value: "min7", label: "Min7", position: "col-start-8 row-start-2"},
+    %{value: "maj9", label: "Maj9", position: "col-start-5 row-start-3"},
+    %{value: "dom9", label: "Dom9", position: "col-start-6 row-start-3"},
+    %{value: "min9", label: "Min9", position: "col-start-7 row-start-3"},
+    %{value: "half_dim", label: "m7b5", position: "col-start-8 row-start-3"},
+    %{value: "dim7", label: "Dim7", position: "col-start-4 row-start-4"},
+    %{value: "maj11", label: "Maj11", position: "col-start-5 row-start-4"},
+    %{value: "min11", label: "Min11", position: "col-start-6 row-start-4"},
+    %{value: "dom13", label: "Dom13", position: "col-start-7 row-start-4"},
+    %{value: "min7_add11", label: "m7+11", position: "col-start-8 row-start-4"}
+  ]
+
   @pitch_class_from_param Map.new(@pitch_classes, fn pc -> {Atom.to_string(pc), pc} end)
   @quality_from_param Map.new(@qualities, fn quality -> {Atom.to_string(quality), quality} end)
 
@@ -108,6 +131,19 @@ defmodule MenschWeb.ChordLabLive do
     values =
       socket.assigns.values
       |> Map.put("root", root)
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_quality", %{"quality" => quality}, socket) do
+    values =
+      if Map.has_key?(@quality_from_param, quality) do
+        socket.assigns.values
+        |> Map.put("quality", quality)
+      else
+        socket.assigns.values
+      end
 
     {:noreply, assign_form_values_and_preview(socket, values)}
   end
@@ -187,14 +223,31 @@ defmodule MenschWeb.ChordLabLive do
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2">
-                <.input
-                  field={@form[:quality]}
-                  type="select"
-                  label="Quality"
-                  options={quality_options()}
-                />
-                <div></div>
+              <input type="hidden" name={@form[:quality].name} value={@values["quality"]} />
+
+              <div class="space-y-1">
+                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
+                <div class="rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                  <div class="grid grid-cols-8 grid-rows-4 gap-1">
+                    <button
+                      :for={tile <- quality_tiles()}
+                      type="button"
+                      phx-click="set_quality"
+                      phx-value-quality={tile.value}
+                      class={[
+                        "h-9 rounded-md border font-mono text-[10px] font-semibold transition-colors duration-150",
+                        tile.position,
+                        @values["quality"] == tile.value &&
+                          "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                        @values["quality"] != tile.value &&
+                          "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                      ]}
+                      title={tile.value}
+                    >
+                      {tile.label}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
@@ -521,6 +574,8 @@ defmodule MenschWeb.ChordLabLive do
 
   defp root_keyboard_keys, do: @root_keyboard_keys
 
+  defp quality_tiles, do: @quality_tiles
+
   defp selected_root_keyboard_key(values) when is_map(values) do
     root_param = Map.get(values, "root")
 
@@ -687,18 +742,6 @@ defmodule MenschWeb.ChordLabLive do
     @pitch_classes
     |> Enum.map(fn pc ->
       {ChordSpec.root_label(pc), Atom.to_string(pc)}
-    end)
-  end
-
-  defp quality_options do
-    @qualities
-    |> Enum.map(fn quality ->
-      label =
-        quality
-        |> Atom.to_string()
-        |> String.replace("_", " ")
-
-      {label, Atom.to_string(quality)}
     end)
   end
 
