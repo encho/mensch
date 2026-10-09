@@ -289,9 +289,17 @@ defmodule MenschWeb.ChordLabLive do
                 <tbody>
                   <tr
                     :for={entry <- @inversion_sequence}
-                    class="border-b border-zinc-700/40 last:border-b-0"
+                    class={[
+                      "border-b border-zinc-700/40 last:border-b-0 transition-colors",
+                      entry.inversion == current_inversion(@values) && "bg-emerald-400/12"
+                    ]}
                   >
-                    <td class="px-3 py-2 text-zinc-300">{entry.inversion}</td>
+                    <td class={[
+                      "px-3 py-2 text-zinc-300",
+                      entry.inversion == current_inversion(@values) && "font-semibold text-emerald-200"
+                    ]}>
+                      {entry.inversion}
+                    </td>
                     <td class="px-3 py-2">{join_integers(entry.final_notes)}</td>
                     <td class="px-3 py-2">{join_named_notes(entry.final_notes)}</td>
                   </tr>
@@ -538,6 +546,16 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_optional_integer("", _field_name), do: {:ok, nil}
 
   defp parse_optional_integer(value, field_name), do: parse_integer(value, field_name)
+
+  defp current_inversion(%{"inversion" => inversion}) when is_binary(inversion) do
+    case Integer.parse(inversion) do
+      {parsed, ""} -> parsed
+      _ -> nil
+    end
+  end
+
+  defp current_inversion(%{"inversion" => inversion}) when is_integer(inversion), do: inversion
+  defp current_inversion(_values), do: nil
 
   defp join_integers(notes), do: Enum.join(notes, ", ")
 
