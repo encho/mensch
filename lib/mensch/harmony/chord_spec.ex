@@ -70,7 +70,8 @@ defmodule Mensch.Harmony.ChordSpec do
               range_min: nil,
               range_max: nil,
               voice_count: nil,
-              doubling: :auto
+              doubling: :auto,
+              inversion_tracking_mode: :per_step_centered
 
     @type t :: %__MODULE__{
             type: :close | :open,
@@ -78,7 +79,8 @@ defmodule Mensch.Harmony.ChordSpec do
             range_min: integer() | nil,
             range_max: integer() | nil,
             voice_count: pos_integer() | nil,
-            doubling: :root | :top | :auto
+            doubling: :root | :top | :auto,
+            inversion_tracking_mode: :per_step_centered | :anchor_then_wander
           }
   end
 
@@ -351,6 +353,9 @@ defmodule Mensch.Harmony.ChordSpec do
 
       voicing.doubling not in [:root, :top, :auto] ->
         {:error, {:invalid_doubling, voicing.doubling}}
+
+      voicing.inversion_tracking_mode not in [:per_step_centered, :anchor_then_wander] ->
+        {:error, {:invalid_inversion_tracking_mode, voicing.inversion_tracking_mode}}
 
       true ->
         :ok

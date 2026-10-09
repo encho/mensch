@@ -31,6 +31,12 @@ defmodule Mensch.Harmony.Resolver do
           final_notes: [integer()]
         }
 
+  @type inversion_sequence_entry :: %{
+          inversion: integer(),
+          final_notes: [integer()],
+          voiced_chord_tones: [integer()]
+        }
+
   @doc "Resolves a harmony chord spec to final MIDI notes."
   @spec resolve(ChordSpec.t()) :: [integer()]
   def resolve(%ChordSpec{} = spec) do
@@ -51,7 +57,33 @@ defmodule Mensch.Harmony.Resolver do
     end
   end
 
+  @doc "Builds inversion sequence entries from inversion 0 to the requested inversion."
+  @spec resolve_inversion_sequence(ChordSpec.t()) :: [inversion_sequence_entry()]
+  def resolve_inversion_sequence(%ChordSpec{} = spec) do
+    sequence_inversions(spec.inversion)
+    |> Enum.map(fn inversion ->
+      step_spec = %{spec | inversion: inversion}
+      steps = resolve_steps(step_spec)
+
+      %{
+        inversion: inversion,
+        final_notes: steps.final_notes,
+        voiced_chord_tones: steps.voiced_chord_tones
+      }
+    end)
+  end
+
   defp do_resolve_steps(%ChordSpec{} = spec) do
+    case spec.voicing.inversion_tracking_mode do
+      :per_step_centered ->
+        do_resolve_steps_per_step_centered(spec)
+
+      :anchor_then_wander ->
+        do_resolve_steps_anchor_then_wander(spec)
+    end
+  end
+
+  defp do_resolve_steps_per_step_centered(%ChordSpec{} = spec) do
     resolved_chord_tones = resolve_chord_tones(spec)
     inverted_chord_tones = apply_inversion(resolved_chord_tones, spec.inversion)
     voiced_chord_tones = apply_voicing(inverted_chord_tones, spec)
@@ -60,10 +92,44 @@ defmodule Mensch.Harmony.Resolver do
       resolve_foreign_bass(spec, voiced_chord_tones, resolved_chord_tones)
 
     final_notes =
-      case foreign_bass_note do
-        nil -> voiced_chord_tones
-        bass -> ([bass] ++ voiced_chord_tones) |> Enum.sort()
-      end
+      voiced_chord_tones
+      |> maybe_prepend_foreign_bass(foreign_bass_note)
+
+    %{
+      resolved_chord_tones: resolved_chord_tones,
+      inverted_chord_tones: inverted_chord_tones,
+      voiced_chord_tones: voiced_chord_tones,
+      foreign_bass_note: foreign_bass_note,
+      final_notes: final_notes
+    }
+  end
+
+  defp do_resolve_steps_anchor_then_wander(%ChordSpec{} = spec) do
+    resolved_chord_tones = resolve_chord_tones(spec)
+    inverted_chord_tones = apply_inversion(resolved_chord_tones, spec.inversion)
+
+    anchor_voiced =
+      resolved_chord_tones
+      |> apply_inversion(0)
+      |> apply_voicing(%{spec | inversion: 0})
+
+    voiced_chord_tones =
+      anchor_voiced
+      |> wander_from_anchor(spec.inversion)
+
+    if not valid_in_range?(voiced_chord_tones, spec.voicing) do
+      raise ArgumentError,
+            "anchor_then_wander voicing drift violates range constraints #{inspect({spec.voicing.range_min, spec.voicing.range_max})}"
+    end
+
+    ensure_all_notes_in_midi_range!(voiced_chord_tones)
+
+    foreign_bass_note =
+      resolve_foreign_bass(spec, voiced_chord_tones, resolved_chord_tones)
+
+    final_notes =
+      voiced_chord_tones
+      |> maybe_prepend_foreign_bass(foreign_bass_note)
 
     %{
       resolved_chord_tones: resolved_chord_tones,
@@ -259,6 +325,33 @@ defmodule Mensch.Harmony.Resolver do
     abs(median - center_note)
   end
 
+  defp wander_from_anchor(anchor_voiced, 0), do: Enum.sort(anchor_voiced)
+
+  defp wander_from_anchor(anchor_voiced, inversion) when inversion > 0 do
+    1..inversion
+    |> Enum.reduce(Enum.sort(anchor_voiced), fn _, notes ->
+      [lowest | rest] = notes
+      Enum.sort(rest ++ [lowest + 12])
+    end)
+  end
+
+  defp wander_from_anchor(anchor_voiced, inversion) when inversion < 0 do
+    1..abs(inversion)
+    |> Enum.reduce(Enum.sort(anchor_voiced), fn _, notes ->
+      highest = List.last(notes)
+      front = Enum.drop(notes, -1)
+      Enum.sort([highest - 12 | front])
+    end)
+  end
+
+  defp sequence_inversions(target_inversion) when target_inversion >= 0,
+    do: Enum.to_list(0..target_inversion)
+
+  defp sequence_inversions(target_inversion) do
+    0..abs(target_inversion)
+    |> Enum.map(&(-&1))
+  end
+
   defp valid_in_range?(notes, %Voicing{range_min: nil, range_max: nil}),
     do: Enum.all?(notes, &(&1 >= 0 and &1 <= 127))
 
@@ -269,6 +362,13 @@ defmodule Mensch.Harmony.Resolver do
       below_max = is_nil(max_note) or n <= max_note
       in_midi and above_min and below_max
     end)
+  end
+
+  defp maybe_prepend_foreign_bass(notes, nil), do: notes
+
+  defp maybe_prepend_foreign_bass(notes, bass_note) do
+    [bass_note | notes]
+    |> Enum.sort()
   end
 
   defp ensure_all_notes_in_midi_range!(notes) do

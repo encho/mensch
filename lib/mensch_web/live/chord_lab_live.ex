@@ -160,6 +160,18 @@ defmodule MenschWeb.ChordLabLive do
                 />
               </div>
 
+              <div class="grid grid-cols-1 gap-2">
+                <.input
+                  field={@form[:inversion_tracking_mode]}
+                  type="select"
+                  label="Inversion Tracking"
+                  options={[
+                    {"Per-step centered (current)", "per_step_centered"},
+                    {"Anchor first then wander", "anchor_then_wander"}
+                  ]}
+                />
+              </div>
+
               <div class="grid grid-cols-3 gap-2">
                 <.input
                   field={@form[:center_note]}
@@ -261,6 +273,31 @@ defmodule MenschWeb.ChordLabLive do
                 </tbody>
               </table>
             </div>
+
+            <div
+              :if={@inversion_sequence != []}
+              class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
+            >
+              <table class="w-full text-left font-mono text-xs text-zinc-200">
+                <thead>
+                  <tr class="border-b border-zinc-700/70 text-zinc-400">
+                    <th class="px-3 py-2 font-normal">Sequence Inversion</th>
+                    <th class="px-3 py-2 font-normal">Final MIDI Notes</th>
+                    <th class="px-3 py-2 font-normal">Named Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    :for={entry <- @inversion_sequence}
+                    class="border-b border-zinc-700/40 last:border-b-0"
+                  >
+                    <td class="px-3 py-2 text-zinc-300">{entry.inversion}</td>
+                    <td class="px-3 py-2">{join_integers(entry.final_notes)}</td>
+                    <td class="px-3 py-2">{join_named_notes(entry.final_notes)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -283,10 +320,12 @@ defmodule MenschWeb.ChordLabLive do
               <span class="inline-block size-2 rounded-full bg-[#2fd5c8]"></span> After voicing
             </span>
             <span class="inline-flex items-center gap-1.5">
-              <span class="inline-block size-2 rounded-sm bg-[#9bf25a]"></span> Final notes key highlight
+              <span class="inline-block size-2 rounded-sm bg-[#9bf25a]"></span>
+              Final notes key highlight
             </span>
             <span class="inline-flex items-center gap-1.5">
-              <span class="inline-block size-2 rounded-sm bg-[#6ea83f]"></span> Foreign bass key highlight
+              <span class="inline-block size-2 rounded-sm bg-[#6ea83f]"></span>
+              Foreign bass key highlight
             </span>
           </div>
 
@@ -307,31 +346,26 @@ defmodule MenschWeb.ChordLabLive do
                   <span
                     :if={key.resolved_tone}
                     class="pointer-events-none absolute left-[32%] top-1 inline-block size-2 rounded-full bg-[#ff7a1a]"
-                  >
-                  </span>
+                  ></span>
                   <span
                     :if={key.inverted_tone}
                     class="pointer-events-none absolute left-[58%] top-1 inline-block size-2 rounded-full bg-[#75b8ff]"
-                  >
-                  </span>
+                  ></span>
                   <span
                     :if={key.voiced_tone}
                     class="pointer-events-none absolute left-[76%] top-1 inline-block size-2 rounded-full bg-[#2fd5c8]"
-                  >
-                  </span>
+                  ></span>
                   <span
                     :if={key.foreign_bass}
                     class="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold text-zinc-900"
                   >
                     B
                   </span>
-                  <span
-                    class={[
-                      "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                      key.active && "text-zinc-900",
-                      !key.active && "text-zinc-500"
-                    ]}
-                  >
+                  <span class={[
+                    "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                    key.active && "text-zinc-900",
+                    !key.active && "text-zinc-500"
+                  ]}>
                     {key.midi}
                   </span>
                 </div>
@@ -352,18 +386,15 @@ defmodule MenschWeb.ChordLabLive do
                   <span
                     :if={key.resolved_tone}
                     class="pointer-events-none absolute left-[26%] top-1 inline-block size-1.5 rounded-full bg-[#ff7a1a]"
-                  >
-                  </span>
+                  ></span>
                   <span
                     :if={key.inverted_tone}
                     class="pointer-events-none absolute left-[58%] top-1 inline-block size-1.5 rounded-full bg-[#75b8ff]"
-                  >
-                  </span>
+                  ></span>
                   <span
                     :if={key.voiced_tone}
                     class="pointer-events-none absolute left-[78%] top-1 inline-block size-1.5 rounded-full bg-[#2fd5c8]"
-                  >
-                  </span>
+                  ></span>
                   <span
                     :if={key.foreign_bass}
                     class={[
@@ -374,13 +405,11 @@ defmodule MenschWeb.ChordLabLive do
                   >
                     B
                   </span>
-                  <span
-                    class={[
-                      "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                      key.active && "text-zinc-900",
-                      !key.active && "text-zinc-300"
-                    ]}
-                  >
+                  <span class={[
+                    "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                    key.active && "text-zinc-900",
+                    !key.active && "text-zinc-300"
+                  ]}>
                     {key.midi}
                   </span>
                 </div>
@@ -397,20 +426,24 @@ defmodule MenschWeb.ChordLabLive do
     case parse_spec(values) do
       {:ok, spec} ->
         result = Resolver.resolve_steps(spec)
+        inversion_sequence = Resolver.resolve_inversion_sequence(spec)
 
         socket
         |> assign(:result, result)
+        |> assign(:inversion_sequence, inversion_sequence)
         |> assign(:error_message, nil)
 
       {:error, reason} ->
         socket
         |> assign(:result, nil)
+        |> assign(:inversion_sequence, [])
         |> assign(:error_message, reason)
     end
   rescue
     error in [ArgumentError] ->
       socket
       |> assign(:result, nil)
+      |> assign(:inversion_sequence, [])
       |> assign(:error_message, Exception.message(error))
   end
 
@@ -420,6 +453,8 @@ defmodule MenschWeb.ChordLabLive do
          {:ok, octave} <- parse_integer(values["octave"], "octave"),
          {:ok, inversion} <- parse_integer(values["inversion"], "inversion"),
          {:ok, voicing_type} <- parse_voicing_type(values["voicing_type"]),
+         {:ok, inversion_tracking_mode} <-
+           parse_inversion_tracking_mode(values["inversion_tracking_mode"]),
          {:ok, center_note} <- parse_integer(values["center_note"], "center_note"),
          {:ok, range_min} <- parse_optional_integer(values["range_min"], "range_min"),
          {:ok, range_max} <- parse_optional_integer(values["range_max"], "range_max"),
@@ -434,6 +469,7 @@ defmodule MenschWeb.ChordLabLive do
         inversion: inversion,
         voicing: %Voicing{
           type: voicing_type,
+          inversion_tracking_mode: inversion_tracking_mode,
           center_note: center_note,
           range_min: range_min,
           range_max: range_max,
@@ -468,6 +504,10 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_voicing_type("close"), do: {:ok, :close}
   defp parse_voicing_type("open"), do: {:ok, :open}
   defp parse_voicing_type(_), do: {:error, "invalid voicing type"}
+
+  defp parse_inversion_tracking_mode("per_step_centered"), do: {:ok, :per_step_centered}
+  defp parse_inversion_tracking_mode("anchor_then_wander"), do: {:ok, :anchor_then_wander}
+  defp parse_inversion_tracking_mode(_), do: {:error, "invalid inversion tracking mode"}
 
   defp parse_doubling("root"), do: {:ok, :root}
   defp parse_doubling("top"), do: {:ok, :top}
@@ -546,6 +586,7 @@ defmodule MenschWeb.ChordLabLive do
       "octave" => "3",
       "inversion" => "0",
       "voicing_type" => "close",
+      "inversion_tracking_mode" => "per_step_centered",
       "center_note" => "60",
       "range_min" => "",
       "range_max" => "",
@@ -580,9 +621,9 @@ defmodule MenschWeb.ChordLabLive do
     |> Enum.count(&(&1 >= 21 and &1 <= 108))
   end
 
-    defp piano_keys(active_notes, foreign_bass_note, resolved_notes, inverted_notes, voiced_notes)
-      when is_list(active_notes) and is_list(resolved_notes) and is_list(inverted_notes) and
-          is_list(voiced_notes) do
+  defp piano_keys(active_notes, foreign_bass_note, resolved_notes, inverted_notes, voiced_notes)
+       when is_list(active_notes) and is_list(resolved_notes) and is_list(inverted_notes) and
+              is_list(voiced_notes) do
     min_midi = 21
     max_midi = 108
 

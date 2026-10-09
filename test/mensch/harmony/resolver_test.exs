@@ -126,4 +126,65 @@ defmodule Mensch.Harmony.ResolverTest do
       Resolver.resolve(spec)
     end
   end
+
+  test "per-step centered mode can wrap back after enough inversions" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 4,
+        voicing: %Voicing{
+          type: :close,
+          center_note: 60,
+          inversion_tracking_mode: :per_step_centered
+        }
+      })
+
+    assert Resolver.resolve(spec) == [48, 52, 55, 59]
+  end
+
+  test "anchor-then-wander mode keeps inversion drift without re-centering each step" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 4,
+        voicing: %Voicing{
+          type: :close,
+          center_note: 60,
+          inversion_tracking_mode: :anchor_then_wander
+        }
+      })
+
+    assert Resolver.resolve(spec) == [60, 64, 67, 71]
+  end
+
+  test "sequence export follows inversion path from zero to target" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 4,
+        voicing: %Voicing{
+          type: :close,
+          center_note: 60,
+          inversion_tracking_mode: :anchor_then_wander
+        }
+      })
+
+    sequence = Resolver.resolve_inversion_sequence(spec)
+
+    assert Enum.map(sequence, & &1.inversion) == [0, 1, 2, 3, 4]
+
+    assert Enum.map(sequence, & &1.final_notes) == [
+             [48, 52, 55, 59],
+             [52, 55, 59, 60],
+             [55, 59, 60, 64],
+             [59, 60, 64, 67],
+             [60, 64, 67, 71]
+           ]
+  end
 end
