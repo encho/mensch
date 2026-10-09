@@ -191,49 +191,10 @@ defmodule MenschWeb.ChordLabLive do
           </p>
         </div>
 
-        <div class="grid gap-6 lg:grid-cols-[minmax(320px,420px)_1fr]">
-          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
+        <div class="flex flex-col gap-6 lg:flex-row">
+          <div class="ui-radius-table flex-1 border border-zinc-700/60 bg-black/30 p-4">
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
               <input type="hidden" name={@form[:root].name} value={@values["root"]} />
-
-              <div class="space-y-1">
-                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Root</label>
-                <div class="relative h-24 w-full max-w-[360px] rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
-                  <button
-                    :for={key <- @root_keyboard_keys}
-                    type="button"
-                    phx-click="set_root"
-                    phx-value-root={key.root}
-                    title={key.label}
-                    class={[
-                      "absolute rounded-sm border transition-colors duration-150",
-                      key.kind == :white && "bottom-1",
-                      key.kind == :white && "h-[86%]",
-                      key.kind == :white && @selected_root_keyboard_key == key.root &&
-                        "border-emerald-300 bg-emerald-200 text-emerald-950",
-                      key.kind == :white && @selected_root_keyboard_key != key.root &&
-                        "border-zinc-700 bg-zinc-100 text-zinc-800",
-                      key.kind == :black && "top-1 z-10 h-[56%]",
-                      key.kind == :black && @selected_root_keyboard_key == key.root &&
-                        "border-emerald-200 bg-emerald-400 text-zinc-950",
-                      key.kind == :black && @selected_root_keyboard_key != key.root &&
-                        "border-black/70 bg-zinc-900 text-zinc-100"
-                    ]}
-                    style={"left: #{key.left}%; width: #{key.width}%;"}
-                  >
-                    <span class={[
-                      "pointer-events-none text-[10px] font-mono font-semibold",
-                      key.kind == :black && @selected_root_keyboard_key == key.root && "text-zinc-950",
-                      key.kind == :black && @selected_root_keyboard_key != key.root && "text-zinc-100",
-                      key.kind == :white && @selected_root_keyboard_key == key.root && "text-emerald-950",
-                      key.kind == :white && @selected_root_keyboard_key != key.root && "text-zinc-800"
-                    ]}>
-                      {key.label}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
               <input type="hidden" name={@form[:quality].name} value={@values["quality"]} />
 
               <div class="space-y-1">
@@ -375,87 +336,43 @@ defmodule MenschWeb.ChordLabLive do
             </.form>
           </div>
 
-          <div class="space-y-4">
-            <div
-              :if={@error_message}
-              class="ui-radius-btn border border-red-400/60 bg-red-500/10 p-3 font-mono text-xs text-red-100"
-            >
-              {@error_message}
-            </div>
-
-            <div
-              :if={@result}
-              class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
-            >
-              <table class="w-full text-left font-mono text-xs text-zinc-200">
-                <thead>
-                  <tr class="border-b border-zinc-700/70 text-zinc-400">
-                    <th class="px-3 py-2 font-normal">Step</th>
-                    <th class="px-3 py-2 font-normal">MIDI Notes</th>
-                    <th class="px-3 py-2 font-normal">Named Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="border-b border-zinc-700/40">
-                    <td class="px-3 py-2 text-zinc-300">Resolved chord tones</td>
-                    <td class="px-3 py-2">{join_integers(@result.resolved_chord_tones)}</td>
-                    <td class="px-3 py-2">{join_named_notes(@result.resolved_chord_tones)}</td>
-                  </tr>
-                  <tr class="border-b border-zinc-700/40">
-                    <td class="px-3 py-2 text-zinc-300">After inversion</td>
-                    <td class="px-3 py-2">{join_integers(@result.inverted_chord_tones)}</td>
-                    <td class="px-3 py-2">{join_named_notes(@result.inverted_chord_tones)}</td>
-                  </tr>
-                  <tr class="border-b border-zinc-700/40">
-                    <td class="px-3 py-2 text-zinc-300">After voicing</td>
-                    <td class="px-3 py-2">{join_integers(@result.voiced_chord_tones)}</td>
-                    <td class="px-3 py-2">{join_named_notes(@result.voiced_chord_tones)}</td>
-                  </tr>
-                  <tr class="border-b border-zinc-700/40">
-                    <td class="px-3 py-2 text-zinc-300">Foreign bass</td>
-                    <td class="px-3 py-2">{foreign_bass_note_text(@result.foreign_bass_note)}</td>
-                    <td class="px-3 py-2">{foreign_bass_named_text(@result.foreign_bass_note)}</td>
-                  </tr>
-                  <tr>
-                    <td class="px-3 py-2 text-zinc-100">Final notes</td>
-                    <td class="px-3 py-2 text-zinc-100">{join_integers(@result.final_notes)}</td>
-                    <td class="px-3 py-2 text-zinc-100">{join_named_notes(@result.final_notes)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div
-              :if={@inversion_sequence != []}
-              class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
-            >
-              <table class="w-full text-left font-mono text-xs text-zinc-200">
-                <thead>
-                  <tr class="border-b border-zinc-700/70 text-zinc-400">
-                    <th class="px-3 py-2 font-normal">Sequence Inversion</th>
-                    <th class="px-3 py-2 font-normal">MIDI Notes</th>
-                    <th class="px-3 py-2 font-normal">Named Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    :for={entry <- @inversion_sequence}
-                    class={[
-                      "border-b border-zinc-700/40 last:border-b-0 transition-colors",
-                      entry.inversion == current_inversion(@values) && "bg-emerald-400/12"
-                    ]}
-                  >
-                    <td class={[
-                      "px-3 py-2 text-zinc-300",
-                      entry.inversion == current_inversion(@values) && "font-semibold text-emerald-200"
-                    ]}>
-                      {entry.inversion}
-                    </td>
-                    <td class="px-3 py-2">{join_integers(entry.final_notes)}</td>
-                    <td class="px-3 py-2">{join_named_notes(entry.final_notes)}</td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4 lg:w-[380px]">
+            <div class="space-y-1">
+              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Root</label>
+              <div class="relative h-24 w-full rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
+                <button
+                  :for={key <- @root_keyboard_keys}
+                  type="button"
+                  phx-click="set_root"
+                  phx-value-root={key.root}
+                  title={key.label}
+                  class={[
+                    "absolute rounded-sm border transition-colors duration-150",
+                    key.kind == :white && "bottom-1",
+                    key.kind == :white && "h-[86%]",
+                    key.kind == :white && @selected_root_keyboard_key == key.root &&
+                      "border-emerald-300 bg-emerald-200 text-emerald-950",
+                    key.kind == :white && @selected_root_keyboard_key != key.root &&
+                      "border-zinc-700 bg-zinc-100 text-zinc-800",
+                    key.kind == :black && "top-1 z-10 h-[56%]",
+                    key.kind == :black && @selected_root_keyboard_key == key.root &&
+                      "border-emerald-200 bg-emerald-400 text-zinc-950",
+                    key.kind == :black && @selected_root_keyboard_key != key.root &&
+                      "border-black/70 bg-zinc-900 text-zinc-100"
+                  ]}
+                  style={"left: #{key.left}%; width: #{key.width}%;"}
+                >
+                  <span class={[
+                    "pointer-events-none text-[10px] font-mono font-semibold",
+                    key.kind == :black && @selected_root_keyboard_key == key.root && "text-zinc-950",
+                    key.kind == :black && @selected_root_keyboard_key != key.root && "text-zinc-100",
+                    key.kind == :white && @selected_root_keyboard_key == key.root && "text-emerald-950",
+                    key.kind == :white && @selected_root_keyboard_key != key.root && "text-zinc-800"
+                  ]}>
+                    {key.label}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -471,60 +388,63 @@ defmodule MenschWeb.ChordLabLive do
           <div class="w-full overflow-x-auto">
             <div class="min-w-[1320px] space-y-3">
               <form phx-change="set_keyboard_register_controls" class="space-y-2">
-                <div class="grid grid-cols-[86px_1fr_220px] items-center gap-2">
-                  <label for="range-min-slider" class="font-mono text-[11px] text-zinc-300">Register</label>
-
-                  <div class="register-slider-shell relative h-8">
-                    <div class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded bg-zinc-700/70"></div>
-                    <div
-                      class="pointer-events-none absolute top-1/2 h-2 -translate-y-1/2 rounded bg-emerald-300/55"
-                      style={
-                        "left: #{slider_note_percent(@values, "range_min", 21)}%; width: #{slider_range_width_percent(@values)}%;"
-                      }
-                    >
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between gap-3 font-mono text-[11px] text-zinc-300">
+                    <label for="range-min-slider" class="text-zinc-300">Register</label>
+                    <div class="grid grid-cols-3 gap-3 text-right">
+                      <span>{slider_note_text(@values, "range_min", 21)}</span>
+                      <span>{slider_note_text(@values, "center_note", 60)}</span>
+                      <span>{slider_note_text(@values, "range_max", 108)}</span>
                     </div>
-                    <div
-                      class="pointer-events-none absolute top-1/2 z-10 h-4 w-1.5 -translate-y-1/2 rounded bg-emerald-500"
-                      style={"left: calc(#{slider_note_percent(@values, "center_note", 60)}% - 0.1875rem);"}
-                    >
-                    </div>
-
-                    <input
-                      id="range-min-slider"
-                      name="range_min"
-                      type="range"
-                      min="21"
-                      max="108"
-                      step="1"
-                      value={slider_note_value(@values, "range_min", 21)}
-                      class="register-range-input register-range-min absolute inset-0"
-                    />
-                    <input
-                      id="center-note-slider"
-                      name="center_note"
-                      type="range"
-                      min="21"
-                      max="108"
-                      step="1"
-                      value={slider_note_value(@values, "center_note", 60)}
-                      class="register-range-input register-range-center absolute inset-0"
-                    />
-                    <input
-                      id="range-max-slider"
-                      name="range_max"
-                      type="range"
-                      min="21"
-                      max="108"
-                      step="1"
-                      value={slider_note_value(@values, "range_max", 108)}
-                      class="register-range-input register-range-max absolute inset-0"
-                    />
                   </div>
 
-                  <div class="grid grid-cols-3 gap-1 text-right font-mono text-[11px] text-zinc-300">
-                    <span>{slider_note_text(@values, "range_min", 21)}</span>
-                    <span>{slider_note_text(@values, "center_note", 60)}</span>
-                    <span>{slider_note_text(@values, "range_max", 108)}</span>
+                  <div class="register-slider-shell relative h-8">
+                    <div class="absolute inset-y-0 left-[0.5682%] right-[0.5682%]">
+                      <div class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded bg-zinc-700/70"></div>
+                      <div
+                        class="pointer-events-none absolute top-1/2 h-2 -translate-y-1/2 rounded bg-emerald-300/55"
+                        style={
+                          "left: #{slider_note_percent(@values, "range_min", 21)}%; width: #{slider_range_width_percent(@values)}%;"
+                        }
+                      >
+                      </div>
+                      <div
+                        class="pointer-events-none absolute top-1/2 z-10 h-4 w-1.5 -translate-y-1/2 rounded bg-emerald-500"
+                        style={"left: calc(#{slider_note_percent(@values, "center_note", 60)}% - 0.1875rem);"}
+                      >
+                      </div>
+
+                      <input
+                        id="range-min-slider"
+                        name="range_min"
+                        type="range"
+                        min="21"
+                        max="108"
+                        step="1"
+                        value={slider_note_value(@values, "range_min", 21)}
+                        class="register-range-input register-range-min absolute inset-0"
+                      />
+                      <input
+                        id="center-note-slider"
+                        name="center_note"
+                        type="range"
+                        min="21"
+                        max="108"
+                        step="1"
+                        value={slider_note_value(@values, "center_note", 60)}
+                        class="register-range-input register-range-center absolute inset-0"
+                      />
+                      <input
+                        id="range-max-slider"
+                        name="range_max"
+                        type="range"
+                        min="21"
+                        max="108"
+                        step="1"
+                        value={slider_note_value(@values, "range_max", 108)}
+                        class="register-range-input register-range-max absolute inset-0"
+                      />
+                    </div>
                   </div>
                 </div>
               </form>
@@ -637,6 +557,93 @@ defmodule MenschWeb.ChordLabLive do
             </span>
           </div>
         </div>
+
+        <div class="space-y-4">
+          <div
+            :if={@error_message}
+            class="ui-radius-btn border border-red-400/60 bg-red-500/10 p-3 font-mono text-xs text-red-100"
+          >
+            {@error_message}
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div
+              :if={@result}
+              class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
+            >
+              <table class="w-full text-left font-mono text-xs text-zinc-200">
+                <thead>
+                  <tr class="border-b border-zinc-700/70 text-zinc-400">
+                    <th class="px-3 py-2 font-normal">Step</th>
+                    <th class="px-3 py-2 font-normal">MIDI Notes</th>
+                    <th class="px-3 py-2 font-normal">Named Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-b border-zinc-700/40">
+                    <td class="px-3 py-2 text-zinc-300">Resolved chord tones</td>
+                    <td class="px-3 py-2">{join_integers(@result.resolved_chord_tones)}</td>
+                    <td class="px-3 py-2">{join_named_notes(@result.resolved_chord_tones)}</td>
+                  </tr>
+                  <tr class="border-b border-zinc-700/40">
+                    <td class="px-3 py-2 text-zinc-300">After inversion</td>
+                    <td class="px-3 py-2">{join_integers(@result.inverted_chord_tones)}</td>
+                    <td class="px-3 py-2">{join_named_notes(@result.inverted_chord_tones)}</td>
+                  </tr>
+                  <tr class="border-b border-zinc-700/40">
+                    <td class="px-3 py-2 text-zinc-300">After voicing</td>
+                    <td class="px-3 py-2">{join_integers(@result.voiced_chord_tones)}</td>
+                    <td class="px-3 py-2">{join_named_notes(@result.voiced_chord_tones)}</td>
+                  </tr>
+                  <tr class="border-b border-zinc-700/40">
+                    <td class="px-3 py-2 text-zinc-300">Foreign bass</td>
+                    <td class="px-3 py-2">{foreign_bass_note_text(@result.foreign_bass_note)}</td>
+                    <td class="px-3 py-2">{foreign_bass_named_text(@result.foreign_bass_note)}</td>
+                  </tr>
+                  <tr>
+                    <td class="px-3 py-2 text-zinc-100">Final notes</td>
+                    <td class="px-3 py-2 text-zinc-100">{join_integers(@result.final_notes)}</td>
+                    <td class="px-3 py-2 text-zinc-100">{join_named_notes(@result.final_notes)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              :if={@inversion_sequence != []}
+              class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
+            >
+              <table class="w-full text-left font-mono text-xs text-zinc-200">
+                <thead>
+                  <tr class="border-b border-zinc-700/70 text-zinc-400">
+                    <th class="px-3 py-2 font-normal">Sequence Inversion</th>
+                    <th class="px-3 py-2 font-normal">MIDI Notes</th>
+                    <th class="px-3 py-2 font-normal">Named Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    :for={entry <- @inversion_sequence}
+                    class={[
+                      "border-b border-zinc-700/40 last:border-b-0 transition-colors",
+                      entry.inversion == current_inversion(@values) && "bg-emerald-400/12"
+                    ]}
+                  >
+                    <td class={[
+                      "px-3 py-2 text-zinc-300",
+                      entry.inversion == current_inversion(@values) && "font-semibold text-emerald-200"
+                    ]}>
+                      {entry.inversion}
+                    </td>
+                    <td class="px-3 py-2">{join_integers(entry.final_notes)}</td>
+                    <td class="px-3 py-2">{join_named_notes(entry.final_notes)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </section>
     </Layouts.app>
     """
