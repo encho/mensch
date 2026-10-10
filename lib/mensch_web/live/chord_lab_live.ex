@@ -236,7 +236,7 @@ defmodule MenschWeb.ChordLabLive do
           </p>
         </div>
 
-        <div class="flex flex-col gap-6 lg:flex-row">
+        <div class="flex flex-col gap-6 lg:flex-row-reverse">
           <div class="ui-radius-table flex-1 border border-zinc-700/60 bg-black/30 p-4">
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
               <input type="hidden" name={@form[:root].name} value={@values["root"]} />
