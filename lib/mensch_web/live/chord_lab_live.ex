@@ -13,8 +13,10 @@ defmodule MenschWeb.ChordLabLive do
 
   use MenschWeb, :live_view
 
+  alias Mensch.ChordLists
   alias Mensch.ChordSpec, as: LegacyChordSpec
   alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.ChordSpec.Parameters
   alias Mensch.Harmony.ChordSpec.ForeignBass
   alias Mensch.Harmony.ChordSpec.Voicing
   alias Mensch.Harmony.Resolver
@@ -93,6 +95,7 @@ defmodule MenschWeb.ChordLabLive do
   @impl true
   def mount(_params, _session, socket) do
     values = default_values()
+    {chord_lists, selected_chord_list_id, selected_chord_list_entries} = load_chord_lists(nil)
 
     socket =
       socket
@@ -100,6 +103,10 @@ defmodule MenschWeb.ChordLabLive do
       |> assign(:values, values)
       |> assign(:form, to_form(values, as: :chord))
       |> assign(:result, nil)
+      |> assign(:chord_lists, chord_lists)
+      |> assign(:selected_chord_list_id, selected_chord_list_id)
+      |> assign(:selected_chord_list_entries, selected_chord_list_entries)
+      |> assign(:new_chord_list_name, "")
       |> assign(:show_doubling_info, false)
       |> assign(:error_message, nil)
       |> resolve_preview(values)
@@ -241,6 +248,114 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
+  def handle_event("set_new_chord_list_name", %{"chord_list" => %{"name" => name}}, socket) do
+    {:noreply, assign(socket, :new_chord_list_name, to_string(name))}
+  end
+
+  @impl true
+  def handle_event("create_chord_list", %{"chord_list" => %{"name" => name}}, socket) do
+    case ChordLists.create_list(name) do
+      {:ok, list} ->
+        {chord_lists, selected_id, entries} = load_chord_lists(list.id)
+
+        {:noreply,
+         socket
+         |> assign(:chord_lists, chord_lists)
+         |> assign(:selected_chord_list_id, selected_id)
+         |> assign(:selected_chord_list_entries, entries)
+         |> assign(:new_chord_list_name, "")
+         |> put_flash(:info, "Chord list created")}
+
+      {:error, :name_required} ->
+        {:noreply, put_flash(socket, :error, "Chord list name is required")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Could not create chord list: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("select_chord_list", %{"list_id" => list_id}, socket) do
+    {chord_lists, selected_id, entries} = load_chord_lists(list_id)
+
+    {:noreply,
+     socket
+     |> assign(:chord_lists, chord_lists)
+     |> assign(:selected_chord_list_id, selected_id)
+     |> assign(:selected_chord_list_entries, entries)}
+  end
+
+  @impl true
+  def handle_event("add_current_to_chord_list", _params, socket) do
+    case socket.assigns.selected_chord_list_id do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select or create a chord list first")}
+
+      list_id ->
+        case ChordLists.add_entry(list_id, socket.assigns.values, socket.assigns.result) do
+          {:ok, _list} ->
+            {chord_lists, selected_id, entries} = load_chord_lists(list_id)
+
+            {:noreply,
+             socket
+             |> assign(:chord_lists, chord_lists)
+             |> assign(:selected_chord_list_id, selected_id)
+             |> assign(:selected_chord_list_entries, entries)
+             |> put_flash(:info, "Chord added to list")}
+
+          {:error, reason} ->
+            {:noreply,
+             put_flash(socket, :error, "Could not add chord to list: #{inspect(reason)}")}
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("delete_chord_list_entry", %{"entry_id" => entry_id}, socket) do
+    case socket.assigns.selected_chord_list_id do
+      nil ->
+        {:noreply, socket}
+
+      list_id ->
+        case ChordLists.delete_entry(list_id, entry_id) do
+          {:ok, _list} ->
+            {chord_lists, selected_id, entries} = load_chord_lists(list_id)
+
+            {:noreply,
+             socket
+             |> assign(:chord_lists, chord_lists)
+             |> assign(:selected_chord_list_id, selected_id)
+             |> assign(:selected_chord_list_entries, entries)}
+
+          {:error, reason} ->
+            {:noreply,
+             put_flash(socket, :error, "Could not delete chord entry: #{inspect(reason)}")}
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("load_chord_list_entry", %{"entry_id" => entry_id}, socket) do
+    entry = Enum.find(socket.assigns.selected_chord_list_entries, &(&1.id == entry_id))
+
+    case entry do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Chord entry not found")}
+
+      _ ->
+        values =
+          entry
+          |> chord_list_entry_values()
+          |> Map.merge(default_values(), fn _key, entry_value, _default_value -> entry_value end)
+
+        {:noreply,
+         socket
+         |> assign_form_values_and_preview(values)
+         |> put_flash(:info, "Chord loaded from list")}
+    end
+  end
+
+  @impl true
   def handle_event("open_doubling_info", _params, socket) do
     {:noreply, assign(socket, :show_doubling_info, true)}
   end
@@ -303,6 +418,117 @@ defmodule MenschWeb.ChordLabLive do
           <p class="font-mono text-xs text-zinc-400">
             Define a chord spec and inspect each step of the new isolated harmony resolver.
           </p>
+        </div>
+
+        <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="font-mono text-sm text-zinc-200">Chord Lists</h2>
+            <button
+              type="button"
+              phx-click="add_current_to_chord_list"
+              disabled={is_nil(@selected_chord_list_id) or is_nil(@result)}
+              class={[
+                "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
+                (is_nil(@selected_chord_list_id) or is_nil(@result)) &&
+                  "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                not is_nil(@selected_chord_list_id) and not is_nil(@result) &&
+                  "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
+              ]}
+            >
+              Add Current Chord
+            </button>
+          </div>
+
+          <div class="grid gap-3 lg:grid-cols-2">
+            <form phx-submit="create_chord_list" phx-change="set_new_chord_list_name" class="space-y-1">
+              <label for="new-chord-list-name" class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                New List
+              </label>
+              <div class="flex items-center gap-2">
+                <input
+                  id="new-chord-list-name"
+                  name="chord_list[name]"
+                  value={@new_chord_list_name}
+                  placeholder="e.g. Verse Progression"
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+                <button
+                  type="submit"
+                  class="rounded-sm border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 font-mono text-xs text-zinc-200 hover:border-zinc-500"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+
+            <form phx-change="select_chord_list" class="space-y-1">
+              <label for="selected-chord-list" class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Active List
+              </label>
+              <select
+                id="selected-chord-list"
+                name="list_id"
+                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+              >
+                <option value="">Select a list</option>
+                <option
+                  :for={list <- @chord_lists}
+                  value={list.id}
+                  selected={@selected_chord_list_id == list.id}
+                >
+                  {list.name} ({list.entry_count})
+                </option>
+              </select>
+            </form>
+          </div>
+
+          <div class="overflow-x-auto rounded-md border border-zinc-700/70">
+            <table class="w-full text-left font-mono text-xs text-zinc-200">
+              <thead>
+                <tr class="border-b border-zinc-700/70 text-zinc-400">
+                  <th class="px-3 py-2 font-normal">#</th>
+                  <th class="px-3 py-2 font-normal">Chord</th>
+                  <th class="px-3 py-2 font-normal">Final Notes</th>
+                  <th class="px-3 py-2 font-normal text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  :for={{entry, index} <- Enum.with_index(@selected_chord_list_entries, 1)}
+                  class="border-b border-zinc-700/40 last:border-b-0"
+                >
+                  <td class="px-3 py-2 text-zinc-400">{index}</td>
+                  <td class="px-3 py-2">{chord_list_entry_label(entry)}</td>
+                  <td class="px-3 py-2">{join_integers(chord_list_entry_final_notes(entry))}</td>
+                  <td class="px-3 py-2 text-right">
+                    <div class="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        phx-click="load_chord_list_entry"
+                        phx-value-entry_id={entry.id}
+                        class="rounded-sm border border-emerald-400/70 bg-emerald-500/15 px-2 py-1 font-mono text-[10px] text-emerald-100 hover:bg-emerald-500/25"
+                      >
+                        Load
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="delete_chord_list_entry"
+                        phx-value-entry_id={entry.id}
+                        class="rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-[10px] text-zinc-300 hover:border-zinc-500"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr :if={@selected_chord_list_entries == []}>
+                  <td colspan="4" class="px-3 py-3 text-center text-zinc-500">
+                    No chords in this list yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="grid gap-4 lg:grid-cols-3">
@@ -1387,6 +1613,65 @@ defmodule MenschWeb.ChordLabLive do
       "foreign_bass_pitch_class" => "",
       "foreign_bass_octave" => "0"
     }
+  end
+
+  defp load_chord_lists(preferred_id) do
+    chord_lists = ChordLists.list_lists()
+
+    selected_id =
+      cond do
+        is_binary(preferred_id) and preferred_id != "" and
+            Enum.any?(chord_lists, &(&1.id == preferred_id)) ->
+          preferred_id
+
+        chord_lists != [] ->
+          chord_lists |> List.first() |> Map.fetch!(:id)
+
+        true ->
+          nil
+      end
+
+    entries =
+      case selected_id do
+        nil -> []
+
+        id ->
+          case ChordLists.fetch_list(id) do
+            {:ok, list} -> list.entries
+            _ -> []
+          end
+      end
+
+    {chord_lists, selected_id, entries}
+  end
+
+  defp chord_list_entry_label(entry) do
+    values = chord_list_entry_values(entry)
+
+    root =
+      case parse_pitch_class(Map.get(values, "root")) do
+        {:ok, root_pc} -> ChordSpec.root_label(root_pc)
+        _ -> "?"
+      end
+
+    quality = Map.get(values, "quality", "?")
+    octave = Map.get(values, "octave", "?")
+    inversion = Map.get(values, "inversion", "?")
+
+    "#{root} #{quality} (oct #{octave}, inv #{inversion})"
+  end
+
+  defp chord_list_entry_final_notes(entry) do
+    entry
+    |> Map.get(:snapshot, %{})
+    |> Map.get(:final_notes, [])
+  end
+
+  defp chord_list_entry_values(entry) do
+    case Map.get(entry, :parameters) do
+      %Parameters{} = parameters -> Parameters.to_values_map(parameters)
+      _ -> Map.get(entry, :values, %{})
+    end
   end
 
   defp result_final_notes(nil), do: []
