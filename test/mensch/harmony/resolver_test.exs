@@ -77,6 +77,60 @@ defmodule Mensch.Harmony.ResolverTest do
     assert Resolver.resolve(spec) == [48, 52, 55, 59, 60, 67]
   end
 
+  test "voice_count expansion with third doubling repeats third pitch class" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 0,
+        voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :third}
+      })
+
+    assert Resolver.resolve(spec) == [48, 52, 55, 59, 64, 76]
+  end
+
+  test "voice_count expansion with fifth doubling repeats fifth family pitch class" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 0,
+        voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :fifth}
+      })
+
+    assert Resolver.resolve(spec) == [48, 52, 55, 59, 67, 79]
+  end
+
+  test "voice_count expansion with bass doubling repeats current lowest voice pitch class" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 1,
+        voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :bass}
+      })
+
+    assert Resolver.resolve(spec) == [52, 55, 59, 60, 64, 76]
+  end
+
+  test "guide_tones doubling fails hard when no third or seventh is present" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :sus2,
+        octave: 3,
+        inversion: 0,
+        voicing: %Voicing{type: :close, center_note: 60, voice_count: 5, doubling: :guide_tones}
+      })
+
+    assert_raise ArgumentError, ~r/guide tone/, fn ->
+      Resolver.resolve(spec)
+    end
+  end
+
   test "fails hard when foreign bass is not foreign" do
     spec =
       ChordSpec.new!(%{

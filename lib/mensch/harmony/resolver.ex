@@ -479,6 +479,40 @@ defmodule Mensch.Harmony.Resolver do
         :auto ->
           order = auto_doubling_order(spec)
           build_additions_by_pitch_class(notes, order, additional)
+
+        :third ->
+          order = pitch_classes_for_tokens(spec, ["3", "b3"])
+
+          if order == [] do
+            raise ArgumentError,
+                  "doubling mode :third requires a chord quality with a third"
+          end
+
+          build_additions_by_pitch_class(notes, order, additional)
+
+        :fifth ->
+          order = pitch_classes_for_tokens(spec, ["5", "b5", "#5"])
+
+          if order == [] do
+            raise ArgumentError,
+                  "doubling mode :fifth requires a chord quality with a fifth-family tone"
+          end
+
+          build_additions_by_pitch_class(notes, order, additional)
+
+        :guide_tones ->
+          order = pitch_classes_for_tokens(spec, ["3", "b3", "7", "b7", "bb7"])
+
+          if order == [] do
+            raise ArgumentError,
+                  "doubling mode :guide_tones requires at least one guide tone (third or seventh)"
+          end
+
+          build_additions_by_pitch_class(notes, order, additional)
+
+        :bass ->
+          bass_pc = rem(Enum.min(notes), 12)
+          build_additions_by_pitch_class(notes, [bass_pc], additional)
       end
 
     Enum.sort(notes ++ additions)
@@ -493,6 +527,19 @@ defmodule Mensch.Harmony.Resolver do
        |> Enum.map(&rem(&1, 12))
        |> Enum.reject(&(&1 in [0, 7, 3, 4]))
        |> Enum.uniq())
+  end
+
+  defp pitch_classes_for_tokens(%ChordSpec{} = spec, ordered_tokens) do
+    available_tokens = MapSet.new(ChordSpec.tones(spec))
+
+    ordered_tokens
+    |> Enum.filter(&MapSet.member?(available_tokens, &1))
+    |> Enum.map(fn token ->
+      token
+      |> ChordSpec.tone_interval()
+      |> rem(12)
+    end)
+    |> Enum.uniq()
   end
 
   defp build_additions_by_pitch_class(notes, pcs_order, additional_count) do

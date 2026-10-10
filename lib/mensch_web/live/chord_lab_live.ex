@@ -100,6 +100,7 @@ defmodule MenschWeb.ChordLabLive do
       |> assign(:values, values)
       |> assign(:form, to_form(values, as: :chord))
       |> assign(:result, nil)
+      |> assign(:show_doubling_info, false)
       |> assign(:error_message, nil)
       |> resolve_preview(values)
 
@@ -200,6 +201,29 @@ defmodule MenschWeb.ChordLabLive do
       end
 
     {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_doubling", %{"mode" => mode}, socket) do
+    values =
+      if mode in doubling_mode_values() and not doubling_mode_disabled?(mode, socket.assigns.values) do
+        socket.assigns.values
+        |> Map.put("doubling", mode)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("open_doubling_info", _params, socket) do
+    {:noreply, assign(socket, :show_doubling_info, true)}
+  end
+
+  @impl true
+  def handle_event("close_doubling_info", _params, socket) do
+    {:noreply, assign(socket, :show_doubling_info, false)}
   end
 
   @impl true
@@ -408,6 +432,7 @@ defmodule MenschWeb.ChordLabLive do
                 name={@form[:inversion_tracking_mode].name}
                 value={@values["inversion_tracking_mode"]}
               />
+              <input type="hidden" name={@form[:doubling].name} value={@values["doubling"]} />
               <input
                 type="hidden"
                 name={@form[:center_note].name}
@@ -507,12 +532,46 @@ defmodule MenschWeb.ChordLabLive do
                     max="12"
                     label="Voice Count"
                   />
-                  <.input
-                    field={@form[:doubling]}
-                    type="select"
-                    label="Doubling"
-                    options={[{"Auto", "auto"}, {"Root", "root"}, {"Top", "top"}]}
-                  />
+                  <div class="space-y-1">
+                    <div class="flex items-center justify-between">
+                      <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                        Doubling
+                      </label>
+                      <button
+                        type="button"
+                        phx-click="open_doubling_info"
+                        class="inline-flex size-5 items-center justify-center rounded-full border border-zinc-600 bg-zinc-900/80 font-mono text-[11px] font-bold leading-none text-zinc-200 transition-colors duration-150 hover:border-zinc-400 hover:text-white"
+                        title="Show doubling strategy information"
+                        aria-label="Show doubling strategy information"
+                      >
+                        i
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1">
+                      <button
+                        :for={mode <- doubling_modes()}
+                        type="button"
+                        phx-click="set_doubling"
+                        phx-value-mode={mode.value}
+                        disabled={doubling_mode_disabled?(mode.value, @values)}
+                        class={[
+                          "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                          doubling_mode_disabled?(mode.value, @values) &&
+                            "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                          not doubling_mode_disabled?(mode.value, @values) && @values["doubling"] == mode.value &&
+                            "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                          not doubling_mode_disabled?(mode.value, @values) && @values["doubling"] != mode.value &&
+                            "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                        ]}
+                        title={mode.description}
+                      >
+                        {mode.label}
+                      </button>
+                    </div>
+                  </div>
+                  <p class="font-mono text-[10px] text-zinc-500">
+                    Doubling is used only when Voice Count is greater than the chord tone count.
+                  </p>
                 </div>
               </div>
             </.form>
@@ -837,6 +896,64 @@ defmodule MenschWeb.ChordLabLive do
 
         </div>
 
+        <div
+          :if={@show_doubling_info}
+          class="fixed inset-0 z-50 flex items-center justify-center px-4"
+        >
+          <button
+            type="button"
+            phx-click="close_doubling_info"
+            class="absolute inset-0 bg-black/70"
+            aria-label="Close doubling information"
+          >
+          </button>
+          <div
+            class="ui-radius-table relative z-10 w-full max-w-2xl border border-zinc-600 bg-zinc-950/95 p-4 shadow-2xl"
+            phx-click-away="close_doubling_info"
+          >
+            <div class="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h3 class="font-mono text-sm text-zinc-100">Doubling Strategies</h3>
+                <p class="mt-1 font-mono text-[11px] text-zinc-400">
+                  Applied only when Voice Count exceeds the number of chord tones.
+                </p>
+              </div>
+              <button
+                type="button"
+                phx-click="close_doubling_info"
+                class="inline-flex size-7 items-center justify-center rounded-full border border-zinc-600 bg-zinc-900/80 text-zinc-200 transition-colors duration-150 hover:border-zinc-400 hover:text-white"
+                aria-label="Close doubling information"
+                title="Close"
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
+
+            <div class="overflow-x-auto rounded-md border border-zinc-700/70">
+              <table class="w-full text-left font-mono text-xs text-zinc-200">
+                <thead>
+                  <tr class="border-b border-zinc-700/70 text-zinc-400">
+                    <th class="px-3 py-2 font-normal">Mode</th>
+                    <th class="px-3 py-2 font-normal">What Gets Doubled</th>
+                    <th class="px-3 py-2 font-normal">Availability</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr :for={row <- doubling_info_rows()} class="border-b border-zinc-700/40 last:border-b-0">
+                    <td class="px-3 py-2 text-zinc-100">{row.label}</td>
+                    <td class="px-3 py-2">{row.explanation}</td>
+                    <td class="px-3 py-2 text-zinc-300">{row.availability}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p class="mt-3 font-mono text-[11px] text-zinc-500">
+              Tip: use Guide or Third when you want stronger functional identity; use Bass for heavier low-end emphasis.
+            </p>
+          </div>
+        </div>
+
       </section>
     </Layouts.app>
     """
@@ -1021,6 +1138,10 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_doubling("root"), do: {:ok, :root}
   defp parse_doubling("top"), do: {:ok, :top}
   defp parse_doubling("auto"), do: {:ok, :auto}
+  defp parse_doubling("third"), do: {:ok, :third}
+  defp parse_doubling("fifth"), do: {:ok, :fifth}
+  defp parse_doubling("guide_tones"), do: {:ok, :guide_tones}
+  defp parse_doubling("bass"), do: {:ok, :bass}
   defp parse_doubling(_), do: {:error, "invalid doubling"}
 
   defp parse_foreign_bass("", _mode, _octave), do: {:ok, nil}
@@ -1137,6 +1258,72 @@ defmodule MenschWeb.ChordLabLive do
     |> result_final_notes()
     |> Enum.uniq()
     |> Enum.count(&(&1 >= 21 and &1 <= 108))
+  end
+
+  defp doubling_modes do
+    [
+      %{value: "auto", label: "Auto", description: "Root/fifth/third priority"},
+      %{value: "root", label: "Root", description: "Repeat the root pitch class"},
+      %{value: "top", label: "Top", description: "Repeat the top note"},
+      %{value: "third", label: "Third", description: "Repeat the chord third"},
+      %{value: "fifth", label: "Fifth", description: "Repeat the chord fifth family"},
+      %{value: "guide_tones", label: "Guide", description: "Repeat third/seventh guide tones"},
+      %{value: "bass", label: "Bass", description: "Repeat the current lowest voice"}
+    ]
+  end
+
+  defp doubling_info_rows do
+    [
+      %{
+        label: "Auto",
+        explanation: "Uses the internal priority order root -> fifth -> third when adding voices.",
+        availability: "Always"
+      },
+      %{
+        label: "Root",
+        explanation: "Repeats the root pitch class across octaves.",
+        availability: "Always"
+      },
+      %{
+        label: "Top",
+        explanation: "Repeats the current top note of the voiced stack.",
+        availability: "Always"
+      },
+      %{
+        label: "Third",
+        explanation: "Repeats the chord third (major or minor depending on quality).",
+        availability: "Disabled for sus2 and sus4"
+      },
+      %{
+        label: "Fifth",
+        explanation: "Repeats the fifth family (perfect, flat, or sharp fifth).",
+        availability: "Always"
+      },
+      %{
+        label: "Guide",
+        explanation: "Repeats guide tones (third and/or seventh) to strengthen harmonic function.",
+        availability: "Disabled for sus2 and sus4"
+      },
+      %{
+        label: "Bass",
+        explanation: "Repeats the current lowest voice pitch class.",
+        availability: "Always"
+      }
+    ]
+  end
+
+  defp doubling_mode_values do
+    Enum.map(doubling_modes(), & &1.value)
+  end
+
+  defp doubling_mode_disabled?(mode, values) do
+    quality = Map.get(values, "quality", "")
+
+    case mode do
+      "third" -> quality in ["sus2", "sus4"]
+      "guide_tones" -> quality in ["sus2", "sus4"]
+      _ -> false
+    end
   end
 
   defp keyboard_range_value(values, key) when is_map(values) and is_binary(key) do
