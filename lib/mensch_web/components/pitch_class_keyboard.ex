@@ -29,6 +29,7 @@ defmodule MenschWeb.PitchClassKeyboard do
   attr :header_action, :boolean, default: false
   attr :header_action_label, :string, default: nil
   attr :header_action_value, :string, default: ""
+  attr :selected_key_color, :string, default: "#9bf25a"
 
   def mini(assigns) do
     assigns = assign(assigns, :keyboard_keys, @keyboard_keys)
@@ -59,15 +60,12 @@ defmodule MenschWeb.PitchClassKeyboard do
             key.kind == :white && "rounded-sm",
             key.kind == :black && "rounded-b-sm rounded-t-none",
             key.kind == :white && "inset-y-1",
-            key.kind == :white && @selected_key == key.root &&
-              "border-emerald-300 bg-emerald-200 text-emerald-950",
+            @selected_key == key.root && "text-zinc-950",
             key.kind == :white && @selected_key != key.root && "border-zinc-700 bg-zinc-100 text-zinc-800",
             key.kind == :black && "top-1 z-10 h-[50%]",
-            key.kind == :black && @selected_key == key.root &&
-              "border-emerald-200 bg-emerald-400 text-zinc-950",
             key.kind == :black && @selected_key != key.root && "border-black/70 bg-zinc-900 text-zinc-100"
           ]}
-          style={"left: #{key.left}%; width: #{key.width}%;"}
+          style={"left: #{key.left}%; width: #{key.width}%; #{selected_key_style(@selected_key, key.root, @selected_key_color)}"}
         >
           <span class={[
             "pointer-events-none text-[10px] font-mono font-semibold",
@@ -94,4 +92,11 @@ defmodule MenschWeb.PitchClassKeyboard do
     </div>
     """
   end
+
+  defp selected_key_style(selected_key, key_root, selected_key_color)
+       when selected_key == key_root and is_binary(selected_key_color) do
+    "background-color: #{selected_key_color}; border-color: #{selected_key_color};"
+  end
+
+  defp selected_key_style(_selected_key, _key_root, _selected_key_color), do: ""
 end

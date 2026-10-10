@@ -280,6 +280,7 @@ defmodule MenschWeb.ChordLabLive do
               label="Root"
               event="set_root_pitch_class"
               selected_key={@selected_root_keyboard_key}
+              selected_key_color="#9bf25a"
             />
 
             <form phx-change="set_octave" class="space-y-1 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
@@ -307,6 +308,7 @@ defmodule MenschWeb.ChordLabLive do
                 label="Foreign Bass"
                 event="set_foreign_bass_pitch_class"
                 selected_key={@selected_foreign_bass_keyboard_key}
+                selected_key_color="#ff4d6d"
                 header_action={true}
                 header_action_label="No Foreign Bass"
                 header_action_value=""
