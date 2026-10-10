@@ -144,6 +144,28 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
+  def handle_event("set_foreign_bass_mode", %{"mode" => mode}, socket) do
+    values =
+      if mode in ["absolute", "relative"] do
+        socket.assigns.values
+        |> Map.put("foreign_bass_mode", mode)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_foreign_bass_octave", %{"foreign_bass_octave" => octave}, socket) do
+    values =
+      socket.assigns.values
+      |> Map.put("foreign_bass_octave", octave)
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
   def handle_event("set_quality", %{"quality" => quality}, socket) do
     values =
       if Map.has_key?(@quality_from_param, quality) do
@@ -208,6 +230,16 @@ defmodule MenschWeb.ChordLabLive do
                 type="hidden"
                 name={@form[:foreign_bass_pitch_class].name}
                 value={@values["foreign_bass_pitch_class"]}
+              />
+              <input
+                type="hidden"
+                name={@form[:foreign_bass_mode].name}
+                value={@values["foreign_bass_mode"]}
+              />
+              <input
+                type="hidden"
+                name={@form[:foreign_bass_octave].name}
+                value={@values["foreign_bass_octave"]}
               />
 
               <div class="space-y-1">
@@ -321,20 +353,13 @@ defmodule MenschWeb.ChordLabLive do
                 value={@values["range_max"]}
               />
 
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 gap-2">
                 <.input
                   field={@form[:voice_count]}
                   type="number"
                   min="1"
                   max="12"
                   label="Voice Count"
-                />
-                <.input
-                  field={@form[:foreign_bass_octave]}
-                  type="number"
-                  min="-1"
-                  max="9"
-                  label="Bass Octave"
                 />
               </div>
             </.form>
@@ -353,9 +378,69 @@ defmodule MenschWeb.ChordLabLive do
               label="Foreign Bass"
               event="set_foreign_bass_pitch_class"
               selected_key={@selected_foreign_bass_keyboard_key}
-              show_clear={true}
+              header_action={true}
+              header_action_label="No Foreign Bass"
+              header_action_value=""
               clear_label="No Foreign Bass"
             />
+
+            <div class="space-y-2">
+              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Bass Placement
+              </label>
+              <div class="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  phx-click="set_foreign_bass_mode"
+                  phx-value-mode="relative"
+                  class={[
+                    "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                    @values["foreign_bass_mode"] == "relative" &&
+                      "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                    @values["foreign_bass_mode"] != "relative" &&
+                      "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                  ]}
+                >
+                  Relative
+                </button>
+                <button
+                  type="button"
+                  phx-click="set_foreign_bass_mode"
+                  phx-value-mode="absolute"
+                  class={[
+                    "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                    @values["foreign_bass_mode"] == "absolute" &&
+                      "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                    @values["foreign_bass_mode"] != "absolute" &&
+                      "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                  ]}
+                >
+                  Absolute
+                </button>
+              </div>
+
+              <form phx-change="set_foreign_bass_octave" class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <label
+                    for="foreign-bass-octave-inline"
+                    class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                  >
+                    Bass Octave
+                  </label>
+                  <span class="font-mono text-xs text-zinc-200">{@values["foreign_bass_octave"]}</span>
+                </div>
+                <input
+                  id="foreign-bass-octave-inline"
+                  name="foreign_bass_octave"
+                  type="number"
+                  min={if @values["foreign_bass_mode"] == "relative", do: "0", else: "-1"}
+                  max="9"
+                  step="1"
+                  value={@values["foreign_bass_octave"]}
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+              </form>
+            </div>
           </div>
         </div>
 
@@ -755,7 +840,11 @@ defmodule MenschWeb.ChordLabLive do
          {:ok, voice_count} <- parse_optional_integer(values["voice_count"], "voice_count"),
          {:ok, doubling} <- parse_doubling(values["doubling"]),
          {:ok, foreign_bass} <-
-           parse_foreign_bass(values["foreign_bass_pitch_class"], values["foreign_bass_octave"]) do
+           parse_foreign_bass(
+             values["foreign_bass_pitch_class"],
+             values["foreign_bass_mode"],
+             values["foreign_bass_octave"]
+           ) do
       attrs = %{
         root: root,
         quality: quality,
@@ -808,15 +897,32 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_doubling("auto"), do: {:ok, :auto}
   defp parse_doubling(_), do: {:error, "invalid doubling"}
 
-  defp parse_foreign_bass("", _octave), do: {:ok, nil}
-  defp parse_foreign_bass(nil, _octave), do: {:ok, nil}
+  defp parse_foreign_bass("", _mode, _octave), do: {:ok, nil}
+  defp parse_foreign_bass(nil, _mode, _octave), do: {:ok, nil}
 
-  defp parse_foreign_bass(pitch_class, octave_value) do
+  defp parse_foreign_bass(pitch_class, mode_value, octave_value) do
     with {:ok, parsed_pitch_class} <- parse_pitch_class(pitch_class),
-         {:ok, octave} <- parse_optional_integer(octave_value, "foreign_bass_octave") do
-      {:ok, %ForeignBass{pitch_class: parsed_pitch_class, octave: octave}}
+         {:ok, mode} <- parse_foreign_bass_mode(mode_value),
+         {:ok, octave} <- parse_foreign_bass_octave(mode, octave_value) do
+      {:ok, %ForeignBass{pitch_class: parsed_pitch_class, mode: mode, octave: octave}}
     end
   end
+
+  defp parse_foreign_bass_mode("relative"), do: {:ok, :relative}
+  defp parse_foreign_bass_mode("absolute"), do: {:ok, :absolute}
+  defp parse_foreign_bass_mode(_), do: {:error, "foreign_bass_mode is invalid"}
+
+  defp parse_foreign_bass_octave(:relative, value) do
+    with {:ok, octave} <- parse_integer(value, "foreign_bass_octave"),
+         true <- octave >= 0 do
+      {:ok, octave}
+    else
+      false -> {:error, "foreign_bass_octave must be >= 0 in relative mode"}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp parse_foreign_bass_octave(:absolute, value), do: parse_integer(value, "foreign_bass_octave")
 
   defp parse_integer(value, field_name) when is_binary(value) do
     case Integer.parse(value) do
@@ -877,8 +983,9 @@ defmodule MenschWeb.ChordLabLive do
       "range_max" => "",
       "voice_count" => "",
       "doubling" => "auto",
+      "foreign_bass_mode" => "relative",
       "foreign_bass_pitch_class" => "",
-      "foreign_bass_octave" => ""
+      "foreign_bass_octave" => "0"
     }
   end
 

@@ -56,7 +56,7 @@ defmodule MenschWeb.Layouts do
         <div class="flex items-center gap-3">
           <a href="/" class="flex items-center gap-1.5">
             <img src={~p"/images/logo.svg"} width="20" />
-            <span class="text-base font-bold text-white">mensch</span>
+            <span class="text-base font-bold text-white">mensch:maschine</span>
           </a>
           <.link
             navigate={~p"/chord-lab"}

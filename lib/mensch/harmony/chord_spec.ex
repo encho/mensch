@@ -88,15 +88,18 @@ defmodule Mensch.Harmony.ChordSpec do
     @moduledoc """
     Independent foreign bass definition.
 
-    If octave is nil, the resolver deterministically places the foreign bass
-    below the lowest voiced chord note.
+      `mode` controls how octave is interpreted:
+
+      * `:absolute` - place foreign bass in the explicit octave
+      * `:relative` - octave is an offset below the lowest voiced chord note octave
     """
 
-    defstruct [:pitch_class, :octave]
+      defstruct pitch_class: nil, octave: 0, mode: :relative
 
     @type t :: %__MODULE__{
             pitch_class: Mensch.Harmony.ChordSpec.pitch_class(),
-            octave: integer() | nil
+        octave: integer(),
+        mode: :absolute | :relative
           }
   end
 
@@ -371,8 +374,14 @@ defmodule Mensch.Harmony.ChordSpec do
       not valid_pitch_class?(bass.pitch_class) ->
         {:error, {:invalid_foreign_bass_pitch_class, bass.pitch_class}}
 
-      not is_nil(bass.octave) and not is_integer(bass.octave) ->
+      bass.mode not in [:absolute, :relative] ->
+        {:error, {:invalid_foreign_bass_mode, bass.mode}}
+
+      not is_integer(bass.octave) ->
         {:error, {:invalid_foreign_bass_octave, bass.octave}}
+
+      bass.mode == :relative and bass.octave < 0 ->
+        {:error, {:invalid_foreign_bass_relative_octave, bass.octave}}
 
       true ->
         :ok

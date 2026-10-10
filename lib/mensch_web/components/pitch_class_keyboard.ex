@@ -26,13 +26,27 @@ defmodule MenschWeb.PitchClassKeyboard do
   attr :selected_key, :string, default: nil
   attr :show_clear, :boolean, default: false
   attr :clear_label, :string, default: "Clear"
+  attr :header_action, :boolean, default: false
+  attr :header_action_label, :string, default: nil
+  attr :header_action_value, :string, default: ""
 
   def mini(assigns) do
     assigns = assign(assigns, :keyboard_keys, @keyboard_keys)
 
     ~H"""
     <div id={@id} class="space-y-1">
-      <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">{@label}</label>
+      <div class="flex items-center justify-between gap-2">
+        <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">{@label}</label>
+        <button
+          :if={@header_action}
+          type="button"
+          phx-click={@event}
+          phx-value-pitch_class={@header_action_value}
+          class="rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-[10px] text-zinc-300 hover:border-zinc-500"
+        >
+          {@header_action_label || @clear_label}
+        </button>
+      </div>
       <div class="relative h-24 w-full rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
         <button
           :for={key <- @keyboard_keys}
@@ -66,7 +80,7 @@ defmodule MenschWeb.PitchClassKeyboard do
         </button>
       </div>
 
-      <div :if={@show_clear} class="flex justify-end">
+      <div :if={@show_clear and not @header_action} class="flex justify-end">
         <button
           type="button"
           phx-click={@event}

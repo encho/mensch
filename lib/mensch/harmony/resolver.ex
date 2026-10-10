@@ -395,12 +395,12 @@ defmodule Mensch.Harmony.Resolver do
     end
 
     bass_note =
-      case bass.octave do
-        octave when is_integer(octave) ->
-          ChordSpec.midi_note_number(bass.pitch_class, octave)
+      case bass.mode do
+        :absolute ->
+          ChordSpec.midi_note_number(bass.pitch_class, bass.octave)
 
-        nil ->
-          place_foreign_bass_below(voiced_notes, bass_pc)
+        :relative ->
+          place_foreign_bass_relative(voiced_notes, bass_pc, bass.octave)
       end
 
     if not valid_in_range?([bass_note], voicing) do
@@ -417,9 +417,16 @@ defmodule Mensch.Harmony.Resolver do
     bass_note
   end
 
-  defp place_foreign_bass_below(voiced_notes, bass_pc) do
+  defp place_foreign_bass_relative(voiced_notes, bass_pc, relative_octaves_below) do
     lowest = Enum.min(voiced_notes)
-    candidate = closest_at_or_below(bass_pc, lowest - 1)
+    lowest_octave = div(lowest, 12) - 1
+    target_octave = lowest_octave - relative_octaves_below
+
+    candidate =
+      bass_pc
+      |> semitone_to_pitch_class!()
+      |> ChordSpec.midi_note_number(target_octave)
+      |> ensure_strictly_below(lowest)
 
     if candidate < 0 do
       raise ArgumentError,
@@ -429,14 +436,30 @@ defmodule Mensch.Harmony.Resolver do
     candidate
   end
 
+  defp ensure_strictly_below(note, lowest) when note >= lowest, do: note - 12
+  defp ensure_strictly_below(note, _lowest), do: note
+
+  defp semitone_to_pitch_class!(semitone) do
+    case rem(semitone, 12) do
+      0 -> :c
+      1 -> :c_sharp
+      2 -> :d
+      3 -> :d_sharp
+      4 -> :e
+      5 -> :f
+      6 -> :f_sharp
+      7 -> :g
+      8 -> :g_sharp
+      9 -> :a
+      10 -> :a_sharp
+      11 -> :b
+    end
+  end
+
   defp closest_at_or_above(pc, at_least) when is_integer(pc) and is_integer(at_least) do
     # MIDI note n has pitch class `rem(n, 12)`.
     base = at_least - rem(at_least, 12) + pc
     if base < at_least, do: base + 12, else: base
   end
 
-  defp closest_at_or_below(pc, at_most) when is_integer(pc) and is_integer(at_most) do
-    base = at_most - rem(at_most, 12) + pc
-    if base > at_most, do: base - 12, else: base
-  end
 end
