@@ -107,6 +107,8 @@ defmodule MenschWeb.ChordLabLive do
       |> assign(:selected_chord_list_id, selected_chord_list_id)
       |> assign(:selected_chord_list_entries, selected_chord_list_entries)
       |> assign(:new_chord_list_name, "")
+      |> assign(:preview_note_channels, [])
+      |> assign(:preview_stop_ref, nil)
       |> assign(:show_doubling_info, false)
       |> assign(:error_message, nil)
       |> resolve_preview(values)
@@ -335,6 +337,43 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
+  def handle_event("move_chord_list_entry", %{"entry_id" => entry_id, "direction" => direction}, socket) do
+    case socket.assigns.selected_chord_list_id do
+      nil ->
+        {:noreply, socket}
+
+      list_id ->
+        parsed_direction =
+          case direction do
+            "up" -> :up
+            "down" -> :down
+            _ -> nil
+          end
+
+        case parsed_direction do
+          nil ->
+            {:noreply, socket}
+
+          move_direction ->
+            case ChordLists.move_entry(list_id, entry_id, move_direction) do
+              {:ok, _list} ->
+                {chord_lists, selected_id, entries} = load_chord_lists(list_id)
+
+                {:noreply,
+                 socket
+                 |> assign(:chord_lists, chord_lists)
+                 |> assign(:selected_chord_list_id, selected_id)
+                 |> assign(:selected_chord_list_entries, entries)}
+
+              {:error, reason} ->
+                {:noreply,
+                 put_flash(socket, :error, "Could not move chord entry: #{inspect(reason)}")}
+            end
+        end
+    end
+  end
+
+  @impl true
   def handle_event("load_chord_list_entry", %{"entry_id" => entry_id}, socket) do
     entry = Enum.find(socket.assigns.selected_chord_list_entries, &(&1.id == entry_id))
 
@@ -382,6 +421,81 @@ defmodule MenschWeb.ChordLabLive do
   @impl true
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
+  end
+
+  @impl true
+  def handle_event("play_current_chord", _params, socket) do
+    play_notes_for_3s(socket, result_final_notes(socket.assigns.result))
+  end
+
+  @impl true
+  def handle_event("play_chord_list_entry", %{"entry_id" => entry_id}, socket) do
+    entry = Enum.find(socket.assigns.selected_chord_list_entries, &(&1.id == entry_id))
+
+    case entry do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Chord entry not found")}
+
+      _ ->
+        play_notes_for_3s(socket, chord_list_entry_final_notes(entry))
+    end
+  end
+
+  defp play_notes_for_3s(socket, notes) do
+    final_notes = Enum.filter(notes, &is_integer/1)
+
+    cond do
+      final_notes == [] ->
+        {:noreply, put_flash(socket, :error, "No notes to play")}
+
+      true ->
+        socket = stop_preview(socket)
+
+        channels = Mensch.Midi.Connection.member_channels()
+
+        note_channels =
+          final_notes
+          |> Enum.uniq()
+          |> Enum.take(length(channels))
+          |> Enum.zip(channels)
+
+        if note_channels == [] do
+          {:noreply, put_flash(socket, :error, "No MIDI channels available")}
+        else
+          on_messages =
+            Enum.flat_map(note_channels, fn {note, channel} ->
+              [
+                <<0x90 + channel, note, 100>>,
+                <<0xD0 + channel, 100>>,
+                <<0xE0 + channel, 0, 64>>,
+                <<0xB0 + channel, 74, 64>>
+              ]
+            end)
+
+          case Mensch.Midi.Connection.send_messages(on_messages) do
+            :ok ->
+              stop_ref = make_ref()
+              Process.send_after(self(), {:stop_preview_notes, stop_ref}, 3000)
+
+              {:noreply,
+               socket
+               |> assign(:preview_note_channels, note_channels)
+               |> assign(:preview_stop_ref, stop_ref)}
+
+            {:error, :disconnected} ->
+              {:noreply, put_flash(socket, :error, "MIDI is disconnected")}
+          end
+        end
+    end
+  end
+
+  @impl true
+  def handle_info({:stop_preview_notes, stop_ref}, socket) do
+    if socket.assigns.preview_stop_ref == stop_ref do
+      {:noreply, stop_preview(socket)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -512,6 +626,57 @@ defmodule MenschWeb.ChordLabLive do
                   <td class="px-3 py-2">{join_integers(chord_list_entry_final_notes(entry))}</td>
                   <td class="px-3 py-2 text-right">
                     <div class="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        phx-click="move_chord_list_entry"
+                        phx-value-entry_id={entry.id}
+                        phx-value-direction="up"
+                        disabled={index == 1}
+                        class={[
+                          "rounded-sm border p-1 transition-colors duration-150",
+                          index == 1 &&
+                            "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                          index != 1 &&
+                            "border-zinc-700 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500"
+                        ]}
+                        title="Move up"
+                        aria-label="Move chord up"
+                      >
+                        <.icon name="hero-chevron-up" class="size-3" />
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="move_chord_list_entry"
+                        phx-value-entry_id={entry.id}
+                        phx-value-direction="down"
+                        disabled={index == length(@selected_chord_list_entries)}
+                        class={[
+                          "rounded-sm border p-1 transition-colors duration-150",
+                          index == length(@selected_chord_list_entries) &&
+                            "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                          index != length(@selected_chord_list_entries) &&
+                            "border-zinc-700 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500"
+                        ]}
+                        title="Move down"
+                        aria-label="Move chord down"
+                      >
+                        <.icon name="hero-chevron-down" class="size-3" />
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="play_chord_list_entry"
+                        phx-value-entry_id={entry.id}
+                        disabled={chord_list_entry_final_notes(entry) == []}
+                        class={[
+                          "rounded-sm border px-2 py-1 font-mono text-[10px] transition-colors duration-150",
+                          chord_list_entry_final_notes(entry) == [] &&
+                            "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                          chord_list_entry_final_notes(entry) != [] &&
+                            "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
+                        ]}
+                      >
+                        Play
+                      </button>
                       <button
                         type="button"
                         phx-click="load_chord_list_entry"
@@ -898,9 +1063,25 @@ defmodule MenschWeb.ChordLabLive do
         <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
           <div class="flex items-center justify-between">
             <h2 class="font-mono text-sm text-zinc-200">Final Notes Keyboard</h2>
-            <p class="font-mono text-[11px] text-zinc-400">
-              Highlighted: {highlighted_count(@result)} / 88
-            </p>
+            <div class="flex items-center gap-3">
+              <p class="font-mono text-[11px] text-zinc-400">
+                Highlighted: {highlighted_count(@result)} / 88
+              </p>
+              <button
+                type="button"
+                phx-click="play_current_chord"
+                disabled={result_final_notes(@result) == []}
+                class={[
+                  "rounded-sm border px-3 py-1 font-mono text-[11px] font-semibold transition-colors duration-150",
+                  result_final_notes(@result) == [] &&
+                    "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                  result_final_notes(@result) != [] &&
+                    "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
+                ]}
+              >
+                Play 3s
+              </button>
+            </div>
           </div>
 
           <div class="w-full overflow-x-hidden">
@@ -1699,6 +1880,26 @@ defmodule MenschWeb.ChordLabLive do
 
   defp result_voiced_notes(nil), do: []
   defp result_voiced_notes(result), do: Map.get(result, :voiced_chord_tones, [])
+
+  defp stop_preview(socket) do
+    off_messages =
+      Enum.flat_map(socket.assigns.preview_note_channels, fn {note, channel} ->
+        [
+          <<0x80 + channel, note, 0>>,
+          <<0x90 + channel, note, 0>>,
+          <<0xD0 + channel, 0>>,
+          <<0xB0 + channel, 74, 0>>
+        ]
+      end)
+
+    if off_messages != [] do
+      _ = Mensch.Midi.Connection.send_messages(off_messages)
+    end
+
+    socket
+    |> assign(:preview_note_channels, [])
+    |> assign(:preview_stop_ref, nil)
+  end
 
   defp highlighted_count(nil), do: 0
 

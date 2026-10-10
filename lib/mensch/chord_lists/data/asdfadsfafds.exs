@@ -4,6 +4,141 @@
   version: 1,
   entries: [
     %{
+      id: "23",
+      parameters: %Mensch.Harmony.ChordSpec.Parameters{
+        root: :d,
+        quality: :min,
+        octave: 3,
+        inversion: 0,
+        voicing_type: :close,
+        inversion_tracking_mode: :per_step_centered,
+        center_note: 60,
+        range_min: nil,
+        range_max: nil,
+        voice_count: nil,
+        doubling: :auto,
+        foreign_bass_mode: :relative,
+        foreign_bass_pitch_class: nil,
+        foreign_bass_octave: 0
+      },
+      inserted_at: "2026-10-10T16:39:23Z",
+      snapshot: %{
+        voiced_chord_tones: [62, 65, 69],
+        final_note_details: [
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 62,
+            named_note_name: "D4",
+            named_note_note: "D",
+            named_note_octave: 4,
+            note_distance: 0,
+            degree_simple: "1",
+            degree_compound_preferred: "1",
+            interval_human_label: "Perfect unison",
+            chord_tone_role: "non_chord_tone"
+          },
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 65,
+            named_note_name: "F4",
+            named_note_note: "F",
+            named_note_octave: 4,
+            note_distance: 3,
+            degree_simple: "b3",
+            degree_compound_preferred: "b3",
+            interval_human_label: "Minor third",
+            chord_tone_role: "non_chord_tone"
+          },
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 69,
+            named_note_name: "A4",
+            named_note_note: "A",
+            named_note_octave: 4,
+            note_distance: 7,
+            degree_simple: "5",
+            degree_compound_preferred: "5",
+            interval_human_label: "Perfect fifth",
+            chord_tone_role: "non_chord_tone"
+          }
+        ],
+        final_notes: [62, 65, 69],
+        foreign_bass_note: nil,
+        inverted_chord_tones: [50, 53, 57],
+        resolved_chord_tones: [50, 53, 57]
+      }
+    },
+    %{
+      id: "24",
+      parameters: %Mensch.Harmony.ChordSpec.Parameters{
+        root: :g,
+        quality: :dom7,
+        octave: 3,
+        inversion: 0,
+        voicing_type: :close,
+        inversion_tracking_mode: :per_step_centered,
+        center_note: 60,
+        range_min: nil,
+        range_max: nil,
+        voice_count: nil,
+        doubling: :auto,
+        foreign_bass_mode: :relative,
+        foreign_bass_pitch_class: nil,
+        foreign_bass_octave: 0
+      },
+      inserted_at: "2026-10-10T16:39:35Z",
+      snapshot: %{
+        voiced_chord_tones: [55, 59, 62, 65],
+        final_note_details: [
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 55,
+            named_note_name: "D3",
+            named_note_note: "D",
+            named_note_octave: 3,
+            note_distance: 0,
+            degree_simple: "1",
+            degree_compound_preferred: "1",
+            interval_human_label: "Perfect unison",
+            chord_tone_role: "chord_tone"
+          },
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 59,
+            named_note_name: "B3",
+            named_note_note: "B",
+            named_note_octave: 3,
+            note_distance: 4,
+            degree_simple: "3",
+            degree_compound_preferred: "3",
+            interval_human_label: "Major third",
+            chord_tone_role: "non_chord_tone"
+          },
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 62,
+            named_note_name: "D4",
+            named_note_note: "D",
+            named_note_octave: 4,
+            note_distance: 7,
+            degree_simple: "5",
+            degree_compound_preferred: "5",
+            interval_human_label: "Perfect fifth",
+            chord_tone_role: "non_chord_tone"
+          },
+          %Mensch.Harmony.Resolver.NoteDetail{
+            midi_note: 65,
+            named_note_name: "F4",
+            named_note_note: "F",
+            named_note_octave: 4,
+            note_distance: 10,
+            degree_simple: "b7",
+            degree_compound_preferred: "b7",
+            interval_human_label: "Minor seventh",
+            chord_tone_role: "non_chord_tone"
+          }
+        ],
+        final_notes: [55, 59, 62, 65],
+        foreign_bass_note: nil,
+        inverted_chord_tones: [55, 59, 62, 65],
+        resolved_chord_tones: [55, 59, 62, 65]
+      }
+    },
+    %{
       id: "19",
       parameters: %Mensch.Harmony.ChordSpec.Parameters{
         root: :c,
@@ -78,5 +213,5 @@
     }
   ],
   inserted_at: "2026-10-10T16:34:31Z",
-  updated_at: "2026-10-10T16:34:34Z"
+  updated_at: "2026-10-10T16:41:32Z"
 }

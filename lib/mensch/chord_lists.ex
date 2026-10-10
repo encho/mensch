@@ -140,6 +140,23 @@ defmodule Mensch.ChordLists do
     end
   end
 
+  @spec move_entry(String.t(), String.t(), :up | :down) :: {:ok, chord_list()} | {:error, term()}
+  def move_entry(list_id, entry_id, direction)
+      when is_binary(list_id) and is_binary(entry_id) and direction in [:up, :down] do
+    with {:ok, list} <- fetch_list(list_id),
+         {:ok, reordered_entries} <- reorder_entries(list.entries, entry_id, direction) do
+      updated = %{
+        list
+        | entries: reordered_entries,
+          updated_at: now_iso8601()
+      }
+
+      with :ok <- write_term_file(list_path(list.id), updated) do
+        {:ok, updated}
+      end
+    end
+  end
+
   defp build_snapshot(nil), do: %{}
 
   defp build_snapshot(result) when is_map(result) do
@@ -224,6 +241,36 @@ defmodule Mensch.ChordLists do
 
       _ ->
         :ok
+    end
+  end
+
+  defp reorder_entries(entries, entry_id, direction) do
+    current_index = Enum.find_index(entries, &(&1.id == entry_id))
+
+    case current_index do
+      nil ->
+        {:error, :entry_not_found}
+
+      _ ->
+        target_index =
+          case direction do
+            :up -> max(current_index - 1, 0)
+            :down -> min(current_index + 1, length(entries) - 1)
+          end
+
+        if target_index == current_index do
+          {:ok, entries}
+        else
+          current_entry = Enum.at(entries, current_index)
+          target_entry = Enum.at(entries, target_index)
+
+          swapped =
+            entries
+            |> List.replace_at(current_index, target_entry)
+            |> List.replace_at(target_index, current_entry)
+
+          {:ok, swapped}
+        end
     end
   end
 
