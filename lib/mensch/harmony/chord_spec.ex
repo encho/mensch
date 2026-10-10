@@ -41,6 +41,7 @@ defmodule Mensch.Harmony.ChordSpec do
   @type quality ::
           :maj
           | :min
+      | :maj6
           | :maj7
           | :min7
           | :dom7
@@ -151,6 +152,7 @@ defmodule Mensch.Harmony.ChordSpec do
   @quality_tones %{
     maj: ["1", "3", "5"],
     min: ["1", "b3", "5"],
+    maj6: ["1", "3", "5", "6"],
     maj7: ["1", "3", "5", "7"],
     min7: ["1", "b3", "5", "b7"],
     dom7: ["1", "3", "5", "b7"],

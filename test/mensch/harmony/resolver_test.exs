@@ -51,6 +51,19 @@ defmodule Mensch.Harmony.ResolverTest do
     assert Resolver.resolve(spec) == [52, 55, 60, 71]
   end
 
+  test "major 6 quality resolves with added sixth" do
+    spec =
+      ChordSpec.new!(%{
+        root: :g,
+        quality: :maj6,
+        octave: 3,
+        inversion: 0,
+        voicing: %Voicing{type: :close, center_note: 60}
+      })
+
+    assert Resolver.resolve(spec) == [55, 59, 62, 64]
+  end
+
   test "voice_count expansion with auto doubling is deterministic" do
     spec =
       ChordSpec.new!(%{

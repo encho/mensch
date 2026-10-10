@@ -42,6 +42,7 @@ defmodule MenschWeb.ChordLabLive do
   @qualities [
     :maj,
     :min,
+    :maj6,
     :maj7,
     :min7,
     :dom7,
@@ -64,25 +65,26 @@ defmodule MenschWeb.ChordLabLive do
 
   @quality_tiles [
     %{value: "maj", label: "Maj", position: "col-start-1 row-start-1"},
+    %{value: "maj6", label: "6", position: "col-start-1 row-start-2"},
+    %{value: "maj7", label: "Maj7", position: "col-start-1 row-start-3"},
+    %{value: "maj9", label: "Maj9", position: "col-start-1 row-start-4"},
+    %{value: "maj11", label: "Maj11", position: "col-start-1 row-start-5"},
+    %{value: "six_nine", label: "6/9", position: "col-start-1 row-start-6"},
     %{value: "min", label: "Min", position: "col-start-2 row-start-1"},
-    %{value: "dim", label: "Dim", position: "col-start-7 row-start-1"},
-    %{value: "aug", label: "Aug", position: "col-start-8 row-start-1"},
-    %{value: "sus2", label: "Sus2", position: "col-start-1 row-start-2"},
-    %{value: "sus4", label: "Sus4", position: "col-start-2 row-start-2"},
-    %{value: "min6", label: "Min6", position: "col-start-3 row-start-2"},
-    %{value: "six_nine", label: "6/9", position: "col-start-4 row-start-2"},
-    %{value: "maj7", label: "Maj7", position: "col-start-6 row-start-2"},
-    %{value: "dom7", label: "Dom7", position: "col-start-7 row-start-2"},
-    %{value: "min7", label: "Min7", position: "col-start-8 row-start-2"},
-    %{value: "maj9", label: "Maj9", position: "col-start-5 row-start-3"},
-    %{value: "dom9", label: "Dom9", position: "col-start-6 row-start-3"},
-    %{value: "min9", label: "Min9", position: "col-start-7 row-start-3"},
-    %{value: "half_dim", label: "m7b5", position: "col-start-8 row-start-3"},
-    %{value: "dim7", label: "Dim7", position: "col-start-4 row-start-4"},
-    %{value: "maj11", label: "Maj11", position: "col-start-5 row-start-4"},
-    %{value: "min11", label: "Min11", position: "col-start-6 row-start-4"},
-    %{value: "dom13", label: "Dom13", position: "col-start-7 row-start-4"},
-    %{value: "min7_add11", label: "m7+11", position: "col-start-8 row-start-4"}
+    %{value: "min6", label: "Min6", position: "col-start-2 row-start-2"},
+    %{value: "min7", label: "Min7", position: "col-start-2 row-start-3"},
+    %{value: "min9", label: "Min9", position: "col-start-2 row-start-4"},
+    %{value: "min11", label: "Min11", position: "col-start-2 row-start-5"},
+    %{value: "min7_add11", label: "m7+11", position: "col-start-2 row-start-6"},
+    %{value: "dom7", label: "Dom7", position: "col-start-3 row-start-1"},
+    %{value: "dom9", label: "Dom9", position: "col-start-3 row-start-2"},
+    %{value: "dom13", label: "Dom13", position: "col-start-3 row-start-3"},
+    %{value: "sus2", label: "Sus2", position: "col-start-4 row-start-1"},
+    %{value: "sus4", label: "Sus4", position: "col-start-4 row-start-2"},
+    %{value: "dim", label: "Dim", position: "col-start-5 row-start-1"},
+    %{value: "half_dim", label: "m7b5", position: "col-start-5 row-start-2"},
+    %{value: "dim7", label: "Dim7", position: "col-start-5 row-start-3"},
+    %{value: "aug", label: "Aug", position: "col-start-5 row-start-4"}
   ]
 
   @pitch_class_from_param Map.new(@pitch_classes, fn pc -> {Atom.to_string(pc), pc} end)
@@ -263,7 +265,15 @@ defmodule MenschWeb.ChordLabLive do
               <div class="space-y-1">
                 <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
                 <div class="rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
-                  <div class="grid grid-cols-8 grid-rows-4 gap-1">
+                  <div class="mb-1 grid grid-cols-5 gap-1">
+                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Major</span>
+                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Minor</span>
+                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dominant</span>
+                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Suspended</span>
+                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dim/Aug</span>
+                  </div>
+
+                  <div class="grid grid-cols-5 grid-rows-6 gap-1">
                     <button
                       :for={tile <- quality_tiles()}
                       type="button"
