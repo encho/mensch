@@ -248,6 +248,12 @@ defmodule Mensch.Harmony.ChordSpec do
     |> Enum.sort()
   end
 
+  @doc "Returns the semitone interval for a single tone token."
+  @spec tone_interval(tone()) :: integer()
+  def tone_interval(tone) when is_binary(tone) do
+    Map.fetch!(@tone_intervals, tone)
+  end
+
   @doc "Returns semitone for a pitch class, or nil if invalid."
   @spec pitch_class_to_semitone(pitch_class()) :: integer() | nil
   def pitch_class_to_semitone(note) do

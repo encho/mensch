@@ -23,12 +23,41 @@ defmodule Mensch.Harmony.Resolver do
   alias Mensch.Harmony.ChordSpec.ForeignBass
   alias Mensch.Harmony.ChordSpec.Voicing
 
+  defmodule NoteDetail do
+    @moduledoc "Harmonic metadata for a resolved note."
+
+    defstruct [
+      :midi_note,
+      :named_note_name,
+      :named_note_note,
+      :named_note_octave,
+      :note_distance,
+      :degree_simple,
+      :degree_compound_preferred,
+      :interval_human_label,
+      :chord_tone_role
+    ]
+
+    @type t :: %__MODULE__{
+            midi_note: integer(),
+            named_note_name: String.t(),
+            named_note_note: String.t(),
+            named_note_octave: integer(),
+            note_distance: integer(),
+            degree_simple: String.t(),
+            degree_compound_preferred: String.t(),
+            interval_human_label: String.t(),
+            chord_tone_role: String.t()
+          }
+  end
+
   @type resolution_steps :: %{
           resolved_chord_tones: [integer()],
           inverted_chord_tones: [integer()],
           voiced_chord_tones: [integer()],
           foreign_bass_note: integer() | nil,
-          final_notes: [integer()]
+      final_notes: [integer()],
+      final_note_details: [NoteDetail.t()]
         }
 
   @type inversion_sequence_entry :: %{
@@ -95,12 +124,16 @@ defmodule Mensch.Harmony.Resolver do
       voiced_chord_tones
       |> maybe_prepend_foreign_bass(foreign_bass_note)
 
+    final_note_details =
+      build_final_note_details(spec, final_notes, foreign_bass_note)
+
     %{
       resolved_chord_tones: resolved_chord_tones,
       inverted_chord_tones: inverted_chord_tones,
       voiced_chord_tones: voiced_chord_tones,
       foreign_bass_note: foreign_bass_note,
-      final_notes: final_notes
+      final_notes: final_notes,
+      final_note_details: final_note_details
     }
   end
 
@@ -131,13 +164,247 @@ defmodule Mensch.Harmony.Resolver do
       voiced_chord_tones
       |> maybe_prepend_foreign_bass(foreign_bass_note)
 
+    final_note_details =
+      build_final_note_details(spec, final_notes, foreign_bass_note)
+
     %{
       resolved_chord_tones: resolved_chord_tones,
       inverted_chord_tones: inverted_chord_tones,
       voiced_chord_tones: voiced_chord_tones,
       foreign_bass_note: foreign_bass_note,
-      final_notes: final_notes
+      final_notes: final_notes,
+      final_note_details: final_note_details
     }
+  end
+
+  defp build_final_note_details(%ChordSpec{} = spec, final_notes, foreign_bass_note) do
+    root_pc = ChordSpec.pitch_class_to_semitone(spec.root)
+
+    preferred_tokens_by_pc =
+      spec
+      |> ChordSpec.tones()
+      |> Enum.uniq()
+      |> Enum.reduce(%{}, fn token, acc ->
+        pc = rem(ChordSpec.tone_interval(token), 12)
+        Map.put_new(acc, pc, token)
+      end)
+
+    Enum.map(final_notes, fn midi_note ->
+      note_pc = rem(midi_note, 12)
+      note_distance = normalize_pc(note_pc - root_pc)
+      degree_simple = degree_simple_for_distance(note_distance)
+
+      token = Map.get(preferred_tokens_by_pc, note_pc)
+
+      degree_compound_preferred =
+        case token do
+          nil -> degree_simple
+          t -> degree_compound_from_token_or_simple(t, degree_simple)
+        end
+
+      {named_note_note, named_note_octave} =
+        cond do
+          is_integer(foreign_bass_note) and midi_note == foreign_bass_note and
+              match?(%ForeignBass{}, spec.foreign_bass) ->
+            spell_from_pitch_class_atom(spec.foreign_bass.pitch_class, midi_note)
+
+          is_binary(token) ->
+            spell_from_root_and_token(spec.root, token, midi_note)
+
+          true ->
+            spell_from_midi_fallback(midi_note)
+        end
+
+      %NoteDetail{
+        midi_note: midi_note,
+        named_note_name: "#{named_note_note}#{named_note_octave}",
+        named_note_note: named_note_note,
+        named_note_octave: named_note_octave,
+        note_distance: note_distance,
+        degree_simple: degree_simple,
+        degree_compound_preferred: degree_compound_preferred,
+        interval_human_label: interval_human_label(note_distance),
+        chord_tone_role: chord_tone_role(token, midi_note, foreign_bass_note)
+      }
+    end)
+  end
+
+  defp chord_tone_role(_token, midi_note, foreign_bass_note)
+       when is_integer(foreign_bass_note) and midi_note == foreign_bass_note,
+       do: "foreign_bass"
+
+  defp chord_tone_role("1", _midi_note, _foreign_bass_note), do: "root"
+
+  defp chord_tone_role(token, _midi_note, _foreign_bass_note) when is_binary(token) do
+    cond do
+      token in ["b9", "#9", "#11", "b13", "b5", "#5"] -> "alteration"
+      token_has_compound_degree?(token) -> "extension"
+      true -> "chord_tone"
+    end
+  end
+
+  defp chord_tone_role(_token, _midi_note, _foreign_bass_note), do: "non_chord_tone"
+
+  defp degree_compound_from_token_or_simple(token, simple) do
+    if token_has_compound_degree?(token), do: token, else: simple
+  end
+
+  defp token_has_compound_degree?(token) do
+    case parse_tone_token(token) do
+      {_acc, degree_num} -> degree_num in [9, 11, 13]
+      :error -> false
+    end
+  end
+
+  defp degree_simple_for_distance(distance) do
+    case distance do
+      0 -> "1"
+      1 -> "b2"
+      2 -> "2"
+      3 -> "b3"
+      4 -> "3"
+      5 -> "4"
+      6 -> "b5"
+      7 -> "5"
+      8 -> "b6"
+      9 -> "6"
+      10 -> "b7"
+      11 -> "7"
+    end
+  end
+
+  defp interval_human_label(distance) do
+    case distance do
+      0 -> "Perfect unison"
+      1 -> "Minor second"
+      2 -> "Major second"
+      3 -> "Minor third"
+      4 -> "Major third"
+      5 -> "Perfect fourth"
+      6 -> "Tritone"
+      7 -> "Perfect fifth"
+      8 -> "Minor sixth"
+      9 -> "Major sixth"
+      10 -> "Minor seventh"
+      11 -> "Major seventh"
+    end
+  end
+
+  defp spell_from_root_and_token(root_pitch_class, token, midi_note) do
+        with {root_letter, root_acc} <- pitch_class_spelling!(root_pitch_class),
+          {_token_acc, token_degree} <- parse_tone_token(token) do
+      root_idx = letter_index(root_letter)
+      root_pc = normalize_pc(letter_pc(root_letter) + root_acc)
+      target_simple_degree = rem(token_degree - 1, 7) + 1
+      target_letter = Enum.at(["C", "D", "E", "F", "G", "A", "B"], rem(root_idx + target_simple_degree - 1, 7))
+      target_natural_pc = letter_pc(target_letter)
+      desired_pc = normalize_pc(ChordSpec.tone_interval(token))
+      base_interval = normalize_pc(target_natural_pc - root_pc)
+      target_acc = accidental_for_interval(base_interval, desired_pc)
+      octave = div(midi_note - target_natural_pc - target_acc, 12) - 1
+      {target_letter <> accidental_text(target_acc), octave}
+    else
+      _ -> spell_from_midi_fallback(midi_note)
+    end
+  end
+
+  defp spell_from_pitch_class_atom(pitch_class, midi_note) do
+    {letter, acc} = pitch_class_spelling!(pitch_class)
+    octave = div(midi_note - letter_pc(letter) - acc, 12) - 1
+    {letter <> accidental_text(acc), octave}
+  end
+
+  defp spell_from_midi_fallback(midi_note) do
+    note =
+      case rem(midi_note, 12) do
+        0 -> "C"
+        1 -> "C#"
+        2 -> "D"
+        3 -> "D#"
+        4 -> "E"
+        5 -> "F"
+        6 -> "F#"
+        7 -> "G"
+        8 -> "G#"
+        9 -> "A"
+        10 -> "A#"
+        11 -> "B"
+      end
+
+    {note, div(midi_note, 12) - 1}
+  end
+
+  defp pitch_class_spelling!(pitch_class) do
+    case pitch_class do
+      :c -> {"C", 0}
+      :c_flat -> {"C", -1}
+      :b_sharp -> {"B", 1}
+      :c_sharp -> {"C", 1}
+      :d_flat -> {"D", -1}
+      :d -> {"D", 0}
+      :d_sharp -> {"D", 1}
+      :e_flat -> {"E", -1}
+      :e -> {"E", 0}
+      :f_flat -> {"F", -1}
+      :e_sharp -> {"E", 1}
+      :f -> {"F", 0}
+      :f_sharp -> {"F", 1}
+      :g_flat -> {"G", -1}
+      :g -> {"G", 0}
+      :g_sharp -> {"G", 1}
+      :a_flat -> {"A", -1}
+      :a -> {"A", 0}
+      :a_sharp -> {"A", 1}
+      :b_flat -> {"B", -1}
+      :b -> {"B", 0}
+    end
+  end
+
+  defp parse_tone_token(token) when is_binary(token) do
+    case Regex.run(~r/^(bb|b|#)?(\d+)$/, token, capture: :all_but_first) do
+      [accidental, degree_num] -> {accidental_value(accidental), String.to_integer(degree_num)}
+      [degree_num] -> {0, String.to_integer(degree_num)}
+      _ -> :error
+    end
+  end
+
+  defp accidental_value("bb"), do: -2
+  defp accidental_value("b"), do: -1
+  defp accidental_value("#"), do: 1
+  defp accidental_value(_), do: 0
+
+  defp accidental_text(acc) when acc > 0, do: String.duplicate("#", acc)
+  defp accidental_text(acc) when acc < 0, do: String.duplicate("b", abs(acc))
+  defp accidental_text(_acc), do: ""
+
+  defp letter_pc("C"), do: 0
+  defp letter_pc("D"), do: 2
+  defp letter_pc("E"), do: 4
+  defp letter_pc("F"), do: 5
+  defp letter_pc("G"), do: 7
+  defp letter_pc("A"), do: 9
+  defp letter_pc("B"), do: 11
+
+  defp letter_index("C"), do: 0
+  defp letter_index("D"), do: 1
+  defp letter_index("E"), do: 2
+  defp letter_index("F"), do: 3
+  defp letter_index("G"), do: 4
+  defp letter_index("A"), do: 5
+  defp letter_index("B"), do: 6
+
+  defp normalize_pc(value), do: rem(value + 120, 12)
+
+  defp accidental_for_interval(base_interval, desired_pc) do
+    case Enum.find(-2..2, fn accidental ->
+           normalize_pc(base_interval + accidental) == desired_pc
+         end) do
+      nil ->
+        0
+
+      accidental ->
+        accidental
+    end
   end
 
   defp resolve_chord_tones(%ChordSpec{} = spec) do

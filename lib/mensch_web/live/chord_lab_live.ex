@@ -181,6 +181,15 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
+  def handle_event("set_octave", %{"octave" => octave}, socket) do
+    values =
+      socket.assigns.values
+      |> Map.put("octave", octave)
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
   def handle_event("set_inversion_tracking_mode", %{"mode" => mode}, socket) do
     values =
       if mode in ["per_step_centered", "anchor_then_wander"] do
@@ -239,8 +248,142 @@ defmodule MenschWeb.ChordLabLive do
           </p>
         </div>
 
-        <div class="flex flex-col gap-6 lg:flex-row-reverse">
-          <div class="ui-radius-table flex-1 border border-zinc-700/60 bg-black/30 p-4">
+        <div class="grid gap-4 lg:grid-cols-3">
+          <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
+            <MenschWeb.PitchClassKeyboard.mini
+              id="root-pitch-class-keyboard"
+              label="Root"
+              event="set_root_pitch_class"
+              selected_key={@selected_root_keyboard_key}
+            />
+
+            <form phx-change="set_octave" class="space-y-1 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+              <div class="flex items-center justify-between">
+                <label for="root-octave-slider" class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Octave
+                </label>
+                <span class="font-mono text-xs text-zinc-200">{@values["octave"]}</span>
+              </div>
+              <input
+                id="root-octave-slider"
+                name="octave"
+                type="range"
+                min="-1"
+                max="9"
+                step="1"
+                value={@values["octave"]}
+                class="w-full accent-emerald-400"
+              />
+            </form>
+
+            <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+              <MenschWeb.PitchClassKeyboard.mini
+                id="foreign-bass-pitch-class-keyboard"
+                label="Foreign Bass"
+                event="set_foreign_bass_pitch_class"
+                selected_key={@selected_foreign_bass_keyboard_key}
+                header_action={true}
+                header_action_label="No Foreign Bass"
+                header_action_value=""
+                clear_label="No Foreign Bass"
+              />
+
+              <div class="space-y-2">
+                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Bass Placement
+                </label>
+                <div class="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    phx-click="set_foreign_bass_mode"
+                    phx-value-mode="relative"
+                    class={[
+                      "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                      @values["foreign_bass_mode"] == "relative" &&
+                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                      @values["foreign_bass_mode"] != "relative" &&
+                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                    ]}
+                  >
+                    Relative
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="set_foreign_bass_mode"
+                    phx-value-mode="absolute"
+                    class={[
+                      "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                      @values["foreign_bass_mode"] == "absolute" &&
+                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                      @values["foreign_bass_mode"] != "absolute" &&
+                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                    ]}
+                  >
+                    Absolute
+                  </button>
+                </div>
+
+                <form phx-change="set_foreign_bass_octave" class="space-y-1">
+                  <div class="flex items-center justify-between">
+                    <label
+                      for="foreign-bass-octave-inline"
+                      class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                    >
+                      Bass Octave
+                    </label>
+                    <span class="font-mono text-xs text-zinc-200">{@values["foreign_bass_octave"]}</span>
+                  </div>
+                  <input
+                    id="foreign-bass-octave-inline"
+                    name="foreign_bass_octave"
+                    type="number"
+                    min={if @values["foreign_bass_mode"] == "relative", do: "0", else: "-1"}
+                    max="9"
+                    step="1"
+                    value={@values["foreign_bass_octave"]}
+                    class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                  />
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
+            <div class="space-y-1">
+              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
+              <div class="rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                <div class="mb-1 grid grid-cols-5 gap-1">
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Major</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Minor</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dominant</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Suspended</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dim/Aug</span>
+                </div>
+
+                <div class="grid grid-cols-5 grid-rows-6 gap-1">
+                  <button
+                    :for={tile <- quality_tiles()}
+                    type="button"
+                    phx-click="set_quality"
+                    phx-value-quality={tile.value}
+                    class={[
+                      "h-9 rounded-md border font-mono text-[10px] font-semibold transition-colors duration-150",
+                      tile.position,
+                      @values["quality"] == tile.value &&
+                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                      @values["quality"] != tile.value &&
+                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                    ]}
+                    title={tile.value}
+                  >
+                    {tile.label}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
               <input type="hidden" name={@form[:root].name} value={@values["root"]} />
               <input type="hidden" name={@form[:quality].name} value={@values["quality"]} />
@@ -259,145 +402,12 @@ defmodule MenschWeb.ChordLabLive do
                 name={@form[:foreign_bass_octave].name}
                 value={@values["foreign_bass_octave"]}
               />
+              <input type="hidden" name={@form[:octave].name} value={@values["octave"]} />
               <input
                 type="hidden"
                 name={@form[:inversion_tracking_mode].name}
                 value={@values["inversion_tracking_mode"]}
               />
-
-              <div class="space-y-1">
-                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
-                <div class="rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
-                  <div class="mb-1 grid grid-cols-5 gap-1">
-                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Major</span>
-                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Minor</span>
-                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dominant</span>
-                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Suspended</span>
-                    <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dim/Aug</span>
-                  </div>
-
-                  <div class="grid grid-cols-5 grid-rows-6 gap-1">
-                    <button
-                      :for={tile <- quality_tiles()}
-                      type="button"
-                      phx-click="set_quality"
-                      phx-value-quality={tile.value}
-                      class={[
-                        "h-9 rounded-md border font-mono text-[10px] font-semibold transition-colors duration-150",
-                        tile.position,
-                        @values["quality"] == tile.value &&
-                          "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                        @values["quality"] != tile.value &&
-                          "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                      ]}
-                      title={tile.value}
-                    >
-                      {tile.label}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between">
-                    <label for={@form[:octave].id} class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Octave
-                    </label>
-                    <span class="font-mono text-xs text-zinc-200">{@values["octave"]}</span>
-                  </div>
-                  <input
-                    id={@form[:octave].id}
-                    name={@form[:octave].name}
-                    type="range"
-                    min="-1"
-                    max="9"
-                    step="1"
-                    value={@values["octave"]}
-                    class="w-full accent-emerald-400"
-                  />
-                </div>
-
-                <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
-                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                    Inversion Control
-                  </label>
-
-                  <div class="space-y-1">
-                    <div class="flex items-center justify-between">
-                      <label
-                        for={@form[:inversion].id}
-                        class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
-                      >
-                        Inversion
-                      </label>
-                      <span class="font-mono text-xs text-zinc-200">{@values["inversion"]}</span>
-                    </div>
-                    <input
-                      id={@form[:inversion].id}
-                      name={@form[:inversion].name}
-                      type="range"
-                      min="-24"
-                      max="24"
-                      step="1"
-                      value={@values["inversion"]}
-                      class="w-full accent-emerald-400"
-                    />
-                  </div>
-
-                  <div class="space-y-1">
-                    <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Inversion Tracking
-                    </label>
-                    <div class="grid grid-cols-2 gap-1">
-                      <button
-                        type="button"
-                        phx-click="set_inversion_tracking_mode"
-                        phx-value-mode="per_step_centered"
-                        class={[
-                          "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                          @values["inversion_tracking_mode"] == "per_step_centered" &&
-                            "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                          @values["inversion_tracking_mode"] != "per_step_centered" &&
-                            "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                        ]}
-                      >
-                        Per-step centered
-                      </button>
-                      <button
-                        type="button"
-                        phx-click="set_inversion_tracking_mode"
-                        phx-value-mode="anchor_then_wander"
-                        class={[
-                          "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                          @values["inversion_tracking_mode"] == "anchor_then_wander" &&
-                            "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                          @values["inversion_tracking_mode"] != "anchor_then_wander" &&
-                            "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                        ]}
-                      >
-                        Anchor then wander
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-2">
-                <.input
-                  field={@form[:voicing_type]}
-                  type="select"
-                  label="Voicing Type"
-                  options={[{"Close", "close"}, {"Open", "open"}]}
-                />
-                <.input
-                  field={@form[:doubling]}
-                  type="select"
-                  label="Doubling"
-                  options={[{"Auto", "auto"}, {"Root", "root"}, {"Top", "top"}]}
-                />
-              </div>
-
               <input
                 type="hidden"
                 name={@form[:center_note].name}
@@ -414,94 +424,98 @@ defmodule MenschWeb.ChordLabLive do
                 value={@values["range_max"]}
               />
 
-              <div class="grid grid-cols-1 gap-2">
-                <.input
-                  field={@form[:voice_count]}
-                  type="number"
-                  min="1"
-                  max="12"
-                  label="Voice Count"
-                />
+              <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Inversion Control
+                </label>
+
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between">
+                    <label
+                      for={@form[:inversion].id}
+                      class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                    >
+                      Inversion
+                    </label>
+                    <span class="font-mono text-xs text-zinc-200">{@values["inversion"]}</span>
+                  </div>
+                  <input
+                    id={@form[:inversion].id}
+                    name={@form[:inversion].name}
+                    type="range"
+                    min="-24"
+                    max="24"
+                    step="1"
+                    value={@values["inversion"]}
+                    class="w-full accent-emerald-400"
+                  />
+                </div>
+
+                <div class="space-y-1">
+                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                    Inversion Tracking
+                  </label>
+                  <div class="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      phx-click="set_inversion_tracking_mode"
+                      phx-value-mode="per_step_centered"
+                      class={[
+                        "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                        @values["inversion_tracking_mode"] == "per_step_centered" &&
+                          "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                        @values["inversion_tracking_mode"] != "per_step_centered" &&
+                          "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                      ]}
+                    >
+                      Per-step centered
+                    </button>
+                    <button
+                      type="button"
+                      phx-click="set_inversion_tracking_mode"
+                      phx-value-mode="anchor_then_wander"
+                      class={[
+                        "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                        @values["inversion_tracking_mode"] == "anchor_then_wander" &&
+                          "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                        @values["inversion_tracking_mode"] != "anchor_then_wander" &&
+                          "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                      ]}
+                    >
+                      Anchor then wander
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Voicing Control
+                </label>
+
+                <div class="grid grid-cols-1 gap-2">
+                  <.input
+                    field={@form[:voicing_type]}
+                    type="select"
+                    label="Voicing Type"
+                    options={[{"Close", "close"}, {"Open", "open"}]}
+                  />
+                  <.input
+                    field={@form[:voice_count]}
+                    type="number"
+                    min="1"
+                    max="12"
+                    label="Voice Count"
+                  />
+                  <.input
+                    field={@form[:doubling]}
+                    type="select"
+                    label="Doubling"
+                    options={[{"Auto", "auto"}, {"Root", "root"}, {"Top", "top"}]}
+                  />
+                </div>
               </div>
             </.form>
-          </div>
-
-          <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4 lg:w-[380px]">
-            <MenschWeb.PitchClassKeyboard.mini
-              id="root-pitch-class-keyboard"
-              label="Root"
-              event="set_root_pitch_class"
-              selected_key={@selected_root_keyboard_key}
-            />
-
-            <MenschWeb.PitchClassKeyboard.mini
-              id="foreign-bass-pitch-class-keyboard"
-              label="Foreign Bass"
-              event="set_foreign_bass_pitch_class"
-              selected_key={@selected_foreign_bass_keyboard_key}
-              header_action={true}
-              header_action_label="No Foreign Bass"
-              header_action_value=""
-              clear_label="No Foreign Bass"
-            />
-
-            <div class="space-y-2">
-              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                Bass Placement
-              </label>
-              <div class="grid grid-cols-2 gap-1">
-                <button
-                  type="button"
-                  phx-click="set_foreign_bass_mode"
-                  phx-value-mode="relative"
-                  class={[
-                    "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                    @values["foreign_bass_mode"] == "relative" &&
-                      "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                    @values["foreign_bass_mode"] != "relative" &&
-                      "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                  ]}
-                >
-                  Relative
-                </button>
-                <button
-                  type="button"
-                  phx-click="set_foreign_bass_mode"
-                  phx-value-mode="absolute"
-                  class={[
-                    "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                    @values["foreign_bass_mode"] == "absolute" &&
-                      "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                    @values["foreign_bass_mode"] != "absolute" &&
-                      "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                  ]}
-                >
-                  Absolute
-                </button>
-              </div>
-
-              <form phx-change="set_foreign_bass_octave" class="space-y-1">
-                <div class="flex items-center justify-between">
-                  <label
-                    for="foreign-bass-octave-inline"
-                    class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
-                  >
-                    Bass Octave
-                  </label>
-                  <span class="font-mono text-xs text-zinc-200">{@values["foreign_bass_octave"]}</span>
-                </div>
-                <input
-                  id="foreign-bass-octave-inline"
-                  name="foreign_bass_octave"
-                  type="number"
-                  min={if @values["foreign_bass_mode"] == "relative", do: "0", else: "-1"}
-                  max="9"
-                  step="1"
-                  value={@values["foreign_bass_octave"]}
-                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
-                />
-              </form>
-            </div>
           </div>
         </div>
 
@@ -698,11 +712,54 @@ defmodule MenschWeb.ChordLabLive do
             {@error_message}
           </div>
 
+          <div
+            :if={@result && Map.get(@result, :final_note_details, []) != []}
+            class="ui-radius-table overflow-x-auto border border-zinc-700/60 bg-black/30"
+          >
+            <div class="border-b border-zinc-700/70 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+              Final Note Analysis
+            </div>
+            <table class="w-full text-left font-mono text-xs text-zinc-200">
+              <thead>
+                <tr class="border-b border-zinc-700/70 text-zinc-400">
+                  <th class="px-3 py-2 font-normal">MIDI</th>
+                  <th class="px-3 py-2 font-normal">Note</th>
+                  <th class="px-3 py-2 font-normal">Name</th>
+                  <th class="px-3 py-2 font-normal">Oct</th>
+                  <th class="px-3 py-2 font-normal">Distance (st)</th>
+                  <th class="px-3 py-2 font-normal">Degree</th>
+                  <th class="px-3 py-2 font-normal">Compound Preferred</th>
+                  <th class="px-3 py-2 font-normal">Interval</th>
+                  <th class="px-3 py-2 font-normal">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  :for={detail <- Map.get(@result, :final_note_details, [])}
+                  class="border-b border-zinc-700/40 last:border-b-0"
+                >
+                  <td class="px-3 py-2">{detail.midi_note}</td>
+                  <td class="px-3 py-2 text-zinc-100">{detail.named_note_name}</td>
+                  <td class="px-3 py-2">{detail.named_note_note}</td>
+                  <td class="px-3 py-2">{detail.named_note_octave}</td>
+                  <td class="px-3 py-2">{detail.note_distance}</td>
+                  <td class="px-3 py-2">{detail.degree_simple}</td>
+                  <td class="px-3 py-2">{detail.degree_compound_preferred}</td>
+                  <td class="px-3 py-2">{detail.interval_human_label}</td>
+                  <td class="px-3 py-2">{detail.chord_tone_role}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <div class="grid gap-4 lg:grid-cols-2">
             <div
               :if={@result}
               class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
             >
+              <div class="border-b border-zinc-700/70 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Resolution Pipeline
+              </div>
               <table class="w-full text-left font-mono text-xs text-zinc-200">
                 <thead>
                   <tr class="border-b border-zinc-700/70 text-zinc-400">
@@ -745,6 +802,9 @@ defmodule MenschWeb.ChordLabLive do
               :if={@inversion_sequence != []}
               class="ui-radius-table overflow-hidden border border-zinc-700/60 bg-black/30"
             >
+              <div class="border-b border-zinc-700/70 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Inversion Sequence
+              </div>
               <table class="w-full text-left font-mono text-xs text-zinc-200">
                 <thead>
                   <tr class="border-b border-zinc-700/70 text-zinc-400">
@@ -774,6 +834,7 @@ defmodule MenschWeb.ChordLabLive do
               </table>
             </div>
           </div>
+
         </div>
 
       </section>

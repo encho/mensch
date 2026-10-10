@@ -216,4 +216,46 @@ defmodule Mensch.Harmony.ResolverTest do
              [60, 64, 67, 71]
            ]
   end
+
+  test "final note details expose simple and compound degree context" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj9,
+        octave: 3,
+        inversion: 0,
+        voicing: %Voicing{type: :close, center_note: 60}
+      })
+
+    steps = Resolver.resolve_steps(spec)
+
+    detail_9 = Enum.find(steps.final_note_details, &(&1.midi_note == 62))
+    detail_3 = Enum.find(steps.final_note_details, &(&1.midi_note == 52))
+
+    assert detail_9.degree_simple == "2"
+    assert detail_9.degree_compound_preferred == "9"
+    assert detail_9.interval_human_label == "Major second"
+    assert detail_9.chord_tone_role == "extension"
+
+    assert detail_3.degree_simple == "3"
+    assert detail_3.degree_compound_preferred == "3"
+    assert detail_3.chord_tone_role == "chord_tone"
+  end
+
+  test "final note details mark foreign bass role" do
+    spec =
+      ChordSpec.new!(%{
+        root: :c,
+        quality: :maj7,
+        octave: 3,
+        inversion: 0,
+        voicing: %Voicing{type: :close, center_note: 60},
+        foreign_bass: %ForeignBass{pitch_class: :f_sharp, mode: :relative, octave: 1}
+      })
+
+    steps = Resolver.resolve_steps(spec)
+    bass = Enum.find(steps.final_note_details, &(&1.midi_note == steps.foreign_bass_note))
+
+    assert bass.chord_tone_role == "foreign_bass"
+  end
 end
