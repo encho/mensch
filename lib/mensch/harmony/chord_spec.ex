@@ -41,7 +41,7 @@ defmodule Mensch.Harmony.ChordSpec do
   @type quality ::
           :maj
           | :min
-      | :maj6
+          | :maj6
           | :maj7
           | :min7
           | :dom7
@@ -80,7 +80,7 @@ defmodule Mensch.Harmony.ChordSpec do
             range_min: integer() | nil,
             range_max: integer() | nil,
             voice_count: pos_integer() | nil,
-          doubling: :root | :top | :auto | :third | :fifth | :guide_tones | :bass,
+            doubling: :root | :top | :auto | :third | :fifth | :guide_tones | :bass,
             inversion_tracking_mode: :per_step_centered | :anchor_then_wander
           }
   end
@@ -95,12 +95,12 @@ defmodule Mensch.Harmony.ChordSpec do
       * `:relative` - octave is an offset below the lowest voiced chord note octave
     """
 
-      defstruct pitch_class: nil, octave: 0, mode: :relative
+    defstruct pitch_class: nil, octave: 0, mode: :relative
 
     @type t :: %__MODULE__{
             pitch_class: Mensch.Harmony.ChordSpec.pitch_class(),
-        octave: integer(),
-        mode: :absolute | :relative
+            octave: integer(),
+            mode: :absolute | :relative
           }
   end
 
@@ -111,6 +111,7 @@ defmodule Mensch.Harmony.ChordSpec do
             octave: nil,
             inversion: nil,
             voicing: nil,
+            min_voice_count: 0,
             foreign_bass: nil
 
   @type t :: %__MODULE__{
@@ -120,6 +121,7 @@ defmodule Mensch.Harmony.ChordSpec do
           octave: integer(),
           inversion: integer(),
           voicing: Voicing.t(),
+          min_voice_count: non_neg_integer(),
           foreign_bass: ForeignBass.t() | nil
         }
 
@@ -180,6 +182,7 @@ defmodule Mensch.Harmony.ChordSpec do
       struct(__MODULE__, attrs)
       |> normalize_voicing()
       |> normalize_foreign_bass()
+      |> set_min_voice_count()
 
     case validate(spec) do
       :ok -> {:ok, spec}
@@ -224,8 +227,27 @@ defmodule Mensch.Harmony.ChordSpec do
 
       true ->
         validate_voicing(spec.voicing)
+        |> validate_voice_count_against_min(spec)
         |> validate_foreign_bass(spec.foreign_bass)
     end
+  end
+
+  @doc "Returns minimum voice count implied by the chord tones for this spec."
+  @spec min_voice_count(t()) :: non_neg_integer()
+  def min_voice_count(%__MODULE__{} = spec) do
+    spec
+    |> tones()
+    |> Enum.uniq()
+    |> length()
+  end
+
+  @doc "Returns minimum voice count implied by a chord quality."
+  @spec min_voice_count_for_quality(quality()) :: pos_integer()
+  def min_voice_count_for_quality(quality) when is_atom(quality) do
+    @quality_tones
+    |> Map.fetch!(quality)
+    |> Enum.uniq()
+    |> length()
   end
 
   @doc "Returns resolved tones. Explicit tones override quality-derived tones."
@@ -340,6 +362,9 @@ defmodule Mensch.Harmony.ChordSpec do
 
   defp normalize_foreign_bass(%__MODULE__{} = spec), do: spec
 
+  defp set_min_voice_count(%__MODULE__{} = spec),
+    do: %{spec | min_voice_count: min_voice_count(spec)}
+
   defp validate_voicing(%Voicing{} = voicing) do
     cond do
       voicing.type not in [:close, :open] ->
@@ -374,6 +399,18 @@ defmodule Mensch.Harmony.ChordSpec do
   end
 
   defp validate_voicing(other), do: {:error, {:invalid_voicing, other}}
+
+  defp validate_voice_count_against_min(:ok, %__MODULE__{} = spec) do
+    voice_count = spec.voicing.voice_count
+
+    if is_integer(voice_count) and voice_count < spec.min_voice_count do
+      {:error, {:invalid_voice_count_below_min, {voice_count, spec.min_voice_count}}}
+    else
+      :ok
+    end
+  end
+
+  defp validate_voice_count_against_min(error, _spec), do: error
 
   defp validate_foreign_bass(:ok, nil), do: :ok
 

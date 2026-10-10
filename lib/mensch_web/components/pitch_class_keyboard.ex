@@ -61,9 +61,11 @@ defmodule MenschWeb.PitchClassKeyboard do
             key.kind == :black && "rounded-b-sm rounded-t-none",
             key.kind == :white && "inset-y-1",
             @selected_key == key.root && "text-zinc-950",
-            key.kind == :white && @selected_key != key.root && "border-zinc-700 bg-zinc-100 text-zinc-800",
+            key.kind == :white && @selected_key != key.root &&
+              "border-zinc-700 bg-zinc-100 text-zinc-800",
             key.kind == :black && "top-1 z-10 h-[50%]",
-            key.kind == :black && @selected_key != key.root && "border-black/70 bg-zinc-900 text-zinc-100"
+            key.kind == :black && @selected_key != key.root &&
+              "border-black/70 bg-zinc-900 text-zinc-100"
           ]}
           style={"left: #{key.left}%; width: #{key.width}%; #{selected_key_style(@selected_key, key.root, @selected_key_color)}"}
         >

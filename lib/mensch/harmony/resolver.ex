@@ -56,8 +56,8 @@ defmodule Mensch.Harmony.Resolver do
           inverted_chord_tones: [integer()],
           voiced_chord_tones: [integer()],
           foreign_bass_note: integer() | nil,
-      final_notes: [integer()],
-      final_note_details: [NoteDetail.t()]
+          final_notes: [integer()],
+          final_note_details: [NoteDetail.t()]
         }
 
   @type inversion_sequence_entry :: %{
@@ -291,12 +291,15 @@ defmodule Mensch.Harmony.Resolver do
   end
 
   defp spell_from_root_and_token(root_pitch_class, token, midi_note) do
-        with {root_letter, root_acc} <- pitch_class_spelling!(root_pitch_class),
-          {_token_acc, token_degree} <- parse_tone_token(token) do
+    with {root_letter, root_acc} <- pitch_class_spelling!(root_pitch_class),
+         {_token_acc, token_degree} <- parse_tone_token(token) do
       root_idx = letter_index(root_letter)
       root_pc = normalize_pc(letter_pc(root_letter) + root_acc)
       target_simple_degree = rem(token_degree - 1, 7) + 1
-      target_letter = Enum.at(["C", "D", "E", "F", "G", "A", "B"], rem(root_idx + target_simple_degree - 1, 7))
+
+      target_letter =
+        Enum.at(["C", "D", "E", "F", "G", "A", "B"], rem(root_idx + target_simple_degree - 1, 7))
+
       target_natural_pc = letter_pc(target_letter)
       desired_pc = normalize_pc(ChordSpec.tone_interval(token))
       base_interval = normalize_pc(target_natural_pc - root_pc)
@@ -775,5 +778,4 @@ defmodule Mensch.Harmony.Resolver do
     base = at_least - rem(at_least, 12) + pc
     if base < at_least, do: base + 12, else: base
   end
-
 end

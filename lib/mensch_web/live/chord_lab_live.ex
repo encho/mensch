@@ -206,13 +206,37 @@ defmodule MenschWeb.ChordLabLive do
   @impl true
   def handle_event("set_doubling", %{"mode" => mode}, socket) do
     values =
-      if mode in doubling_mode_values() and not doubling_mode_disabled?(mode, socket.assigns.values) do
+      if mode in doubling_mode_values() and
+           not doubling_mode_disabled?(mode, socket.assigns.values) do
         socket.assigns.values
         |> Map.put("doubling", mode)
       else
         socket.assigns.values
       end
 
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_voice_count", %{"voice_count" => voice_count}, socket) do
+    min_voice_count = minimum_voice_count_from_values(socket.assigns.values)
+
+    values =
+      case Integer.parse(to_string(voice_count)) do
+        {parsed, ""} ->
+          normalized = parsed |> max(min_voice_count) |> min(12)
+          Map.put(socket.assigns.values, "voice_count", Integer.to_string(normalized))
+
+        _ ->
+          socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_voice_count_auto", _params, socket) do
+    values = Map.put(socket.assigns.values, "voice_count", "")
     {:noreply, assign_form_values_and_preview(socket, values)}
   end
 
@@ -230,7 +254,10 @@ defmodule MenschWeb.ChordLabLive do
   def handle_event("set_keyboard_register_controls", params, socket) do
     values =
       socket.assigns.values
-      |> Map.put("center_note", Map.get(params, "center_note", socket.assigns.values["center_note"]))
+      |> Map.put(
+        "center_note",
+        Map.get(params, "center_note", socket.assigns.values["center_note"])
+      )
       |> Map.put("range_min", Map.get(params, "range_min", socket.assigns.values["range_min"]))
       |> Map.put("range_max", Map.get(params, "range_max", socket.assigns.values["range_max"]))
 
@@ -259,9 +286,14 @@ defmodule MenschWeb.ChordLabLive do
           keyboard_range_value(assigns.values, "range_max")
         )
       )
+      |> assign(:minimum_voice_count, minimum_voice_count_from_values(assigns.values))
+      |> assign(:voice_count_slider_value, voice_count_slider_value(assigns.values))
       |> assign(:keyboard_degree_labels, keyboard_degree_labels(assigns.result))
       |> assign(:selected_root_keyboard_key, selected_root_keyboard_key(assigns.values))
-      |> assign(:selected_foreign_bass_keyboard_key, selected_foreign_bass_keyboard_key(assigns.values))
+      |> assign(
+        :selected_foreign_bass_keyboard_key,
+        selected_foreign_bass_keyboard_key(assigns.values)
+      )
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
@@ -283,9 +315,15 @@ defmodule MenschWeb.ChordLabLive do
               selected_key_color="#9bf25a"
             />
 
-            <form phx-change="set_octave" class="space-y-1 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+            <form
+              phx-change="set_octave"
+              class="space-y-1 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2"
+            >
               <div class="flex items-center justify-between">
-                <label for="root-octave-slider" class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                <label
+                  for="root-octave-slider"
+                  class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                >
                   Octave
                 </label>
                 <span class="font-mono text-xs text-zinc-200">{@values["octave"]}</span>
@@ -451,6 +489,7 @@ defmodule MenschWeb.ChordLabLive do
                 name={@form[:range_max].name}
                 value={@values["range_max"]}
               />
+              <input type="hidden" name={@form[:voice_count].name} value={@values["voice_count"]} />
 
               <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
                 <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
@@ -528,13 +567,50 @@ defmodule MenschWeb.ChordLabLive do
                     label="Voicing Type"
                     options={[{"Close", "close"}, {"Open", "open"}]}
                   />
-                  <.input
-                    field={@form[:voice_count]}
-                    type="number"
-                    min="1"
-                    max="12"
-                    label="Voice Count"
-                  />
+                  <div class="space-y-1 rounded-sm border border-zinc-700/70 bg-zinc-900/50 p-2">
+                    <div class="flex items-center justify-between">
+                      <label
+                        for="voice-count-slider"
+                        class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                      >
+                        Voice Count
+                      </label>
+                      <span class="font-mono text-xs text-zinc-200">
+                        {if @values["voice_count"] in [nil, ""],
+                          do: "Auto (min #{@minimum_voice_count})",
+                          else: @values["voice_count"]}
+                      </span>
+                    </div>
+                    <input
+                      id="voice-count-slider"
+                      name="voice_count"
+                      type="range"
+                      min={@minimum_voice_count}
+                      max="12"
+                      step="1"
+                      value={@voice_count_slider_value}
+                      phx-change="set_voice_count"
+                      class="w-full accent-emerald-400"
+                    />
+                    <div class="flex items-center justify-between">
+                      <p class="font-mono text-[10px] text-zinc-500">
+                        Minimum: {@minimum_voice_count}
+                      </p>
+                      <button
+                        type="button"
+                        phx-click="set_voice_count_auto"
+                        class={[
+                          "rounded-sm border px-2 py-1 font-mono text-[10px] transition-colors duration-150",
+                          @values["voice_count"] in [nil, ""] &&
+                            "border-emerald-300 bg-emerald-400/20 text-emerald-100",
+                          @values["voice_count"] not in [nil, ""] &&
+                            "border-zinc-700 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500"
+                        ]}
+                      >
+                        Auto/Min
+                      </button>
+                    </div>
+                  </div>
                   <div class="space-y-1">
                     <div class="flex items-center justify-between">
                       <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
@@ -561,9 +637,11 @@ defmodule MenschWeb.ChordLabLive do
                           "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
                           doubling_mode_disabled?(mode.value, @values) &&
                             "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
-                          not doubling_mode_disabled?(mode.value, @values) && @values["doubling"] == mode.value &&
+                          not doubling_mode_disabled?(mode.value, @values) &&
+                            @values["doubling"] == mode.value &&
                             "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                          not doubling_mode_disabled?(mode.value, @values) && @values["doubling"] != mode.value &&
+                          not doubling_mode_disabled?(mode.value, @values) &&
+                            @values["doubling"] != mode.value &&
                             "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
                         ]}
                         title={mode.description}
@@ -604,7 +682,8 @@ defmodule MenschWeb.ChordLabLive do
 
                   <div class="register-slider-shell relative h-8">
                     <div class="absolute inset-y-0 left-[0.5682%] right-[0.5682%]">
-                      <div class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded bg-zinc-700/70"></div>
+                      <div class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded bg-zinc-700/70">
+                      </div>
                       <div
                         class="pointer-events-none absolute top-1/2 h-2 -translate-y-1/2 rounded bg-emerald-300/55"
                         style={
@@ -886,7 +965,8 @@ defmodule MenschWeb.ChordLabLive do
                   >
                     <td class={[
                       "px-3 py-2 text-zinc-300",
-                      entry.inversion == current_inversion(@values) && "font-semibold text-emerald-200"
+                      entry.inversion == current_inversion(@values) &&
+                        "font-semibold text-emerald-200"
                     ]}>
                       {entry.inversion}
                     </td>
@@ -897,7 +977,6 @@ defmodule MenschWeb.ChordLabLive do
               </table>
             </div>
           </div>
-
         </div>
 
         <div
@@ -909,8 +988,7 @@ defmodule MenschWeb.ChordLabLive do
             phx-click="close_doubling_info"
             class="absolute inset-0 bg-black/70"
             aria-label="Close doubling information"
-          >
-          </button>
+          ></button>
           <div
             class="ui-radius-table relative z-10 w-full max-w-2xl border border-zinc-600 bg-zinc-950/95 p-4 shadow-2xl"
             phx-click-away="close_doubling_info"
@@ -943,7 +1021,10 @@ defmodule MenschWeb.ChordLabLive do
                   </tr>
                 </thead>
                 <tbody>
-                  <tr :for={row <- doubling_info_rows()} class="border-b border-zinc-700/40 last:border-b-0">
+                  <tr
+                    :for={row <- doubling_info_rows()}
+                    class="border-b border-zinc-700/40 last:border-b-0"
+                  >
                     <td class="px-3 py-2 text-zinc-100">{row.label}</td>
                     <td class="px-3 py-2">{row.explanation}</td>
                     <td class="px-3 py-2 text-zinc-300">{row.availability}</td>
@@ -957,7 +1038,6 @@ defmodule MenschWeb.ChordLabLive do
             </p>
           </div>
         </div>
-
       </section>
     </Layouts.app>
     """
@@ -989,26 +1069,94 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   defp assign_form_values_and_preview(socket, values) do
+    values = normalize_voice_count_value(values)
+
     socket
     |> assign(:values, values)
     |> assign(:form, to_form(values, as: :chord))
     |> resolve_preview(values)
   end
 
+  defp minimum_voice_count_from_values(values) when is_map(values) do
+    case Map.get(values, "quality") do
+      quality when is_binary(quality) ->
+        case Map.get(@quality_from_param, quality) do
+          nil -> 1
+          quality_atom -> ChordSpec.min_voice_count_for_quality(quality_atom)
+        end
+
+      _ ->
+        1
+    end
+  end
+
+  defp voice_count_slider_value(values) do
+    min_voice_count = minimum_voice_count_from_values(values)
+
+    values
+    |> Map.get("voice_count")
+    |> parse_integer_or_nil()
+    |> case do
+      nil -> min_voice_count
+      count -> count |> max(min_voice_count) |> min(12)
+    end
+  end
+
+  defp normalize_voice_count_value(values) do
+    min_voice_count = minimum_voice_count_from_values(values)
+
+    values
+    |> Map.get("voice_count")
+    |> parse_integer_or_nil()
+    |> case do
+      nil ->
+        values
+
+      count when count < min_voice_count ->
+        Map.put(values, "voice_count", Integer.to_string(min_voice_count))
+
+      count when count > 12 ->
+        Map.put(values, "voice_count", "12")
+
+      _ ->
+        values
+    end
+  end
+
+  defp parse_integer_or_nil(nil), do: nil
+  defp parse_integer_or_nil(""), do: nil
+  defp parse_integer_or_nil(value) when is_integer(value), do: value
+
+  defp parse_integer_or_nil(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {parsed, ""} -> parsed
+      _ -> nil
+    end
+  end
+
+  defp parse_integer_or_nil(_value), do: nil
+
   defp quality_tiles, do: @quality_tiles
 
   defp slider_note_value(values, key, default_value) when is_map(values) and is_binary(key) do
     case Map.get(values, key) do
-      nil -> default_value
-      "" -> default_value
-      value when is_integer(value) -> value
+      nil ->
+        default_value
+
+      "" ->
+        default_value
+
+      value when is_integer(value) ->
+        value
+
       value when is_binary(value) ->
         case Integer.parse(value) do
           {parsed, ""} -> parsed
           _ -> default_value
         end
 
-      _ -> default_value
+      _ ->
+        default_value
     end
   end
 
@@ -1018,7 +1166,7 @@ defmodule MenschWeb.ChordLabLive do
 
   defp slider_note_percent(values, key, default_value) do
     note = slider_note_value(values, key, default_value)
-    ((note - 21) / 87) * 100
+    (note - 21) / 87 * 100
   end
 
   defp slider_range_width_percent(values) do
@@ -1173,7 +1321,8 @@ defmodule MenschWeb.ChordLabLive do
     end
   end
 
-  defp parse_foreign_bass_octave(:absolute, value), do: parse_integer(value, "foreign_bass_octave")
+  defp parse_foreign_bass_octave(:absolute, value),
+    do: parse_integer(value, "foreign_bass_octave")
 
   defp parse_integer(value, field_name) when is_binary(value) do
     case Integer.parse(value) do
@@ -1296,7 +1445,8 @@ defmodule MenschWeb.ChordLabLive do
     [
       %{
         label: "Auto",
-        explanation: "Uses the internal priority order root -> fifth -> third when adding voices.",
+        explanation:
+          "Uses the internal priority order root -> fifth -> third when adding voices.",
         availability: "Always"
       },
       %{
@@ -1321,7 +1471,8 @@ defmodule MenschWeb.ChordLabLive do
       },
       %{
         label: "Guide",
-        explanation: "Repeats guide tones (third and/or seventh) to strengthen harmonic function.",
+        explanation:
+          "Repeats guide tones (third and/or seventh) to strengthen harmonic function.",
         availability: "Disabled for sus2 and sus4"
       },
       %{
@@ -1337,27 +1488,44 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   defp doubling_mode_disabled?(mode, values) do
+    auto_min_active? = voice_count_at_auto_min?(values)
     quality = Map.get(values, "quality", "")
 
-    case mode do
-      "third" -> quality in ["sus2", "sus4"]
-      "guide_tones" -> quality in ["sus2", "sus4"]
-      _ -> false
-    end
+    quality_restricted? =
+      case mode do
+        "third" -> quality in ["sus2", "sus4"]
+        "guide_tones" -> quality in ["sus2", "sus4"]
+        _ -> false
+      end
+
+    auto_min_active? or quality_restricted?
   end
+
+  defp voice_count_at_auto_min?(values) when is_map(values) do
+    minimum_voice_count_from_values(values) == voice_count_slider_value(values)
+  end
+
+  defp voice_count_at_auto_min?(_values), do: true
 
   defp keyboard_range_value(values, key) when is_map(values) and is_binary(key) do
     case Map.get(values, key) do
-      nil -> nil
-      "" -> nil
-      value when is_integer(value) -> value
+      nil ->
+        nil
+
+      "" ->
+        nil
+
+      value when is_integer(value) ->
+        value
+
       value when is_binary(value) ->
         case Integer.parse(value) do
           {parsed, ""} -> parsed
           _ -> nil
         end
 
-      _ -> nil
+      _ ->
+        nil
     end
   end
 
