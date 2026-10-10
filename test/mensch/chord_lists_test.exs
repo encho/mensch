@@ -6,7 +6,9 @@ defmodule Mensch.ChordListsTest do
 
   setup do
     previous = Application.get_env(:mensch, :chord_lists_dir)
-    temp_dir = Path.join(System.tmp_dir!(), "mensch_chord_lists_#{System.unique_integer([:positive])}")
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "mensch_chord_lists_#{System.unique_integer([:positive])}")
 
     Application.put_env(:mensch, :chord_lists_dir, temp_dir)
 
@@ -36,6 +38,7 @@ defmodule Mensch.ChordListsTest do
       "inversion" => "0",
       "_unused_voicing_type" => ""
     }
+
     result = %{final_notes: [48, 52, 55, 59]}
 
     assert {:ok, updated} = ChordLists.add_entry(list.id, values, result)

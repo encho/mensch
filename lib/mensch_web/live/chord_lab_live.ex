@@ -431,7 +431,7 @@ defmodule MenschWeb.ChordLabLive do
                 "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
                 (is_nil(@selected_chord_list_id) or is_nil(@result)) &&
                   "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
-                not is_nil(@selected_chord_list_id) and not is_nil(@result) &&
+                (not is_nil(@selected_chord_list_id) and not is_nil(@result)) &&
                   "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
               ]}
             >
@@ -440,8 +440,15 @@ defmodule MenschWeb.ChordLabLive do
           </div>
 
           <div class="grid gap-3 lg:grid-cols-2">
-            <form phx-submit="create_chord_list" phx-change="set_new_chord_list_name" class="space-y-1">
-              <label for="new-chord-list-name" class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+            <form
+              phx-submit="create_chord_list"
+              phx-change="set_new_chord_list_name"
+              class="space-y-1"
+            >
+              <label
+                for="new-chord-list-name"
+                class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+              >
                 New List
               </label>
               <div class="flex items-center gap-2">
@@ -462,7 +469,10 @@ defmodule MenschWeb.ChordLabLive do
             </form>
 
             <form phx-change="select_chord_list" class="space-y-1">
-              <label for="selected-chord-list" class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+              <label
+                for="selected-chord-list"
+                class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+              >
                 Active List
               </label>
               <select
@@ -1633,7 +1643,8 @@ defmodule MenschWeb.ChordLabLive do
 
     entries =
       case selected_id do
-        nil -> []
+        nil ->
+          []
 
         id ->
           case ChordLists.fetch_list(id) do

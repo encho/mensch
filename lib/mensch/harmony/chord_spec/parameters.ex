@@ -54,8 +54,10 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
              Map.get(values, "inversion_tracking_mode", "per_step_centered")
            ),
          {:ok, center_note} <- parse_integer(Map.get(values, "center_note", 60), "center_note"),
-         {:ok, range_min} <- parse_optional_integer(Map.get(values, "range_min", nil), "range_min"),
-         {:ok, range_max} <- parse_optional_integer(Map.get(values, "range_max", nil), "range_max"),
+         {:ok, range_min} <-
+           parse_optional_integer(Map.get(values, "range_min", nil), "range_min"),
+         {:ok, range_max} <-
+           parse_optional_integer(Map.get(values, "range_max", nil), "range_max"),
          {:ok, voice_count} <-
            parse_optional_integer(Map.get(values, "voice_count", nil), "voice_count"),
          {:ok, doubling} <- parse_doubling(Map.get(values, "doubling", "auto")),
@@ -95,13 +97,19 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
       "voicing_type" => Atom.to_string(params.voicing_type),
       "inversion_tracking_mode" => Atom.to_string(params.inversion_tracking_mode),
       "center_note" => Integer.to_string(params.center_note),
-      "range_min" => if(is_integer(params.range_min), do: Integer.to_string(params.range_min), else: ""),
-      "range_max" => if(is_integer(params.range_max), do: Integer.to_string(params.range_max), else: ""),
-      "voice_count" => if(is_integer(params.voice_count), do: Integer.to_string(params.voice_count), else: ""),
+      "range_min" =>
+        if(is_integer(params.range_min), do: Integer.to_string(params.range_min), else: ""),
+      "range_max" =>
+        if(is_integer(params.range_max), do: Integer.to_string(params.range_max), else: ""),
+      "voice_count" =>
+        if(is_integer(params.voice_count), do: Integer.to_string(params.voice_count), else: ""),
       "doubling" => Atom.to_string(params.doubling),
       "foreign_bass_mode" => Atom.to_string(params.foreign_bass_mode),
       "foreign_bass_pitch_class" =>
-        if(is_atom(params.foreign_bass_pitch_class), do: Atom.to_string(params.foreign_bass_pitch_class), else: ""),
+        if(is_atom(params.foreign_bass_pitch_class),
+          do: Atom.to_string(params.foreign_bass_pitch_class),
+          else: ""
+        ),
       "foreign_bass_octave" => Integer.to_string(params.foreign_bass_octave)
     }
   end
@@ -179,7 +187,8 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
 
   defp parse_quality(value) when is_binary(value) do
     case String.to_existing_atom(value) do
-      atom when atom in [
+      atom
+      when atom in [
              :maj,
              :min,
              :maj6,
@@ -201,9 +210,11 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
              :dim7,
              :aug,
              :min7_add11
-           ] -> {:ok, atom}
+           ] ->
+        {:ok, atom}
 
-      _ -> {:error, "invalid quality"}
+      _ ->
+        {:error, "invalid quality"}
     end
   rescue
     ArgumentError -> {:error, "invalid quality"}
@@ -212,6 +223,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
   defp parse_quality(value) when is_atom(value) do
     parse_quality(Atom.to_string(value))
   end
+
   defp parse_quality(_value), do: {:error, "invalid quality"}
 
   defp parse_voicing_type("close"), do: {:ok, :close}

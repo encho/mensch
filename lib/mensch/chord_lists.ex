@@ -5,12 +5,12 @@ defmodule Mensch.ChordLists do
   Lists are persisted as Elixir terms under `lib/mensch/chord_lists/data` by default.
   """
 
-    alias Mensch.Harmony.ChordSpec.Parameters
+  alias Mensch.Harmony.ChordSpec.Parameters
 
   @type list_entry :: %{
           id: String.t(),
           inserted_at: String.t(),
-      parameters: Parameters.t(),
+          parameters: Parameters.t(),
           snapshot: map()
         }
 
@@ -62,8 +62,11 @@ defmodule Mensch.ChordLists do
           maybe_rewrite_legacy_file(path, normalized)
           {:ok, normalized}
 
-        {:ok, _other} -> {:error, :invalid_list_format}
-        {:error, reason} -> {:error, reason}
+        {:ok, _other} ->
+          {:error, :invalid_list_format}
+
+        {:error, reason} ->
+          {:error, reason}
       end
     else
       {:error, :not_found}
@@ -283,7 +286,11 @@ defmodule Mensch.ChordLists do
   defp list_path(id), do: Path.join(storage_dir(), id <> ".exs")
 
   defp storage_dir do
-    Application.get_env(:mensch, :chord_lists_dir, Path.expand("lib/mensch/chord_lists/data", File.cwd!()))
+    Application.get_env(
+      :mensch,
+      :chord_lists_dir,
+      Path.expand("lib/mensch/chord_lists/data", File.cwd!())
+    )
   end
 
   defp now_iso8601 do
