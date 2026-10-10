@@ -259,6 +259,7 @@ defmodule MenschWeb.ChordLabLive do
           keyboard_range_value(assigns.values, "range_max")
         )
       )
+      |> assign(:keyboard_degree_labels, keyboard_degree_labels(assigns.result))
       |> assign(:selected_root_keyboard_key, selected_root_keyboard_key(assigns.values))
       |> assign(:selected_foreign_bass_keyboard_key, selected_foreign_bass_keyboard_key(assigns.values))
 
@@ -656,10 +657,10 @@ defmodule MenschWeb.ChordLabLive do
                     :if={key.kind == :white}
                     title={key.label}
                     class={[
-                      "absolute bottom-0 top-0 border-r border-zinc-900 transition-colors duration-150",
+                      "absolute bottom-6 top-0 border-r border-zinc-900 transition-colors duration-150",
                       key.center_marker && "ring-2 ring-amber-400 ring-inset",
                       key.outside_register && "opacity-35 saturate-50",
-                      key.foreign_bass && "bg-[#6ea83f]",
+                      key.foreign_bass && "bg-[#ff4d6d]",
                       !key.foreign_bass && key.active && "bg-[#9bf25a]",
                       !key.active && "bg-zinc-100"
                     ]}
@@ -677,12 +678,6 @@ defmodule MenschWeb.ChordLabLive do
                       :if={key.voiced_tone}
                       class="pointer-events-none absolute left-[76%] top-1 inline-block size-2 rounded-full bg-[#2fd5c8]"
                     ></span>
-                    <span
-                      :if={key.foreign_bass}
-                      class="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold text-zinc-900"
-                    >
-                      B
-                    </span>
                     <span class={[
                       "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
                       key.active && "text-zinc-900",
@@ -701,7 +696,7 @@ defmodule MenschWeb.ChordLabLive do
                       "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
                       key.center_marker && "ring-2 ring-amber-400 ring-inset",
                       key.outside_register && "opacity-35 saturate-50",
-                      key.foreign_bass && "bg-[#6ea83f]",
+                      key.foreign_bass && "bg-[#ff4d6d]",
                       !key.foreign_bass && key.active && "bg-[#9bf25a]",
                       !key.active && "bg-zinc-900"
                     ]}
@@ -719,16 +714,6 @@ defmodule MenschWeb.ChordLabLive do
                       :if={key.voiced_tone}
                       class="pointer-events-none absolute left-[78%] top-1 inline-block size-1.5 rounded-full bg-[#2fd5c8]"
                     ></span>
-                    <span
-                      :if={key.foreign_bass}
-                      class={[
-                        "pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 font-mono text-[11px] font-bold",
-                        key.active && "text-zinc-900",
-                        !key.active && "text-zinc-100"
-                      ]}
-                    >
-                      B
-                    </span>
                     <span class={[
                       "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
                       key.active && "text-zinc-900",
@@ -738,6 +723,23 @@ defmodule MenschWeb.ChordLabLive do
                     </span>
                   </div>
                 <% end %>
+
+                <div class="pointer-events-none absolute inset-x-0 bottom-0 h-6">
+                  <%= for key <- @keyboard_keys do %>
+                    <span
+                      :if={Map.has_key?(@keyboard_degree_labels, key.midi) or key.foreign_bass}
+                      class={[
+                        "absolute bottom-1 -translate-x-1/2 font-mono text-[10px] font-semibold",
+                        key.foreign_bass && "text-[#ff4d6d]",
+                        !key.foreign_bass && "text-[#9bf25a]",
+                        key.outside_register && "opacity-45"
+                      ]}
+                      style={"left: calc(#{key.left_pct}% + #{key.width_pct / 2}%);"}
+                    >
+                      {if key.foreign_bass, do: "B", else: Map.get(@keyboard_degree_labels, key.midi)}
+                    </span>
+                  <% end %>
+                </div>
               </div>
             </div>
           </div>
@@ -757,7 +759,7 @@ defmodule MenschWeb.ChordLabLive do
               Final notes key highlight
             </span>
             <span class="inline-flex items-center gap-1.5">
-              <span class="inline-block size-2 rounded-sm bg-[#6ea83f]"></span>
+              <span class="inline-block size-2 rounded-sm bg-[#ff4d6d]"></span>
               Foreign bass key highlight
             </span>
           </div>
@@ -1258,6 +1260,22 @@ defmodule MenschWeb.ChordLabLive do
     |> result_final_notes()
     |> Enum.uniq()
     |> Enum.count(&(&1 >= 21 and &1 <= 108))
+  end
+
+  defp keyboard_degree_labels(nil), do: %{}
+
+  defp keyboard_degree_labels(result) do
+    voiced_set = result |> Map.get(:voiced_chord_tones, []) |> MapSet.new()
+
+    result
+    |> Map.get(:final_note_details, [])
+    |> Enum.reduce(%{}, fn detail, acc ->
+      if MapSet.member?(voiced_set, detail.midi_note) do
+        Map.put(acc, detail.midi_note, detail.degree_compound_preferred)
+      else
+        acc
+      end
+    end)
   end
 
   defp doubling_modes do

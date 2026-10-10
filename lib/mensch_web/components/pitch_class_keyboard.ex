@@ -47,7 +47,7 @@ defmodule MenschWeb.PitchClassKeyboard do
           {@header_action_label || @clear_label}
         </button>
       </div>
-      <div class="relative h-24 w-full rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
+      <div class="relative h-24 w-full overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
         <button
           :for={key <- @keyboard_keys}
           type="button"
@@ -55,13 +55,14 @@ defmodule MenschWeb.PitchClassKeyboard do
           phx-value-pitch_class={key.root}
           title={key.label}
           class={[
-            "absolute rounded-sm border transition-colors duration-150",
-            key.kind == :white && "bottom-1",
-            key.kind == :white && "h-[86%]",
+            "absolute border transition-colors duration-150",
+            key.kind == :white && "rounded-sm",
+            key.kind == :black && "rounded-b-sm rounded-t-none",
+            key.kind == :white && "inset-y-1",
             key.kind == :white && @selected_key == key.root &&
               "border-emerald-300 bg-emerald-200 text-emerald-950",
             key.kind == :white && @selected_key != key.root && "border-zinc-700 bg-zinc-100 text-zinc-800",
-            key.kind == :black && "top-1 z-10 h-[56%]",
+            key.kind == :black && "top-1 z-10 h-[50%]",
             key.kind == :black && @selected_key == key.root &&
               "border-emerald-200 bg-emerald-400 text-zinc-950",
             key.kind == :black && @selected_key != key.root && "border-black/70 bg-zinc-900 text-zinc-100"
