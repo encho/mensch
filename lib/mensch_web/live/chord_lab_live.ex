@@ -62,21 +62,6 @@ defmodule MenschWeb.ChordLabLive do
     :min7_add11
   ]
 
-  @root_keyboard_keys [
-    %{root: "c", kind: :white, left: 0.0, width: 14.2857, label: "C"},
-    %{root: "d_flat", kind: :black, left: 9.5, width: 9.0, label: "Db"},
-    %{root: "d", kind: :white, left: 14.2857, width: 14.2857, label: "D"},
-    %{root: "e_flat", kind: :black, left: 23.8, width: 9.0, label: "Eb"},
-    %{root: "e", kind: :white, left: 28.5714, width: 14.2857, label: "E"},
-    %{root: "f", kind: :white, left: 42.8571, width: 14.2857, label: "F"},
-    %{root: "g_flat", kind: :black, left: 52.3, width: 9.0, label: "Gb"},
-    %{root: "g", kind: :white, left: 57.1428, width: 14.2857, label: "G"},
-    %{root: "a_flat", kind: :black, left: 66.6, width: 9.0, label: "Ab"},
-    %{root: "a", kind: :white, left: 71.4285, width: 14.2857, label: "A"},
-    %{root: "b_flat", kind: :black, left: 80.9, width: 9.0, label: "Bb"},
-    %{root: "b", kind: :white, left: 85.7142, width: 14.2857, label: "B"}
-  ]
-
   @quality_tiles [
     %{value: "maj", label: "Maj", position: "col-start-1 row-start-1"},
     %{value: "min", label: "Min", position: "col-start-2 row-start-1"},
@@ -127,10 +112,33 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
-  def handle_event("set_root", %{"root" => root}, socket) do
+  def handle_event("set_root_pitch_class", %{"pitch_class" => root}, socket) do
     values =
-      socket.assigns.values
-      |> Map.put("root", root)
+      if Map.has_key?(@pitch_class_from_param, root) do
+        socket.assigns.values
+        |> Map.put("root", root)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_foreign_bass_pitch_class", %{"pitch_class" => pitch_class}, socket) do
+    values =
+      cond do
+        pitch_class in ["", nil] ->
+          socket.assigns.values
+          |> Map.put("foreign_bass_pitch_class", "")
+
+        Map.has_key?(@pitch_class_from_param, pitch_class) ->
+          socket.assigns.values
+          |> Map.put("foreign_bass_pitch_class", pitch_class)
+
+        true ->
+          socket.assigns.values
+      end
 
     {:noreply, assign_form_values_and_preview(socket, values)}
   end
@@ -178,8 +186,8 @@ defmodule MenschWeb.ChordLabLive do
           result_voiced_notes(assigns.result)
         )
       )
-      |> assign(:root_keyboard_keys, root_keyboard_keys())
       |> assign(:selected_root_keyboard_key, selected_root_keyboard_key(assigns.values))
+      |> assign(:selected_foreign_bass_keyboard_key, selected_foreign_bass_keyboard_key(assigns.values))
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status}>
@@ -196,6 +204,11 @@ defmodule MenschWeb.ChordLabLive do
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
               <input type="hidden" name={@form[:root].name} value={@values["root"]} />
               <input type="hidden" name={@form[:quality].name} value={@values["quality"]} />
+              <input
+                type="hidden"
+                name={@form[:foreign_bass_pitch_class].name}
+                value={@values["foreign_bass_pitch_class"]}
+              />
 
               <div class="space-y-1">
                 <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
@@ -316,64 +329,33 @@ defmodule MenschWeb.ChordLabLive do
                   max="12"
                   label="Voice Count"
                 />
-                <div class="grid grid-cols-2 gap-2">
-                  <.input
-                    field={@form[:foreign_bass_pitch_class]}
-                    type="select"
-                    label="Foreign Bass"
-                    prompt="none"
-                    options={pitch_class_options()}
-                  />
-                  <.input
-                    field={@form[:foreign_bass_octave]}
-                    type="number"
-                    min="-1"
-                    max="9"
-                    label="Bass Octave"
-                  />
-                </div>
+                <.input
+                  field={@form[:foreign_bass_octave]}
+                  type="number"
+                  min="-1"
+                  max="9"
+                  label="Bass Octave"
+                />
               </div>
             </.form>
           </div>
 
-          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4 lg:w-[380px]">
-            <div class="space-y-1">
-              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Root</label>
-              <div class="relative h-24 w-full rounded-md border border-zinc-700/70 bg-zinc-950/60 p-1">
-                <button
-                  :for={key <- @root_keyboard_keys}
-                  type="button"
-                  phx-click="set_root"
-                  phx-value-root={key.root}
-                  title={key.label}
-                  class={[
-                    "absolute rounded-sm border transition-colors duration-150",
-                    key.kind == :white && "bottom-1",
-                    key.kind == :white && "h-[86%]",
-                    key.kind == :white && @selected_root_keyboard_key == key.root &&
-                      "border-emerald-300 bg-emerald-200 text-emerald-950",
-                    key.kind == :white && @selected_root_keyboard_key != key.root &&
-                      "border-zinc-700 bg-zinc-100 text-zinc-800",
-                    key.kind == :black && "top-1 z-10 h-[56%]",
-                    key.kind == :black && @selected_root_keyboard_key == key.root &&
-                      "border-emerald-200 bg-emerald-400 text-zinc-950",
-                    key.kind == :black && @selected_root_keyboard_key != key.root &&
-                      "border-black/70 bg-zinc-900 text-zinc-100"
-                  ]}
-                  style={"left: #{key.left}%; width: #{key.width}%;"}
-                >
-                  <span class={[
-                    "pointer-events-none text-[10px] font-mono font-semibold",
-                    key.kind == :black && @selected_root_keyboard_key == key.root && "text-zinc-950",
-                    key.kind == :black && @selected_root_keyboard_key != key.root && "text-zinc-100",
-                    key.kind == :white && @selected_root_keyboard_key == key.root && "text-emerald-950",
-                    key.kind == :white && @selected_root_keyboard_key != key.root && "text-zinc-800"
-                  ]}>
-                    {key.label}
-                  </span>
-                </button>
-              </div>
-            </div>
+          <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4 lg:w-[380px]">
+            <MenschWeb.PitchClassKeyboard.mini
+              id="root-pitch-class-keyboard"
+              label="Root"
+              event="set_root_pitch_class"
+              selected_key={@selected_root_keyboard_key}
+            />
+
+            <MenschWeb.PitchClassKeyboard.mini
+              id="foreign-bass-pitch-class-keyboard"
+              label="Foreign Bass"
+              event="set_foreign_bass_pitch_class"
+              selected_key={@selected_foreign_bass_keyboard_key}
+              show_clear={true}
+              clear_label="No Foreign Bass"
+            />
           </div>
         </div>
 
@@ -681,8 +663,6 @@ defmodule MenschWeb.ChordLabLive do
     |> resolve_preview(values)
   end
 
-  defp root_keyboard_keys, do: @root_keyboard_keys
-
   defp quality_tiles, do: @quality_tiles
 
   defp slider_note_value(values, key, default_value) when is_map(values) and is_binary(key) do
@@ -725,6 +705,12 @@ defmodule MenschWeb.ChordLabLive do
       nil -> "c"
       root -> root
     end
+  end
+
+  defp selected_foreign_bass_keyboard_key(values) when is_map(values) do
+    values
+    |> Map.get("foreign_bass_pitch_class")
+    |> keyboard_root_from_param()
   end
 
   defp keyboard_root_from_param(root_param) when is_binary(root_param) do
@@ -876,13 +862,6 @@ defmodule MenschWeb.ChordLabLive do
   defp foreign_bass_named_text(note) do
     {name, octave} = LegacyChordSpec.note_name(note)
     "#{ChordSpec.root_label(name)}#{octave}"
-  end
-
-  defp pitch_class_options do
-    @pitch_classes
-    |> Enum.map(fn pc ->
-      {ChordSpec.root_label(pc), Atom.to_string(pc)}
-    end)
   end
 
   defp default_values do
