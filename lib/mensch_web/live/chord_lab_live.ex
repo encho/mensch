@@ -179,6 +179,19 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
+  def handle_event("set_inversion_tracking_mode", %{"mode" => mode}, socket) do
+    values =
+      if mode in ["per_step_centered", "anchor_then_wander"] do
+        socket.assigns.values
+        |> Map.put("inversion_tracking_mode", mode)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
   def handle_event("set_keyboard_register_controls", params, socket) do
     values =
       socket.assigns.values
@@ -241,6 +254,11 @@ defmodule MenschWeb.ChordLabLive do
                 name={@form[:foreign_bass_octave].name}
                 value={@values["foreign_bass_octave"]}
               />
+              <input
+                type="hidden"
+                name={@form[:inversion_tracking_mode].name}
+                value={@values["inversion_tracking_mode"]}
+              />
 
               <div class="space-y-1">
                 <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
@@ -287,26 +305,68 @@ defmodule MenschWeb.ChordLabLive do
                   />
                 </div>
 
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between">
-                    <label
-                      for={@form[:inversion].id}
-                      class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
-                    >
-                      Inversion
-                    </label>
-                    <span class="font-mono text-xs text-zinc-200">{@values["inversion"]}</span>
+                <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                    Inversion Control
+                  </label>
+
+                  <div class="space-y-1">
+                    <div class="flex items-center justify-between">
+                      <label
+                        for={@form[:inversion].id}
+                        class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                      >
+                        Inversion
+                      </label>
+                      <span class="font-mono text-xs text-zinc-200">{@values["inversion"]}</span>
+                    </div>
+                    <input
+                      id={@form[:inversion].id}
+                      name={@form[:inversion].name}
+                      type="range"
+                      min="-24"
+                      max="24"
+                      step="1"
+                      value={@values["inversion"]}
+                      class="w-full accent-emerald-400"
+                    />
                   </div>
-                  <input
-                    id={@form[:inversion].id}
-                    name={@form[:inversion].name}
-                    type="range"
-                    min="-24"
-                    max="24"
-                    step="1"
-                    value={@values["inversion"]}
-                    class="w-full accent-emerald-400"
-                  />
+
+                  <div class="space-y-1">
+                    <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                      Inversion Tracking
+                    </label>
+                    <div class="grid grid-cols-2 gap-1">
+                      <button
+                        type="button"
+                        phx-click="set_inversion_tracking_mode"
+                        phx-value-mode="per_step_centered"
+                        class={[
+                          "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                          @values["inversion_tracking_mode"] == "per_step_centered" &&
+                            "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                          @values["inversion_tracking_mode"] != "per_step_centered" &&
+                            "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                        ]}
+                      >
+                        Per-step centered
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="set_inversion_tracking_mode"
+                        phx-value-mode="anchor_then_wander"
+                        class={[
+                          "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                          @values["inversion_tracking_mode"] == "anchor_then_wander" &&
+                            "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                          @values["inversion_tracking_mode"] != "anchor_then_wander" &&
+                            "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                        ]}
+                      >
+                        Anchor then wander
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -322,18 +382,6 @@ defmodule MenschWeb.ChordLabLive do
                   type="select"
                   label="Doubling"
                   options={[{"Auto", "auto"}, {"Root", "root"}, {"Top", "top"}]}
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-2">
-                <.input
-                  field={@form[:inversion_tracking_mode]}
-                  type="select"
-                  label="Inversion Tracking"
-                  options={[
-                    {"Per-step centered (current)", "per_step_centered"},
-                    {"Anchor first then wander", "anchor_then_wander"}
-                  ]}
                 />
               </div>
 
