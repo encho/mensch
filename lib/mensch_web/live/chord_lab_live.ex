@@ -220,7 +220,10 @@ defmodule MenschWeb.ChordLabLive do
           result_foreign_bass(assigns.result),
           result_resolved_notes(assigns.result),
           result_inverted_notes(assigns.result),
-          result_voiced_notes(assigns.result)
+          result_voiced_notes(assigns.result),
+          slider_note_value(assigns.values, "center_note", 60),
+          keyboard_range_value(assigns.values, "range_min"),
+          keyboard_range_value(assigns.values, "range_max")
         )
       )
       |> assign(:selected_root_keyboard_key, selected_root_keyboard_key(assigns.values))
@@ -510,8 +513,8 @@ defmodule MenschWeb.ChordLabLive do
             </p>
           </div>
 
-          <div class="w-full overflow-x-auto">
-            <div class="min-w-[1320px] space-y-3">
+          <div class="w-full overflow-x-hidden">
+            <div class="w-full space-y-3">
               <form phx-change="set_keyboard_register_controls" class="space-y-2">
                 <div class="space-y-1.5">
                   <div class="flex items-center justify-between gap-3 font-mono text-[11px] text-zinc-300">
@@ -581,6 +584,8 @@ defmodule MenschWeb.ChordLabLive do
                     title={key.label}
                     class={[
                       "absolute bottom-0 top-0 border-r border-zinc-900 transition-colors duration-150",
+                      key.center_marker && "ring-2 ring-amber-400 ring-inset",
+                      key.outside_register && "opacity-35 saturate-50",
                       key.foreign_bass && "bg-[#6ea83f]",
                       !key.foreign_bass && key.active && "bg-[#9bf25a]",
                       !key.active && "bg-zinc-100"
@@ -621,6 +626,8 @@ defmodule MenschWeb.ChordLabLive do
                     title={key.label}
                     class={[
                       "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
+                      key.center_marker && "ring-2 ring-amber-400 ring-inset",
+                      key.outside_register && "opacity-35 saturate-50",
                       key.foreign_bass && "bg-[#6ea83f]",
                       !key.foreign_bass && key.active && "bg-[#9bf25a]",
                       !key.active && "bg-zinc-900"
@@ -1071,9 +1078,35 @@ defmodule MenschWeb.ChordLabLive do
     |> Enum.count(&(&1 >= 21 and &1 <= 108))
   end
 
-  defp piano_keys(active_notes, foreign_bass_note, resolved_notes, inverted_notes, voiced_notes)
+  defp keyboard_range_value(values, key) when is_map(values) and is_binary(key) do
+    case Map.get(values, key) do
+      nil -> nil
+      "" -> nil
+      value when is_integer(value) -> value
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {parsed, ""} -> parsed
+          _ -> nil
+        end
+
+      _ -> nil
+    end
+  end
+
+  defp piano_keys(
+         active_notes,
+         foreign_bass_note,
+         resolved_notes,
+         inverted_notes,
+         voiced_notes,
+         center_note,
+         range_min,
+         range_max
+       )
        when is_list(active_notes) and is_list(resolved_notes) and is_list(inverted_notes) and
-              is_list(voiced_notes) do
+              is_list(voiced_notes) and is_integer(center_note) and
+              (is_nil(range_min) or is_integer(range_min)) and
+              (is_nil(range_max) or is_integer(range_max)) do
     min_midi = 21
     max_midi = 108
 
@@ -1099,6 +1132,8 @@ defmodule MenschWeb.ChordLabLive do
           inverted_tone: MapSet.member?(inverted_set, midi),
           voiced_tone: MapSet.member?(voiced_set, midi),
           foreign_bass: midi == foreign_bass_note,
+          center_marker: midi == center_note,
+          outside_register: outside_register?(midi, range_min, range_max),
           left_pct: white_before_or_at * white_width - black_width / 2,
           width_pct: black_width,
           label: note_label(midi),
@@ -1115,6 +1150,8 @@ defmodule MenschWeb.ChordLabLive do
           inverted_tone: MapSet.member?(inverted_set, midi),
           voiced_tone: MapSet.member?(voiced_set, midi),
           foreign_bass: midi == foreign_bass_note,
+          center_marker: midi == center_note,
+          outside_register: outside_register?(midi, range_min, range_max),
           left_pct: left_pct,
           width_pct: white_width,
           label: note_label(midi),
@@ -1127,6 +1164,12 @@ defmodule MenschWeb.ChordLabLive do
   defp note_label(midi_note) when is_integer(midi_note) do
     {name, octave} = LegacyChordSpec.note_name(midi_note)
     "#{ChordSpec.root_label(name)}#{octave}"
+  end
+
+  defp outside_register?(midi_note, range_min, range_max) do
+    below_min = is_integer(range_min) and midi_note < range_min
+    above_max = is_integer(range_max) and midi_note > range_max
+    below_min or above_max
   end
 
   defp show_c_label?(midi_note), do: rem(midi_note, 12) == 0
