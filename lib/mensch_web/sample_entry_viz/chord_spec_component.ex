@@ -7,13 +7,17 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   attr :chord_spec, ChordSpec, required: true
 
   def panel(assigns) do
+    chord_spec = normalize_chord_spec(assigns.chord_spec)
+
     assigns =
-      assign(assigns,
-        root_label: root_label(assigns.chord_spec.root),
-        quality_label: quality_label(assigns.chord_spec),
-        tone_labels: ChordSpec.tones(assigns.chord_spec),
-        note_labels: midi_note_labels(assigns.chord_spec)
-      )
+      assigns
+      |> assign(:chord_spec, chord_spec)
+      |> assign(:root_label, root_label(chord_spec.root))
+      |> assign(:quality_label, quality_label(chord_spec))
+      |> assign(:tone_labels, ChordSpec.tones(chord_spec))
+      |> assign(:note_labels, midi_note_labels(chord_spec))
+      |> assign(:voicing_fields, voicing_fields(chord_spec))
+      |> assign(:foreign_bass_fields, foreign_bass_fields(chord_spec.foreign_bass))
 
     ~H"""
     <section class="ui-radius-card border border-zinc-800 bg-zinc-900/50 p-3">
@@ -28,10 +32,30 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
         <dd>{Enum.join(@tone_labels, ", ")}</dd>
         <dt class="text-zinc-500">Foreign bass</dt>
         <dd>{foreign_bass_label(@chord_spec.foreign_bass)}</dd>
+        <dt class="text-zinc-500">Foreign bass pitch class</dt>
+        <dd>{Map.get(@foreign_bass_fields, "pitch_class")}</dd>
+        <dt class="text-zinc-500">Foreign bass mode</dt>
+        <dd>{Map.get(@foreign_bass_fields, "mode")}</dd>
+        <dt class="text-zinc-500">Foreign bass octave</dt>
+        <dd>{Map.get(@foreign_bass_fields, "octave")}</dd>
         <dt class="text-zinc-500">Octave</dt>
         <dd>{@chord_spec.octave}</dd>
         <dt class="text-zinc-500">Inversion</dt>
         <dd>{@chord_spec.inversion}</dd>
+        <dt class="text-zinc-500">Voicing type</dt>
+        <dd>{Map.get(@voicing_fields, "type")}</dd>
+        <dt class="text-zinc-500">Inversion resolution mode</dt>
+        <dd>{Map.get(@voicing_fields, "inversion_resolution_mode")}</dd>
+        <dt class="text-zinc-500">Center note</dt>
+        <dd>{Map.get(@voicing_fields, "center_note")}</dd>
+        <dt class="text-zinc-500">Range min</dt>
+        <dd>{Map.get(@voicing_fields, "range_min")}</dd>
+        <dt class="text-zinc-500">Range max</dt>
+        <dd>{Map.get(@voicing_fields, "range_max")}</dd>
+        <dt class="text-zinc-500">Voice count</dt>
+        <dd>{Map.get(@voicing_fields, "voice_count")}</dd>
+        <dt class="text-zinc-500">Doubling</dt>
+        <dd>{Map.get(@voicing_fields, "doubling")}</dd>
         <dt class="text-zinc-500">MIDI notes</dt>
         <dd>{Enum.join(@note_labels, ", ")}</dd>
       </dl>
@@ -72,4 +96,34 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   end
 
   defp normalize_chord_spec(%ChordSpec{} = chord_spec), do: chord_spec
+
+  defp voicing_fields(%ChordSpec{voicing: voicing}) do
+    %{
+      "type" => atom_or_dash(voicing.type),
+      "inversion_resolution_mode" => atom_or_dash(voicing.inversion_resolution_mode),
+      "center_note" => integer_or_dash(voicing.center_note),
+      "range_min" => integer_or_dash(voicing.range_min),
+      "range_max" => integer_or_dash(voicing.range_max),
+      "voice_count" => integer_or_dash(voicing.voice_count),
+      "doubling" => atom_or_dash(voicing.doubling)
+    }
+  end
+
+  defp foreign_bass_fields(nil) do
+    %{"pitch_class" => "-", "mode" => "-", "octave" => "-"}
+  end
+
+  defp foreign_bass_fields(%ChordSpec.ForeignBass{} = foreign_bass) do
+    %{
+      "pitch_class" => root_label(foreign_bass.pitch_class),
+      "mode" => atom_or_dash(foreign_bass.mode),
+      "octave" => integer_or_dash(foreign_bass.octave)
+    }
+  end
+
+  defp atom_or_dash(value) when is_atom(value), do: Atom.to_string(value)
+  defp atom_or_dash(_value), do: "-"
+
+  defp integer_or_dash(value) when is_integer(value), do: Integer.to_string(value)
+  defp integer_or_dash(_value), do: "-"
 end

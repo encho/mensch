@@ -14,12 +14,15 @@ defmodule MenschWeb.ChordLabLive do
   use MenschWeb, :live_view
 
   alias Mensch.ChordLists
+  alias Mensch.Player
   alias Mensch.Harmony.ChordSpec, as: LegacyChordSpec
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.ChordSpec.Parameters
   alias Mensch.Harmony.ChordSpec.ForeignBass
   alias Mensch.Harmony.ChordSpec.Voicing
   alias Mensch.Harmony.Resolver
+  alias Mensch.PerformanceAssembler
+  alias Mensch.SampleBlueprint
 
   @pitch_classes [
     :c,
@@ -107,6 +110,7 @@ defmodule MenschWeb.ChordLabLive do
       |> assign(:selected_chord_list_id, selected_chord_list_id)
       |> assign(:selected_chord_list_entries, selected_chord_list_entries)
       |> assign(:new_chord_list_name, "")
+      |> assign(:chord_list_blueprint_settings, default_chord_list_blueprint_settings())
       |> assign(:preview_note_channels, [])
       |> assign(:preview_stop_ref, nil)
       |> assign(:show_doubling_info, false)
@@ -252,6 +256,16 @@ defmodule MenschWeb.ChordLabLive do
   @impl true
   def handle_event("set_new_chord_list_name", %{"chord_list" => %{"name" => name}}, socket) do
     {:noreply, assign(socket, :new_chord_list_name, to_string(name))}
+  end
+
+  @impl true
+  def handle_event("set_chord_list_blueprint_settings", %{"blueprint" => params}, socket) do
+    settings =
+      socket.assigns.chord_list_blueprint_settings
+      |> Map.merge(params)
+      |> normalize_chord_list_blueprint_settings()
+
+    {:noreply, assign(socket, :chord_list_blueprint_settings, settings)}
   end
 
   @impl true
@@ -445,6 +459,38 @@ defmodule MenschWeb.ChordLabLive do
     end
   end
 
+  @impl true
+  def handle_event("play_chord_list_blueprint_sample", _params, socket) do
+    with {:ok, sample} <- build_sample_from_chord_list(socket),
+         :ok <- ensure_sample_entries_not_empty(sample),
+         {:ok, performance} <- build_performance_from_sample(sample) do
+      socket = stop_preview(socket)
+      Player.play(performance)
+      {:noreply, put_flash(socket, :info, "Playing chord list blueprint sample")}
+    else
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, reason)}
+    end
+  end
+
+  @impl true
+  def handle_event("export_chord_list_blueprint_sample", _params, socket) do
+    export_opts = [register: true]
+
+    with {:ok, build_opts} <- chord_list_blueprint_build_opts(socket),
+         {:ok, result} <- SampleBlueprint.export_to_sample_db(build_opts, export_opts) do
+      {:noreply,
+       put_flash(
+         socket,
+         :info,
+         "Exported sample blueprint module #{result.module} to #{result.file}"
+       )}
+    else
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, reason)}
+    end
+  end
+
   defp play_notes_for_3s(socket, notes) do
     final_notes = Enum.filter(notes, &is_integer/1)
 
@@ -541,20 +587,50 @@ defmodule MenschWeb.ChordLabLive do
         <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="font-mono text-sm text-zinc-200">Chord Lists</h2>
-            <button
-              type="button"
-              phx-click="add_current_to_chord_list"
-              disabled={is_nil(@selected_chord_list_id) or is_nil(@result)}
-              class={[
-                "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
-                (is_nil(@selected_chord_list_id) or is_nil(@result)) &&
-                  "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
-                (not is_nil(@selected_chord_list_id) and not is_nil(@result)) &&
-                  "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
-              ]}
-            >
-              Add Current Chord
-            </button>
+            <div class="inline-flex items-center gap-2">
+              <button
+                type="button"
+                phx-click="add_current_to_chord_list"
+                disabled={is_nil(@selected_chord_list_id) or is_nil(@result)}
+                class={[
+                  "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
+                  (is_nil(@selected_chord_list_id) or is_nil(@result)) &&
+                    "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                  (not is_nil(@selected_chord_list_id) and not is_nil(@result)) &&
+                    "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
+                ]}
+              >
+                Add Current Chord
+              </button>
+              <button
+                type="button"
+                phx-click="play_chord_list_blueprint_sample"
+                disabled={is_nil(@selected_chord_list_id) or @selected_chord_list_entries == []}
+                class={[
+                  "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
+                  (is_nil(@selected_chord_list_id) or @selected_chord_list_entries == []) &&
+                    "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                  (not is_nil(@selected_chord_list_id) and @selected_chord_list_entries != []) &&
+                    "border-sky-300 bg-sky-400/20 text-sky-100 hover:bg-sky-400/30"
+                ]}
+              >
+                Play List
+              </button>
+              <button
+                type="button"
+                phx-click="export_chord_list_blueprint_sample"
+                disabled={is_nil(@selected_chord_list_id) or @selected_chord_list_entries == []}
+                class={[
+                  "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
+                  (is_nil(@selected_chord_list_id) or @selected_chord_list_entries == []) &&
+                    "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                  (not is_nil(@selected_chord_list_id) and @selected_chord_list_entries != []) &&
+                    "border-amber-300 bg-amber-400/20 text-amber-100 hover:bg-amber-400/30"
+                ]}
+              >
+                Export Sample
+              </button>
+            </div>
           </div>
 
           <div class="grid gap-3 lg:grid-cols-2">
@@ -607,6 +683,191 @@ defmodule MenschWeb.ChordLabLive do
                   {list.name} ({list.entry_count})
                 </option>
               </select>
+            </form>
+          </div>
+
+          <div class="rounded-md border border-cyan-600/40 bg-cyan-950/20 p-3">
+            <div class="mb-2">
+              <h3 class="font-mono text-xs uppercase tracking-wide text-cyan-200">
+                Blueprint Configuration
+              </h3>
+              <p class="font-mono text-[11px] text-cyan-100/80">
+                Base sample settings plus blueprint-specific parameters.
+              </p>
+            </div>
+
+            <form phx-change="set_chord_list_blueprint_settings" class="space-y-3">
+              <div class="space-y-2 rounded-md border border-cyan-700/70 bg-cyan-950/25 p-3">
+                <h4 class="font-mono text-[11px] uppercase tracking-wide text-cyan-200">Blueprint</h4>
+                <label class="space-y-1">
+                  <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-300">Type</span>
+                  <select
+                    name="blueprint[blueprint_id]"
+                    value={@chord_list_blueprint_settings["blueprint_id"]}
+                    class="w-full rounded-sm border border-cyan-800/70 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                  >
+                    <option
+                      :for={bp <- sample_blueprint_options()}
+                      value={bp.id}
+                      selected={@chord_list_blueprint_settings["blueprint_id"] == bp.id}
+                    >
+                      {bp.label}
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-3">
+                <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Base Settings
+                </h4>
+
+                <div class="grid gap-2 lg:grid-cols-3">
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">BPM</span>
+                    <input
+                      name="blueprint[bpm]"
+                      type="number"
+                      min="1"
+                      value={@chord_list_blueprint_settings["bpm"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Chord Duration (mbeats)</span>
+                    <input
+                      name="blueprint[chord_duration_mbeats]"
+                      type="number"
+                      min="1"
+                      value={@chord_list_blueprint_settings["chord_duration_mbeats"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Silence After Chord (mbeats)</span>
+                    <input
+                      name="blueprint[silence_after_chord_mbeats]"
+                      type="number"
+                      min="0"
+                      value={@chord_list_blueprint_settings["silence_after_chord_mbeats"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-2 lg:grid-cols-4">
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Time Sig Numerator</span>
+                    <input
+                      name="blueprint[time_signature_numerator]"
+                      type="number"
+                      min="1"
+                      value={@chord_list_blueprint_settings["time_signature_numerator"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Time Sig Denominator</span>
+                    <input
+                      name="blueprint[time_signature_denominator]"
+                      type="number"
+                      min="1"
+                      value={@chord_list_blueprint_settings["time_signature_denominator"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Sample Name</span>
+                    <input
+                      name="blueprint[name]"
+                      value={@chord_list_blueprint_settings["name"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Folder</span>
+                    <input
+                      name="blueprint[folder]"
+                      value={@chord_list_blueprint_settings["folder"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-2 lg:grid-cols-2">
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Optional Sample ID</span>
+                    <input
+                      name="blueprint[id]"
+                      value={@chord_list_blueprint_settings["id"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Frame mbeats</span>
+                    <input
+                      name="blueprint[frame_mbeats]"
+                      type="number"
+                      min="1"
+                      value={@chord_list_blueprint_settings["frame_mbeats"]}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div class="space-y-2 rounded-md border border-cyan-700/70 bg-cyan-950/25 p-3">
+                <h4 class="font-mono text-[11px] uppercase tracking-wide text-cyan-200">
+                  Blueprint-Specific Settings
+                </h4>
+
+                <div
+                  :if={blueprint_additional_schema(@chord_list_blueprint_settings) == []}
+                  class="font-mono text-xs text-cyan-100/80"
+                >
+                  No additional settings required for this blueprint.
+                </div>
+
+                <div class="grid gap-2 lg:grid-cols-3">
+                  <div
+                    :for={field <- blueprint_additional_schema(@chord_list_blueprint_settings)}
+                    class="space-y-1"
+                  >
+                    <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                      {field.label}
+                    </label>
+
+                    <select
+                      :if={field.type == :enum}
+                      name={"blueprint[additional][#{field.name}]"}
+                      value={blueprint_additional_value(@chord_list_blueprint_settings, field)}
+                      class="w-full rounded-sm border border-cyan-800/70 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    >
+                      <option
+                        :for={option <- Map.get(field, :options, [])}
+                        value={option.value}
+                        selected={
+                          blueprint_additional_value(@chord_list_blueprint_settings, field) ==
+                            to_string(option.value)
+                        }
+                      >
+                        {option.label}
+                      </option>
+                    </select>
+
+                    <input
+                      :if={field.type in [:int, :float]}
+                      name={"blueprint[additional][#{field.name}]"}
+                      type="number"
+                      min={Map.get(field, :min)}
+                      max={Map.get(field, :max)}
+                      step={blueprint_field_input_step(field)}
+                      value={blueprint_additional_value(@chord_list_blueprint_settings, field)}
+                      class="w-full rounded-sm border border-cyan-800/70 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </div>
+                </div>
+              </div>
             </form>
           </div>
 
@@ -1808,6 +2069,157 @@ defmodule MenschWeb.ChordLabLive do
       "foreign_bass_pitch_class" => "",
       "foreign_bass_octave" => "0"
     }
+  end
+
+  defp default_chord_list_blueprint_settings do
+    settings = %{
+      "blueprint_id" => SampleBlueprint.default_blueprint_id(),
+      "bpm" => "120",
+      "time_signature_numerator" => "4",
+      "time_signature_denominator" => "4",
+      "chord_duration_mbeats" => "4000",
+      "silence_after_chord_mbeats" => "0",
+      "name" => "Chord List Generated Sample",
+      "folder" => "Generated",
+      "id" => "",
+      "frame_mbeats" => "50"
+    }
+
+    normalize_chord_list_blueprint_settings(settings)
+  end
+
+  defp sample_blueprint_options do
+    SampleBlueprint.available_blueprints()
+  end
+
+  defp blueprint_additional_schema(settings) do
+    blueprint_id = Map.get(settings, "blueprint_id", SampleBlueprint.default_blueprint_id())
+
+    case SampleBlueprint.additional_param_schema(blueprint_id) do
+      {:ok, schema} -> schema
+      {:error, _} -> []
+    end
+  end
+
+  defp blueprint_additional_value(settings, field) do
+    additional = Map.get(settings, "additional", %{})
+    value = Map.get(additional, field.name, field.default)
+    to_string(value)
+  end
+
+  defp blueprint_field_input_step(%{type: :int}), do: "1"
+
+  defp blueprint_field_input_step(%{type: :float} = field),
+    do: to_string(Map.get(field, :step, 0.1))
+
+  defp normalize_chord_list_blueprint_settings(settings) when is_map(settings) do
+    defaults = %{
+      "blueprint_id" => SampleBlueprint.default_blueprint_id(),
+      "bpm" => "120",
+      "time_signature_numerator" => "4",
+      "time_signature_denominator" => "4",
+      "chord_duration_mbeats" => "4000",
+      "silence_after_chord_mbeats" => "0",
+      "name" => "Chord List Generated Sample",
+      "folder" => "Generated",
+      "id" => "",
+      "frame_mbeats" => "50",
+      "additional" => %{}
+    }
+
+    merged = Map.merge(defaults, settings)
+    blueprint_id = Map.get(merged, "blueprint_id", SampleBlueprint.default_blueprint_id())
+
+    with {:ok, schema} <- SampleBlueprint.additional_param_schema(blueprint_id),
+         {:ok, default_additional} <- SampleBlueprint.default_additional_params(blueprint_id) do
+      incoming_additional =
+        merged
+        |> Map.get("additional", %{})
+        |> normalize_map_string_keys()
+
+      allowed_keys = Enum.map(schema, & &1.name)
+
+      normalized_additional =
+        default_additional
+        |> normalize_map_string_keys()
+        |> Map.merge(incoming_additional)
+        |> Map.take(allowed_keys)
+
+      Map.put(merged, "additional", normalized_additional)
+    else
+      _ ->
+        Map.put(merged, "additional", %{})
+    end
+  end
+
+  defp chord_list_blueprint_build_opts(socket) do
+    entries = socket.assigns.selected_chord_list_entries || []
+
+    if entries == [] do
+      {:error, "Selected chord list is empty"}
+    else
+      settings =
+        default_chord_list_blueprint_settings()
+        |> Map.merge(socket.assigns.chord_list_blueprint_settings || %{})
+
+      normalized_settings = normalize_chord_list_blueprint_settings(settings)
+
+      chords = Enum.map(entries, &Map.fetch!(&1, :parameters))
+
+      {:ok,
+       %{
+         id: Map.get(normalized_settings, "id"),
+         folder: Map.get(normalized_settings, "folder"),
+         name: Map.get(normalized_settings, "name"),
+         blueprint_id: Map.get(normalized_settings, "blueprint_id"),
+         bpm: Map.get(normalized_settings, "bpm"),
+         time_signature: %{
+           "numerator" => Map.get(normalized_settings, "time_signature_numerator"),
+           "denominator" => Map.get(normalized_settings, "time_signature_denominator")
+         },
+         frame_mbeats: Map.get(normalized_settings, "frame_mbeats"),
+         chord_duration_mbeats: Map.get(normalized_settings, "chord_duration_mbeats"),
+         silence_after_chord_mbeats: Map.get(normalized_settings, "silence_after_chord_mbeats"),
+         blueprint_additional_params: Map.get(normalized_settings, "additional", %{}),
+         chords: chords
+       }}
+    end
+  end
+
+  defp build_sample_from_chord_list(socket) do
+    with {:ok, build_opts} <- chord_list_blueprint_build_opts(socket),
+         {:ok, sample} <- SampleBlueprint.build(build_opts) do
+      {:ok, sample}
+    end
+  end
+
+  defp ensure_sample_entries_not_empty(%{sample_entries: entries}) when is_list(entries) do
+    if entries == [], do: {:error, "Generated sample has no entries"}, else: :ok
+  end
+
+  defp build_performance_from_sample(
+         %{sample_entries: entries, sample_context: sample_context} = sample
+       )
+       when is_list(entries) do
+    try do
+      total_length_mbeats = Map.get(sample, :total_length_mbeats)
+
+      performance =
+        PerformanceAssembler.generate_sample(entries, sample_context,
+          total_length_mbeats: total_length_mbeats
+        )
+
+      {:ok, performance}
+    rescue
+      error in [ArgumentError, RuntimeError] -> {:error, Exception.message(error)}
+    end
+  end
+
+  defp normalize_map_string_keys(map) when is_map(map) do
+    Enum.reduce(map, %{}, fn {key, value}, acc ->
+      normalized_key = if is_atom(key), do: Atom.to_string(key), else: to_string(key)
+      Map.put(acc, normalized_key, value)
+    end)
   end
 
   defp load_chord_lists(preferred_id) do
