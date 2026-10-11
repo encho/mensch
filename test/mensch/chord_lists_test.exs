@@ -39,9 +39,7 @@ defmodule Mensch.ChordListsTest do
       "_unused_voicing_type" => ""
     }
 
-    result = %{final_notes: [48, 52, 55, 59]}
-
-    assert {:ok, updated} = ChordLists.add_entry(list.id, values, result)
+    assert {:ok, updated} = ChordLists.add_entry(list.id, values)
     assert length(updated.entries) == 1
 
     persisted_parameters = updated.entries |> List.first() |> Map.fetch!(:parameters)
@@ -61,6 +59,7 @@ defmodule Mensch.ChordListsTest do
     path = Path.join(temp_dir, list.id <> ".exs")
     content = File.read!(path)
     refute String.contains?(content, "~c\"")
+    refute String.contains?(content, "snapshot")
 
     assert {:ok, after_delete} = ChordLists.delete_entry(list.id, entry_id)
     assert after_delete.entries == []

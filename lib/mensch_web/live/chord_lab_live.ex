@@ -294,7 +294,7 @@ defmodule MenschWeb.ChordLabLive do
         {:noreply, put_flash(socket, :error, "Select or create a chord list first")}
 
       list_id ->
-        case ChordLists.add_entry(list_id, socket.assigns.values, socket.assigns.result) do
+        case ChordLists.add_entry(list_id, socket.assigns.values) do
           {:ok, _list} ->
             {chord_lists, selected_id, entries} = load_chord_lists(list_id)
 
@@ -337,7 +337,11 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
-  def handle_event("move_chord_list_entry", %{"entry_id" => entry_id, "direction" => direction}, socket) do
+  def handle_event(
+        "move_chord_list_entry",
+        %{"entry_id" => entry_id, "direction" => direction},
+        socket
+      ) do
     case socket.assigns.selected_chord_list_id do
       nil ->
         {:noreply, socket}
@@ -1829,7 +1833,7 @@ defmodule MenschWeb.ChordLabLive do
 
         id ->
           case ChordLists.fetch_list(id) do
-            {:ok, list} -> list.entries
+            {:ok, list} -> enrich_chord_list_entries(list.entries)
             _ -> []
           end
       end
@@ -1854,17 +1858,32 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   defp chord_list_entry_final_notes(entry) do
-    entry
-    |> Map.get(:snapshot, %{})
-    |> Map.get(:final_notes, [])
+    Map.get(entry, :derived_final_notes, [])
   end
 
   defp chord_list_entry_values(entry) do
-    case Map.get(entry, :parameters) do
-      %Parameters{} = parameters -> Parameters.to_values_map(parameters)
-      _ -> Map.get(entry, :values, %{})
+    parameters = Map.fetch!(entry, :parameters)
+    Parameters.to_values_map(parameters)
+  end
+
+  defp enrich_chord_list_entries(entries) do
+    Enum.map(entries, fn entry ->
+      Map.put(entry, :derived_final_notes, derive_chord_list_entry_final_notes(entry))
+    end)
+  end
+
+  defp derive_chord_list_entry_final_notes(%{parameters: %Parameters{} = parameters}) do
+    try do
+      parameters
+      |> Parameters.to_chord_spec_attrs()
+      |> ChordSpec.new!()
+      |> Resolver.resolve()
+    rescue
+      _ -> []
     end
   end
+
+  defp derive_chord_list_entry_final_notes(_entry), do: []
 
   defp result_final_notes(nil), do: []
   defp result_final_notes(result), do: Map.get(result, :final_notes, [])

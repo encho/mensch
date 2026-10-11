@@ -10,8 +10,7 @@ defmodule Mensch.ChordLists do
   @type list_entry :: %{
           id: String.t(),
           inserted_at: String.t(),
-          parameters: Parameters.t(),
-          snapshot: map()
+          parameters: Parameters.t()
         }
 
   @type chord_list :: %{
@@ -58,9 +57,7 @@ defmodule Mensch.ChordLists do
     if File.exists?(path) do
       case read_term_file(path) do
         {:ok, %{} = list} ->
-          normalized = normalize_loaded_list(id, list)
-          maybe_rewrite_legacy_file(path, normalized)
-          {:ok, normalized}
+          {:ok, normalize_loaded_list(id, list)}
 
         {:ok, _other} ->
           {:error, :invalid_list_format}
@@ -101,15 +98,14 @@ defmodule Mensch.ChordLists do
     end
   end
 
-  @spec add_entry(String.t(), map(), map() | nil) :: {:ok, chord_list()} | {:error, term()}
-  def add_entry(list_id, values, result) when is_binary(list_id) and is_map(values) do
+  @spec add_entry(String.t(), map()) :: {:ok, chord_list()} | {:error, term()}
+  def add_entry(list_id, values) when is_binary(list_id) and is_map(values) do
     with {:ok, list} <- fetch_list(list_id) do
       with {:ok, parameters} <- Parameters.from_values_map(values) do
         entry = %{
           id: Integer.to_string(System.unique_integer([:positive, :monotonic])),
           inserted_at: now_iso8601(),
-          parameters: parameters,
-          snapshot: build_snapshot(result)
+          parameters: parameters
         }
 
         updated = %{
@@ -157,19 +153,6 @@ defmodule Mensch.ChordLists do
     end
   end
 
-  defp build_snapshot(nil), do: %{}
-
-  defp build_snapshot(result) when is_map(result) do
-    %{
-      resolved_chord_tones: normalize_note_list(Map.get(result, :resolved_chord_tones, [])),
-      inverted_chord_tones: normalize_note_list(Map.get(result, :inverted_chord_tones, [])),
-      voiced_chord_tones: normalize_note_list(Map.get(result, :voiced_chord_tones, [])),
-      foreign_bass_note: Map.get(result, :foreign_bass_note),
-      final_notes: normalize_note_list(Map.get(result, :final_notes, [])),
-      final_note_details: Map.get(result, :final_note_details, [])
-    }
-  end
-
   defp normalize_loaded_list(id, %{} = list) do
     %{
       version: Map.get(list, :version, 1),
@@ -182,67 +165,24 @@ defmodule Mensch.ChordLists do
   end
 
   defp normalize_entries(entries) when is_list(entries) do
-    Enum.map(entries, fn entry ->
-      snapshot = Map.get(entry, :snapshot, %{})
-
-      normalized_snapshot = %{
-        resolved_chord_tones: normalize_note_list(Map.get(snapshot, :resolved_chord_tones, [])),
-        inverted_chord_tones: normalize_note_list(Map.get(snapshot, :inverted_chord_tones, [])),
-        voiced_chord_tones: normalize_note_list(Map.get(snapshot, :voiced_chord_tones, [])),
-        foreign_bass_note: Map.get(snapshot, :foreign_bass_note),
-        final_notes: normalize_note_list(Map.get(snapshot, :final_notes, [])),
-        final_note_details: Map.get(snapshot, :final_note_details, [])
-      }
-
-      parameters = normalize_parameters(entry)
-
-      entry
-      |> Map.put(:parameters, parameters)
-      |> Map.delete(:values)
-      |> Map.put(:snapshot, normalized_snapshot)
-    end)
+    entries
+    |> Enum.map(&normalize_entry/1)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp normalize_entries(_entries), do: []
 
-  defp normalize_parameters(entry) do
-    cond do
-      match?(%Parameters{}, Map.get(entry, :parameters)) ->
-        Map.get(entry, :parameters)
-
-      is_map(Map.get(entry, :values)) ->
-        case Parameters.from_values_map(Map.get(entry, :values)) do
-          {:ok, parameters} -> parameters
-          {:error, _reason} -> %Parameters{}
-        end
-
-      true ->
-        %Parameters{}
+  defp normalize_entry(entry) when is_map(entry) do
+    with id when is_binary(id) <- Map.get(entry, :id),
+         inserted_at when is_binary(inserted_at) <- Map.get(entry, :inserted_at),
+         %Parameters{} = parameters <- Map.get(entry, :parameters) do
+      %{id: id, inserted_at: inserted_at, parameters: parameters}
+    else
+      _ -> nil
     end
   end
 
-  defp normalize_note_list(notes) when is_list(notes) do
-    notes
-    |> Enum.filter(&is_integer/1)
-  end
-
-  defp normalize_note_list(_notes), do: []
-
-  defp maybe_rewrite_legacy_file(path, normalized) do
-    case File.read(path) do
-      {:ok, content} ->
-        if String.contains?(content, "~c\"") or String.contains?(content, ":values =>") or
-             String.contains?(content, "_unused_voicing_type") do
-          _ = write_term_file(path, normalized)
-          :ok
-        else
-          :ok
-        end
-
-      _ ->
-        :ok
-    end
-  end
+  defp normalize_entry(_entry), do: nil
 
   defp reorder_entries(entries, entry_id, direction) do
     current_index = Enum.find_index(entries, &(&1.id == entry_id))
