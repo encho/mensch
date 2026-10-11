@@ -2,7 +2,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
   @moduledoc false
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machines.Strum
   alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
   alias Mensch.Machines.StrumParams
@@ -35,6 +35,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a_sharp,
             quality: :maj7,
             octave: 3,
@@ -47,7 +48,13 @@ defmodule Mensch.SampleDb.Sample13Strum do
           machine: machine
         },
         %{
-          chord_spec: %ChordSpec{root: :g, quality: :min7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :g,
+            quality: :min7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 4, beat: 0, mbeat: 0},
             duration_mbeats: 8000
@@ -55,7 +62,13 @@ defmodule Mensch.SampleDb.Sample13Strum do
           machine: machine
         },
         %{
-          chord_spec: %ChordSpec{root: :c, quality: :min7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :c,
+            quality: :min7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 8, beat: 0, mbeat: 0},
             duration_mbeats: 8000
@@ -63,7 +76,13 @@ defmodule Mensch.SampleDb.Sample13Strum do
           machine: machine
         },
         %{
-          chord_spec: %ChordSpec{root: :f, quality: :dom7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :f,
+            quality: :dom7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 12, beat: 0, mbeat: 0},
             duration_mbeats: 8000

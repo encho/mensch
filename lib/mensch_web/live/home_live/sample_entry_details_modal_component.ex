@@ -1,7 +1,7 @@
 defmodule MenschWeb.HomeLive.SampleEntryDetailsModalComponent do
   use MenschWeb, :live_component
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias MenschWeb.SampleEntryViz.ChordSpecComponent
   alias MenschWeb.SampleEntryViz.MachineComponent
   alias MenschWeb.SampleEntryViz.TimelineComponent

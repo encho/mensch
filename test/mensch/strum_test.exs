@@ -2,7 +2,8 @@ defmodule Mensch.StrumTest do
   use ExUnit.Case, async: true
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.Resolver
   alias Mensch.Machine
   alias Mensch.Machines.Strum
   alias Mensch.Machines.StrumParams
@@ -17,7 +18,13 @@ defmodule Mensch.StrumTest do
       duration_mbeats: 4000
     }
 
-    chord_spec = %ChordSpec{root: :c, tones: ["1", "3", "5"], octave: 4, inversion: 0}
+    chord_spec = %ChordSpec{
+      voicing: %ChordSpec.Voicing{},
+      root: :c,
+      tones: ["1", "3", "5"],
+      octave: 4,
+      inversion: 0
+    }
 
     machine = %Strum{params: StrumParams.default()}
 
@@ -30,7 +37,7 @@ defmodule Mensch.StrumTest do
         []
       )
 
-    expected_notes = ChordSpec.to_midi_notes(chord_spec)
+    expected_notes = Resolver.resolve(chord_spec)
 
     frame_0 = Enum.find(rendered.frames, &(&1.at_mbeat == 0))
     frame_end = Enum.find(rendered.frames, &(&1.at_mbeat == 4000))

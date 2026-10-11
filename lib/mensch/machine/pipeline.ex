@@ -6,7 +6,7 @@ defmodule Mensch.Machine.Pipeline do
   external `Mensch.Machine` protocol minimal.
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machine.MachineFrameSequence
   alias Mensch.Machine.NoteModulationStrategy
   alias Mensch.Machine.NoteFrame

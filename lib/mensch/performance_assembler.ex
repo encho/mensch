@@ -8,7 +8,7 @@ defmodule Mensch.PerformanceAssembler do
   a final MPE channel allocation pass.
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.BeatPosition
   alias Mensch.Machine
   alias Mensch.Machine.MachineFrameSequence

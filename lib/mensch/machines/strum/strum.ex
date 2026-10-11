@@ -10,7 +10,8 @@ defmodule Mensch.Machines.Strum do
   - note modulation is delegated to a strategy
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.Resolver
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
@@ -71,7 +72,10 @@ defmodule Mensch.Machines.Strum do
   @impl Pipeline
   @spec build_note_plan(t(), ChordSpec.t(), RenderContext.t()) :: [NotePlanItem.t()]
   def build_note_plan(%__MODULE__{}, %ChordSpec{} = chord_spec, %RenderContext{} = render_context) do
-    chord_notes = ChordSpec.to_midi_notes(chord_spec)
+    chord_notes =
+      chord_spec
+      |> normalize_chord_spec()
+      |> Resolver.resolve()
 
     chord_notes
     |> Enum.with_index()
@@ -133,6 +137,14 @@ defmodule Mensch.Machines.Strum do
   defp harmonic_tags_for_degree(2), do: [:fifth]
   defp harmonic_tags_for_degree(3), do: [:seventh]
   defp harmonic_tags_for_degree(_), do: [:tension]
+
+  defp normalize_chord_spec(%ChordSpec{voicing: nil} = chord_spec) do
+    chord_spec
+    |> Map.from_struct()
+    |> ChordSpec.new!()
+  end
+
+  defp normalize_chord_spec(%ChordSpec{} = chord_spec), do: chord_spec
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.Strum do

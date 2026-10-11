@@ -2,7 +2,7 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
   @moduledoc false
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
@@ -20,7 +20,13 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
         %{
-          chord_spec: %ChordSpec{root: :d, quality: :min7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :d,
+            quality: :min7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -37,7 +43,13 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :g, quality: :dom7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :g,
+            quality: :dom7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 1, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -54,7 +66,13 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :c, quality: :maj7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :c,
+            quality: :maj7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 2, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -71,7 +89,13 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :a, quality: :min7, octave: 3, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :a,
+            quality: :min7,
+            octave: 3,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
             duration_mbeats: 4000

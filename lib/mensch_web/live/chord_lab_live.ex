@@ -14,7 +14,7 @@ defmodule MenschWeb.ChordLabLive do
   use MenschWeb, :live_view
 
   alias Mensch.ChordLists
-  alias Mensch.ChordSpec, as: LegacyChordSpec
+  alias Mensch.Harmony.ChordSpec, as: LegacyChordSpec
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.ChordSpec.Parameters
   alias Mensch.Harmony.ChordSpec.ForeignBass

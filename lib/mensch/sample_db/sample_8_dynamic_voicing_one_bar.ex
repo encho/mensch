@@ -2,7 +2,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   @moduledoc false
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
@@ -33,6 +33,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a_sharp,
             quality: :maj7,
             octave: 3,

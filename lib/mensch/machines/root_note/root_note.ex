@@ -10,7 +10,7 @@ defmodule Mensch.Machines.RootNote do
   from the configured note-modulation strategy.
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
@@ -129,7 +129,10 @@ defmodule Mensch.Machines.RootNote do
   end
 
   defp root_midi_note!(%ChordSpec{} = chord_spec, octave_offset) when is_integer(octave_offset) do
-    midi_note = ChordSpec.root_midi_note(chord_spec) + octave_offset * 12
+    chord_spec = normalize_chord_spec(chord_spec)
+
+    midi_note =
+      ChordSpec.midi_note_number(chord_spec.root, chord_spec.octave) + octave_offset * 12
 
     if midi_note < 0 or midi_note > 127 do
       raise ArgumentError,
@@ -138,6 +141,14 @@ defmodule Mensch.Machines.RootNote do
 
     midi_note
   end
+
+  defp normalize_chord_spec(%ChordSpec{voicing: nil} = chord_spec) do
+    chord_spec
+    |> Map.from_struct()
+    |> ChordSpec.new!()
+  end
+
+  defp normalize_chord_spec(%ChordSpec{} = chord_spec), do: chord_spec
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.RootNote do

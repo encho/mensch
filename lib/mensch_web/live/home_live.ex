@@ -10,7 +10,7 @@ defmodule MenschWeb.HomeLive do
   use MenschWeb, :live_view
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.Player

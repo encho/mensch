@@ -14,7 +14,7 @@ defprotocol Mensch.Machine do
 
   @spec build_frame_sequence(
           t(),
-          Mensch.ChordSpec.t(),
+          Mensch.Harmony.ChordSpec.t(),
           Mensch.SampleContext.t(),
           Mensch.TimelineContext.t(),
           keyword()

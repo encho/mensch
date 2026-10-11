@@ -2,14 +2,14 @@ defmodule Mensch.Machine.VoicingStrategy do
   @moduledoc """
   Behavior for chord-voicing strategies.
 
-  A voicing strategy turns a `Mensch.ChordSpec` into an ordered list of voiced
+  A voicing strategy turns a `Mensch.Harmony.ChordSpec` into an ordered list of voiced
   notes. The output defines what notes are played and in which sequence order.
 
   Timing is intentionally excluded from this stage and is assigned later by the
   machine timing policy.
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
 
   @type voiced_note :: %{
           midi_note: integer(),

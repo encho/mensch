@@ -2,7 +2,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
   @moduledoc false
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machines.Strum
   alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
   alias Mensch.Machines.StrumParams
@@ -25,8 +25,6 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         }
       }
 
-    key = %{tonic: :c, mode: :major}
-
     %{
       id: "sample-15-strum-c-major-i-vi-ii-v-progression",
       folder: "Strum",
@@ -37,12 +35,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :c,
             quality: :maj7,
             octave: 3,
-            inversion: 0,
-            function: "I",
-            key: key
+            inversion: 0
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 0, beat: 0, mbeat: 0},
@@ -52,12 +49,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :c,
             quality: :maj7,
             octave: 3,
-            inversion: 1,
-            function: "I",
-            key: key
+            inversion: 1
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 4, beat: 0, mbeat: 0},
@@ -67,12 +63,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :c,
             quality: :maj7,
             octave: 3,
-            inversion: 2,
-            function: "I",
-            key: key
+            inversion: 2
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 8, beat: 0, mbeat: 0},
@@ -82,12 +77,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :c,
             quality: :maj7,
             octave: 3,
-            inversion: 3,
-            function: "I",
-            key: key
+            inversion: 3
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 12, beat: 0, mbeat: 0},
@@ -97,12 +91,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a,
             quality: :min7,
             octave: 2,
-            inversion: 1,
-            function: "vi",
-            key: key
+            inversion: 1
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 16, beat: 0, mbeat: 0},
@@ -112,12 +105,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a,
             quality: :min7,
             octave: 2,
-            inversion: 2,
-            function: "vi",
-            key: key
+            inversion: 2
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 20, beat: 0, mbeat: 0},
@@ -127,12 +119,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a,
             quality: :min7,
             octave: 2,
-            inversion: 3,
-            function: "vi",
-            key: key
+            inversion: 3
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 24, beat: 0, mbeat: 0},
@@ -142,12 +133,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a,
             quality: :min7,
             octave: 3,
-            inversion: 0,
-            function: "vi",
-            key: key
+            inversion: 0
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 28, beat: 0, mbeat: 0},
@@ -157,12 +147,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :d,
             quality: :min7,
             octave: 2,
-            inversion: 3,
-            function: "ii",
-            key: key
+            inversion: 3
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 32, beat: 0, mbeat: 0},
@@ -172,12 +161,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :d,
             quality: :min7,
             octave: 3,
-            inversion: 0,
-            function: "ii",
-            key: key
+            inversion: 0
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 36, beat: 0, mbeat: 0},
@@ -187,12 +175,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :d,
             quality: :min7,
             octave: 3,
-            inversion: 1,
-            function: "ii",
-            key: key
+            inversion: 1
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 40, beat: 0, mbeat: 0},
@@ -202,12 +189,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :d,
             quality: :min7,
             octave: 3,
-            inversion: 2,
-            function: "ii",
-            key: key
+            inversion: 2
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 44, beat: 0, mbeat: 0},
@@ -217,12 +203,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :g,
             quality: :dom7,
             octave: 2,
-            inversion: 1,
-            function: "V",
-            key: key
+            inversion: 1
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 48, beat: 0, mbeat: 0},
@@ -232,12 +217,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :g,
             quality: :dom7,
             octave: 2,
-            inversion: 2,
-            function: "V",
-            key: key
+            inversion: 2
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 52, beat: 0, mbeat: 0},
@@ -247,12 +231,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :g,
             quality: :dom7,
             octave: 2,
-            inversion: 3,
-            function: "V",
-            key: key
+            inversion: 3
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 56, beat: 0, mbeat: 0},
@@ -262,12 +245,11 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :g,
             quality: :dom7,
             octave: 3,
-            inversion: 0,
-            function: "V",
-            key: key
+            inversion: 0
           },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 60, beat: 0, mbeat: 0},

@@ -12,7 +12,8 @@ defmodule Mensch.Machines.DynamicVoicing do
   - note modulation is delegated to a strategy
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.Resolver
   alias Mensch.Machine.NotePlanItem
   alias Mensch.Machine.Pipeline
   alias Mensch.Machine.RenderContextCommon
@@ -123,7 +124,15 @@ defmodule Mensch.Machines.DynamicVoicing do
          inversion_count,
          voicing_count
        ) do
-    first_voicing = ChordSpec.to_midi_notes(chord_spec) |> Enum.sort()
+    first_voicing =
+      chord_spec
+      |> normalize_chord_spec()
+      |> Resolver.resolve()
+      |> Enum.sort()
+
+    IO.puts("********** first_voicing **********")
+    IO.inspect(first_voicing, label: "first_voicing")
+    IO.puts("***********************************")
 
     cycle_step_span = cycle_step_span(direction, inversion_count)
 
@@ -454,6 +463,14 @@ defmodule Mensch.Machines.DynamicVoicing do
   defp harmonic_tags_for_degree(2), do: [:fifth]
   defp harmonic_tags_for_degree(3), do: [:seventh]
   defp harmonic_tags_for_degree(_), do: [:tension]
+
+  defp normalize_chord_spec(%ChordSpec{voicing: nil} = chord_spec) do
+    chord_spec
+    |> Map.from_struct()
+    |> ChordSpec.new!()
+  end
+
+  defp normalize_chord_spec(%ChordSpec{} = chord_spec), do: chord_spec
 end
 
 defimpl Mensch.Machine, for: Mensch.Machines.DynamicVoicing do

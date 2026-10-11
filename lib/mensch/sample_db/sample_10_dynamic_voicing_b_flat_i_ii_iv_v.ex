@@ -2,7 +2,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
   @moduledoc false
 
   alias Mensch.BeatPosition
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
   alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
@@ -23,6 +23,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :a_sharp,
             quality: :maj7,
             octave: 2,
@@ -44,7 +45,13 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :c, quality: :min7, octave: 2, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :c,
+            quality: :min7,
+            octave: 2,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 1, beat: 0, mbeat: 0},
             duration_mbeats: 4000
@@ -62,6 +69,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
         },
         %{
           chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
             root: :d_sharp,
             quality: :maj7,
             octave: 2,
@@ -83,7 +91,13 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
           }
         },
         %{
-          chord_spec: %ChordSpec{root: :f, quality: :dom7, octave: 2, inversion: 0},
+          chord_spec: %ChordSpec{
+            voicing: %ChordSpec.Voicing{},
+            root: :f,
+            quality: :dom7,
+            octave: 2,
+            inversion: 0
+          },
           timeline_context: %TimelineContext{
             start_beat: %BeatPosition{bar: 3, beat: 0, mbeat: 0},
             duration_mbeats: 4000

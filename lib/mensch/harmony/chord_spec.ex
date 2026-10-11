@@ -175,6 +175,9 @@ defmodule Mensch.Harmony.ChordSpec do
     min7_add11: ["1", "b3", "5", "b7", "11"]
   }
 
+  @sharp_note_names ~w(c c_sharp d d_sharp e f f_sharp g g_sharp a a_sharp b)a
+  @flat_note_names ~w(c d_flat d e_flat e f g_flat g a_flat a b_flat b)a
+
   @doc "Builds and validates a harmony chord spec from a map."
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
@@ -337,6 +340,77 @@ defmodule Mensch.Harmony.ChordSpec do
       :b_flat -> "Bb"
       _ -> root |> Atom.to_string() |> String.upcase()
     end
+  end
+
+  @doc "The note name and octave for a MIDI note number, e.g. `64` -> `{:e, 4}`."
+  @spec note_name(integer()) :: {pitch_class(), integer()}
+  def note_name(note_number) when is_integer(note_number) do
+    note_name(note_number, :sharp)
+  end
+
+  @doc "The note name and octave for a MIDI note number using the requested spelling."
+  @spec note_name(integer(), :sharp | :flat) :: {pitch_class(), integer()}
+  def note_name(note_number, spelling)
+      when is_integer(note_number) and spelling in [:sharp, :flat] do
+    octave = div(note_number, 12) - 1
+    semitone = rem(note_number, 12)
+    note_names = if spelling == :flat, do: @flat_note_names, else: @sharp_note_names
+    {Enum.at(note_names, semitone), octave}
+  end
+
+  @doc "Compact human-readable chord symbol with optional foreign bass."
+  @spec symbol_label(t()) :: String.t()
+  def symbol_label(%__MODULE__{} = spec) do
+    root = root_label(spec.root)
+    tones = spec |> tones() |> Enum.uniq()
+    quality = symbol_quality_suffix(tones)
+    explicit = "(" <> Enum.map_join(tones, ",", &display_tone/1) <> ")"
+
+    bass =
+      case spec.foreign_bass do
+        %ForeignBass{pitch_class: pitch_class} -> "/" <> root_label(pitch_class)
+        _ -> ""
+      end
+
+    case quality do
+      nil -> "#{root}#{explicit}#{bass}"
+      suffix -> "#{root}#{suffix}#{bass}"
+    end
+  end
+
+  defp symbol_quality_suffix(tones) do
+    set = MapSet.new(tones)
+
+    cond do
+      set == MapSet.new(["1", "3", "5"]) -> ""
+      set == MapSet.new(["1", "b3", "5"]) -> "m"
+      set == MapSet.new(["1", "b3", "b5"]) -> "dim"
+      set == MapSet.new(["1", "3", "#5"]) -> "aug"
+      set == MapSet.new(["1", "4", "5"]) -> "sus4"
+      set == MapSet.new(["1", "2", "5"]) -> "sus2"
+      set == MapSet.new(["1", "3", "5", "7"]) -> "maj7"
+      set == MapSet.new(["1", "b3", "5", "b7"]) -> "m7"
+      set == MapSet.new(["1", "3", "5", "b7"]) -> "7"
+      set == MapSet.new(["1", "b3", "b5", "b7"]) -> "m7♭5"
+      set == MapSet.new(["1", "b3", "b5", "bb7"]) -> "dim7"
+      set == MapSet.new(["1", "3", "5", "7", "9"]) -> "maj9"
+      set == MapSet.new(["1", "b3", "5", "b7", "9"]) -> "m9"
+      set == MapSet.new(["1", "3", "5", "b7", "9"]) -> "9"
+      set == MapSet.new(["1", "b3", "5", "b7", "9", "11"]) -> "m11"
+      set == MapSet.new(["1", "3", "5", "7", "9", "11"]) -> "maj11"
+      set == MapSet.new(["1", "3", "5", "b7", "9", "13"]) -> "13"
+      set == MapSet.new(["1", "3", "5", "6"]) -> "6"
+      set == MapSet.new(["1", "3", "5", "6", "9"]) -> "6/9"
+      set == MapSet.new(["1", "b3", "5", "6"]) -> "m6"
+      set == MapSet.new(["1", "b3", "5", "b7", "11"]) -> "m7(add11)"
+      true -> nil
+    end
+  end
+
+  defp display_tone(tone) when is_binary(tone) do
+    tone
+    |> String.replace("b", "♭")
+    |> String.replace("#", "♯")
   end
 
   defp valid_pitch_class?(root) when is_atom(root), do: not is_nil(pitch_class_to_semitone(root))

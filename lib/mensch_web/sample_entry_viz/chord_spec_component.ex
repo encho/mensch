@@ -1,7 +1,8 @@
 defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   use MenschWeb, :html
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.Resolver
 
   attr :chord_spec, ChordSpec, required: true
 
@@ -25,12 +26,8 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
         <dd>{@quality_label}</dd>
         <dt class="text-zinc-500">Tones</dt>
         <dd>{Enum.join(@tone_labels, ", ")}</dd>
-        <dt class="text-zinc-500">Bass</dt>
-        <dd>{if is_nil(@chord_spec.bass), do: "-", else: root_label(@chord_spec.bass)}</dd>
-        <dt class="text-zinc-500">Key</dt>
-        <dd>{if is_nil(@chord_spec.key), do: "-", else: ChordSpec.key_label(@chord_spec.key)}</dd>
-        <dt class="text-zinc-500">Function</dt>
-        <dd>{Map.get(@chord_spec, :function, "-") || "-"}</dd>
+        <dt class="text-zinc-500">Foreign bass</dt>
+        <dd>{foreign_bass_label(@chord_spec.foreign_bass)}</dd>
         <dt class="text-zinc-500">Octave</dt>
         <dd>{@chord_spec.octave}</dd>
         <dt class="text-zinc-500">Inversion</dt>
@@ -44,7 +41,8 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
 
   defp midi_note_labels(%ChordSpec{} = chord_spec) do
     chord_spec
-    |> ChordSpec.to_midi_notes()
+    |> normalize_chord_spec()
+    |> Resolver.resolve()
     |> Enum.map(fn note_number ->
       {note_name, octave} = ChordSpec.note_name(note_number)
       "#{root_label(note_name)}#{octave}(#{note_number})"
@@ -59,4 +57,19 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
 
   defp quality_label(%ChordSpec{quality: quality}) when is_atom(quality),
     do: Atom.to_string(quality)
+
+  defp foreign_bass_label(nil), do: "-"
+
+  defp foreign_bass_label(%ChordSpec.ForeignBass{} = foreign_bass) do
+    mode = Atom.to_string(foreign_bass.mode)
+    "#{root_label(foreign_bass.pitch_class)} o#{foreign_bass.octave} (#{mode})"
+  end
+
+  defp normalize_chord_spec(%ChordSpec{voicing: nil} = chord_spec) do
+    chord_spec
+    |> Map.from_struct()
+    |> ChordSpec.new!()
+  end
+
+  defp normalize_chord_spec(%ChordSpec{} = chord_spec), do: chord_spec
 end
