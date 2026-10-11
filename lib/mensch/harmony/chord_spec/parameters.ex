@@ -15,7 +15,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
             octave: 3,
             inversion: 0,
             voicing_type: :close,
-            inversion_tracking_mode: :per_step_centered,
+            inversion_resolution_mode: :per_step_centered,
             center_note: 60,
             range_min: nil,
             range_max: nil,
@@ -31,7 +31,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
           octave: integer(),
           inversion: integer(),
           voicing_type: :close | :open,
-          inversion_tracking_mode: :per_step_centered | :anchor_then_wander,
+          inversion_resolution_mode: :per_step_centered | :anchor_then_wander,
           center_note: integer(),
           range_min: integer() | nil,
           range_max: integer() | nil,
@@ -49,9 +49,9 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
          {:ok, octave} <- parse_integer(Map.get(values, "octave", 3), "octave"),
          {:ok, inversion} <- parse_integer(Map.get(values, "inversion", 0), "inversion"),
          {:ok, voicing_type} <- parse_voicing_type(Map.get(values, "voicing_type", "close")),
-         {:ok, inversion_tracking_mode} <-
-           parse_inversion_tracking_mode(
-             Map.get(values, "inversion_tracking_mode", "per_step_centered")
+         {:ok, inversion_resolution_mode} <-
+           parse_inversion_resolution_mode(
+             Map.get(values, "inversion_resolution_mode", "per_step_centered")
            ),
          {:ok, center_note} <- parse_integer(Map.get(values, "center_note", 60), "center_note"),
          {:ok, range_min} <-
@@ -74,7 +74,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
          octave: octave,
          inversion: inversion,
          voicing_type: voicing_type,
-         inversion_tracking_mode: inversion_tracking_mode,
+         inversion_resolution_mode: inversion_resolution_mode,
          center_note: center_note,
          range_min: range_min,
          range_max: range_max,
@@ -95,7 +95,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
       "octave" => Integer.to_string(params.octave),
       "inversion" => Integer.to_string(params.inversion),
       "voicing_type" => Atom.to_string(params.voicing_type),
-      "inversion_tracking_mode" => Atom.to_string(params.inversion_tracking_mode),
+      "inversion_resolution_mode" => Atom.to_string(params.inversion_resolution_mode),
       "center_note" => Integer.to_string(params.center_note),
       "range_min" =>
         if(is_integer(params.range_min), do: Integer.to_string(params.range_min), else: ""),
@@ -123,7 +123,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
       inversion: params.inversion,
       voicing: %Voicing{
         type: params.voicing_type,
-        inversion_tracking_mode: params.inversion_tracking_mode,
+        inversion_resolution_mode: params.inversion_resolution_mode,
         center_note: params.center_note,
         range_min: params.range_min,
         range_max: params.range_max,
@@ -232,11 +232,11 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
   defp parse_voicing_type(:open), do: {:ok, :open}
   defp parse_voicing_type(_), do: {:error, "invalid voicing type"}
 
-  defp parse_inversion_tracking_mode("per_step_centered"), do: {:ok, :per_step_centered}
-  defp parse_inversion_tracking_mode("anchor_then_wander"), do: {:ok, :anchor_then_wander}
-  defp parse_inversion_tracking_mode(:per_step_centered), do: {:ok, :per_step_centered}
-  defp parse_inversion_tracking_mode(:anchor_then_wander), do: {:ok, :anchor_then_wander}
-  defp parse_inversion_tracking_mode(_), do: {:error, "invalid inversion tracking mode"}
+  defp parse_inversion_resolution_mode("per_step_centered"), do: {:ok, :per_step_centered}
+  defp parse_inversion_resolution_mode("anchor_then_wander"), do: {:ok, :anchor_then_wander}
+  defp parse_inversion_resolution_mode(:per_step_centered), do: {:ok, :per_step_centered}
+  defp parse_inversion_resolution_mode(:anchor_then_wander), do: {:ok, :anchor_then_wander}
+  defp parse_inversion_resolution_mode(_), do: {:error, "invalid inversion resolution mode"}
 
   defp parse_doubling("root"), do: {:ok, :root}
   defp parse_doubling("top"), do: {:ok, :top}

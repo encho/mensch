@@ -3,6 +3,7 @@ defmodule Mensch.DynamicVoicingTest do
 
   alias Mensch.BeatPosition
   alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.Resolver
   alias Mensch.Machine
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
@@ -38,7 +39,7 @@ defmodule Mensch.DynamicVoicingTest do
     end
   end
 
-  test "swaps one note at each inversion boundary while other notes continue" do
+  test "applies resolver-driven transitions at inversion boundaries" do
     sample_context = SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: 50})
 
     timeline_context = %TimelineContext{
@@ -70,13 +71,15 @@ defmodule Mensch.DynamicVoicingTest do
     frame_1000 = Enum.find(rendered.frames, &(&1.at_mbeat == 1000))
     frame_2000 = Enum.find(rendered.frames, &(&1.at_mbeat == 2000))
 
-    assert Enum.count(frame_0.notes, & &1.note_on) == 3
+    initial_voicing_count = chord_spec |> Resolver.resolve() |> length()
 
-    assert Enum.count(frame_1000.notes, & &1.note_on) == 1
-    assert Enum.count(frame_1000.notes, & &1.note_off) == 1
+    assert Enum.count(frame_0.notes, & &1.note_on) == initial_voicing_count
 
-    assert Enum.count(frame_2000.notes, & &1.note_on) == 1
-    assert Enum.count(frame_2000.notes, & &1.note_off) == 1
+    assert Enum.count(frame_1000.notes, & &1.note_on) >= 1
+    assert Enum.count(frame_1000.notes, & &1.note_off) >= 1
+
+    assert Enum.count(frame_2000.notes, & &1.note_on) >= 1
+    assert Enum.count(frame_2000.notes, & &1.note_off) >= 1
   end
 
   test "all sounding notes end at chord duration" do
@@ -148,9 +151,16 @@ defmodule Mensch.DynamicVoicingTest do
     rendered =
       Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
 
-    boundary_note_ons = transition_note_ons_by_mbeat(rendered.frames)
+    expected_voicings =
+      [0, 1, 2, 1, 0]
+      |> Enum.map(fn inversion ->
+        chord_spec
+        |> Map.put(:inversion, inversion)
+        |> Resolver.resolve()
+        |> Enum.sort()
+      end)
 
-    assert boundary_note_ons == %{1000 => 72, 2000 => 76, 3000 => 64, 4000 => 60}
+    assert_active_voicings_match(rendered.frames, expected_voicings)
   end
 
   test "cycle_down direction bounces for configured cycle count" do
@@ -181,9 +191,16 @@ defmodule Mensch.DynamicVoicingTest do
     rendered =
       Machine.build_frame_sequence(machine, chord_spec, sample_context, timeline_context, [])
 
-    boundary_note_ons = transition_note_ons_by_mbeat(rendered.frames)
+    expected_voicings =
+      [0, -1, 0, -1, 0]
+      |> Enum.map(fn inversion ->
+        chord_spec
+        |> Map.put(:inversion, inversion)
+        |> Resolver.resolve()
+        |> Enum.sort()
+      end)
 
-    assert boundary_note_ons == %{1000 => 55, 2000 => 67, 3000 => 55, 4000 => 67}
+    assert_active_voicings_match(rendered.frames, expected_voicings)
   end
 
   test "cycle modes fail validation when requested voicings exceed frame budget" do
@@ -232,19 +249,35 @@ defmodule Mensch.DynamicVoicingTest do
     assert Enum.min(pressure_values) < Enum.max(pressure_values)
   end
 
-  defp transition_note_ons_by_mbeat(frames) do
-    frames
-    |> Enum.reduce(%{}, fn frame, acc ->
-      note_ons = Enum.filter(frame.notes, & &1.note_on)
+  defp assert_active_voicings_match(frames, expected_voicings) do
+    active_by_mbeat = active_notes_by_mbeat(frames)
 
-      case note_ons do
-        [note] when frame.at_mbeat > 0 ->
-          Map.put(acc, frame.at_mbeat, note.midi_note)
-
-        _ ->
-          acc
-      end
+    expected_voicings
+    |> Enum.with_index()
+    |> Enum.each(fn {expected, index} ->
+      mbeat = index * 1000
+      assert Map.fetch!(active_by_mbeat, mbeat) == expected
     end)
+  end
+
+  defp active_notes_by_mbeat(frames) do
+    {_, by_mbeat} =
+      Enum.reduce(frames, {MapSet.new(), %{}}, fn frame, {active, acc} ->
+        active_after_offs =
+          Enum.reduce(frame.notes, active, fn note, active_acc ->
+            if note.note_off, do: MapSet.delete(active_acc, note.midi_note), else: active_acc
+          end)
+
+        active_after_ons =
+          Enum.reduce(frame.notes, active_after_offs, fn note, active_acc ->
+            if note.note_on, do: MapSet.put(active_acc, note.midi_note), else: active_acc
+          end)
+
+        {active_after_ons,
+         Map.put(acc, frame.at_mbeat, active_after_ons |> MapSet.to_list() |> Enum.sort())}
+      end)
+
+    by_mbeat
   end
 
   defp pressures_by_at_mbeat(machine, start_mbeat \\ 0) do

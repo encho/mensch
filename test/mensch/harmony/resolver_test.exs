@@ -220,7 +220,7 @@ defmodule Mensch.Harmony.ResolverTest do
         voicing: %Voicing{
           type: :close,
           center_note: 60,
-          inversion_tracking_mode: :per_step_centered
+          inversion_resolution_mode: :per_step_centered
         }
       })
 
@@ -237,7 +237,7 @@ defmodule Mensch.Harmony.ResolverTest do
         voicing: %Voicing{
           type: :close,
           center_note: 60,
-          inversion_tracking_mode: :anchor_then_wander
+          inversion_resolution_mode: :anchor_then_wander
         }
       })
 
@@ -254,7 +254,7 @@ defmodule Mensch.Harmony.ResolverTest do
         voicing: %Voicing{
           type: :close,
           center_note: 60,
-          inversion_tracking_mode: :anchor_then_wander
+          inversion_resolution_mode: :anchor_then_wander
         }
       })
 

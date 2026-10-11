@@ -103,7 +103,7 @@ defmodule Mensch.Harmony.Resolver do
   end
 
   defp do_resolve_steps(%ChordSpec{} = spec) do
-    case spec.voicing.inversion_tracking_mode do
+    case spec.voicing.inversion_resolution_mode do
       :per_step_centered ->
         do_resolve_steps_per_step_centered(spec)
 

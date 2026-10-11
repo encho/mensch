@@ -200,11 +200,11 @@ defmodule MenschWeb.ChordLabLive do
   end
 
   @impl true
-  def handle_event("set_inversion_tracking_mode", %{"mode" => mode}, socket) do
+  def handle_event("set_inversion_resolution_mode", %{"mode" => mode}, socket) do
     values =
       if mode in ["per_step_centered", "anchor_then_wander"] do
         socket.assigns.values
-        |> Map.put("inversion_tracking_mode", mode)
+        |> Map.put("inversion_resolution_mode", mode)
       else
         socket.assigns.values
       end
@@ -875,8 +875,8 @@ defmodule MenschWeb.ChordLabLive do
               <input type="hidden" name={@form[:octave].name} value={@values["octave"]} />
               <input
                 type="hidden"
-                name={@form[:inversion_tracking_mode].name}
-                value={@values["inversion_tracking_mode"]}
+                name={@form[:inversion_resolution_mode].name}
+                value={@values["inversion_resolution_mode"]}
               />
               <input type="hidden" name={@form[:doubling].name} value={@values["doubling"]} />
               <input
@@ -930,13 +930,13 @@ defmodule MenschWeb.ChordLabLive do
                   <div class="grid grid-cols-2 gap-1">
                     <button
                       type="button"
-                      phx-click="set_inversion_tracking_mode"
+                      phx-click="set_inversion_resolution_mode"
                       phx-value-mode="per_step_centered"
                       class={[
                         "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                        @values["inversion_tracking_mode"] == "per_step_centered" &&
+                        @values["inversion_resolution_mode"] == "per_step_centered" &&
                           "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                        @values["inversion_tracking_mode"] != "per_step_centered" &&
+                        @values["inversion_resolution_mode"] != "per_step_centered" &&
                           "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
                       ]}
                     >
@@ -944,13 +944,13 @@ defmodule MenschWeb.ChordLabLive do
                     </button>
                     <button
                       type="button"
-                      phx-click="set_inversion_tracking_mode"
+                      phx-click="set_inversion_resolution_mode"
                       phx-value-mode="anchor_then_wander"
                       class={[
                         "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                        @values["inversion_tracking_mode"] == "anchor_then_wander" &&
+                        @values["inversion_resolution_mode"] == "anchor_then_wander" &&
                           "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                        @values["inversion_tracking_mode"] != "anchor_then_wander" &&
+                        @values["inversion_resolution_mode"] != "anchor_then_wander" &&
                           "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
                       ]}
                     >
@@ -1648,8 +1648,8 @@ defmodule MenschWeb.ChordLabLive do
          {:ok, octave} <- parse_integer(values["octave"], "octave"),
          {:ok, inversion} <- parse_integer(values["inversion"], "inversion"),
          {:ok, voicing_type} <- parse_voicing_type(values["voicing_type"]),
-         {:ok, inversion_tracking_mode} <-
-           parse_inversion_tracking_mode(values["inversion_tracking_mode"]),
+         {:ok, inversion_resolution_mode} <-
+           parse_inversion_resolution_mode(values["inversion_resolution_mode"]),
          {:ok, center_note} <- parse_integer(values["center_note"], "center_note"),
          {:ok, range_min} <- parse_optional_integer(values["range_min"], "range_min"),
          {:ok, range_max} <- parse_optional_integer(values["range_max"], "range_max"),
@@ -1668,7 +1668,7 @@ defmodule MenschWeb.ChordLabLive do
         inversion: inversion,
         voicing: %Voicing{
           type: voicing_type,
-          inversion_tracking_mode: inversion_tracking_mode,
+          inversion_resolution_mode: inversion_resolution_mode,
           center_note: center_note,
           range_min: range_min,
           range_max: range_max,
@@ -1704,9 +1704,9 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_voicing_type("open"), do: {:ok, :open}
   defp parse_voicing_type(_), do: {:error, "invalid voicing type"}
 
-  defp parse_inversion_tracking_mode("per_step_centered"), do: {:ok, :per_step_centered}
-  defp parse_inversion_tracking_mode("anchor_then_wander"), do: {:ok, :anchor_then_wander}
-  defp parse_inversion_tracking_mode(_), do: {:error, "invalid inversion tracking mode"}
+  defp parse_inversion_resolution_mode("per_step_centered"), do: {:ok, :per_step_centered}
+  defp parse_inversion_resolution_mode("anchor_then_wander"), do: {:ok, :anchor_then_wander}
+  defp parse_inversion_resolution_mode(_), do: {:error, "invalid inversion resolution mode"}
 
   defp parse_doubling("root"), do: {:ok, :root}
   defp parse_doubling("top"), do: {:ok, :top}
@@ -1798,7 +1798,7 @@ defmodule MenschWeb.ChordLabLive do
       "octave" => "3",
       "inversion" => "0",
       "voicing_type" => "close",
-      "inversion_tracking_mode" => "per_step_centered",
+      "inversion_resolution_mode" => "per_step_centered",
       "center_note" => "60",
       "range_min" => "",
       "range_max" => "",

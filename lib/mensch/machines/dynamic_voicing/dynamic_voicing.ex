@@ -124,28 +124,18 @@ defmodule Mensch.Machines.DynamicVoicing do
          inversion_count,
          voicing_count
        ) do
-    first_voicing =
-      chord_spec
-      |> normalize_chord_spec()
-      |> Resolver.resolve()
-      |> Enum.sort()
-
-    IO.puts("********** first_voicing **********")
-    IO.inspect(first_voicing, label: "first_voicing")
-    IO.puts("***********************************")
+    chord_spec = normalize_chord_spec(chord_spec)
 
     cycle_step_span = cycle_step_span(direction, inversion_count)
 
-    if voicing_count == 1 do
-      [first_voicing]
-    else
-      1..(voicing_count - 1)
-      |> Enum.reduce([first_voicing], fn step, [current | _] = acc ->
-        transition_direction = direction_for_step(direction, cycle_step_span, step - 1)
-        [next_voicing(current, transition_direction) | acc]
-      end)
-      |> Enum.reverse()
-    end
+    chord_spec
+    |> build_inversion_sequence(direction, cycle_step_span, voicing_count)
+    |> Enum.map(fn inversion ->
+      chord_spec
+      |> Map.put(:inversion, inversion)
+      |> Resolver.resolve()
+      |> Enum.sort()
+    end)
   end
 
   defp direction_for_step(:up, _inversion_distance, _step_index), do: :up
@@ -199,14 +189,28 @@ defmodule Mensch.Machines.DynamicVoicing do
     inversion_distance * 2 * cycle_count + 1
   end
 
-  defp next_voicing([lowest | rest], :up) do
-    Enum.sort(rest ++ [lowest + 12])
-  end
-
-  defp next_voicing(notes, :down) do
-    highest = List.last(notes)
-    front = Enum.drop(notes, -1)
-    Enum.sort([highest - 12 | front])
+  # Builds the per-slot inversion path used for resolver-based voicing generation.
+  # The sequence starts at the input chord inversion and advances one inversion
+  # step per slot, with direction chosen by direction_for_step/3 (including
+  # cycle bounce behavior for {:cycle_up, n} / {:cycle_down, n}).
+  defp build_inversion_sequence(
+         %ChordSpec{inversion: start_inversion},
+         direction,
+         cycle_step_span,
+         voicing_count
+       )
+       when is_integer(start_inversion) and is_integer(voicing_count) and voicing_count >= 1 do
+    if voicing_count == 1 do
+      [start_inversion]
+    else
+      1..(voicing_count - 1)
+      |> Enum.reduce([start_inversion], fn step, [current_inversion | _] = acc ->
+        transition_direction = direction_for_step(direction, cycle_step_span, step - 1)
+        delta = if transition_direction == :up, do: 1, else: -1
+        [current_inversion + delta | acc]
+      end)
+      |> Enum.reverse()
+    end
   end
 
   defp build_slot_boundaries(

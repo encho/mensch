@@ -33,7 +33,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :a_sharp,
             quality: :maj7,
             octave: 3,

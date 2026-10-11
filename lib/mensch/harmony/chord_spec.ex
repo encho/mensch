@@ -64,6 +64,13 @@ defmodule Mensch.Harmony.ChordSpec do
   defmodule Voicing do
     @moduledoc """
     Voicing controls register and distribution of already inverted chord tones.
+
+    `inversion_resolution_mode` controls how inversion progression is resolved:
+
+    * `:per_step_centered` - each inversion is independently re-centered to the
+      configured voicing constraints
+    * `:anchor_then_wander` - inversion 0 is first anchored to constraints, then
+      subsequent inversions wander from that anchor
     """
 
     defstruct type: :close,
@@ -72,7 +79,7 @@ defmodule Mensch.Harmony.ChordSpec do
               range_max: nil,
               voice_count: nil,
               doubling: :auto,
-              inversion_tracking_mode: :per_step_centered
+              inversion_resolution_mode: :per_step_centered
 
     @type t :: %__MODULE__{
             type: :close | :open,
@@ -81,7 +88,7 @@ defmodule Mensch.Harmony.ChordSpec do
             range_max: integer() | nil,
             voice_count: pos_integer() | nil,
             doubling: :root | :top | :auto | :third | :fifth | :guide_tones | :bass,
-            inversion_tracking_mode: :per_step_centered | :anchor_then_wander
+            inversion_resolution_mode: :per_step_centered | :anchor_then_wander
           }
   end
 
@@ -464,8 +471,8 @@ defmodule Mensch.Harmony.ChordSpec do
       voicing.doubling not in [:root, :top, :auto, :third, :fifth, :guide_tones, :bass] ->
         {:error, {:invalid_doubling, voicing.doubling}}
 
-      voicing.inversion_tracking_mode not in [:per_step_centered, :anchor_then_wander] ->
-        {:error, {:invalid_inversion_tracking_mode, voicing.inversion_tracking_mode}}
+      voicing.inversion_resolution_mode not in [:per_step_centered, :anchor_then_wander] ->
+        {:error, {:invalid_inversion_resolution_mode, voicing.inversion_resolution_mode}}
 
       true ->
         :ok

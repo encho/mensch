@@ -23,7 +23,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :e,
             quality: :maj7,
             octave: 4,
@@ -46,7 +46,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
         },
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :f_sharp,
             quality: :min7,
             octave: 4,
@@ -69,7 +69,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
         },
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :a,
             quality: :maj7,
             octave: 4,
@@ -92,7 +92,7 @@ defmodule Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv do
         },
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :b,
             quality: :dom7,
             octave: 4,

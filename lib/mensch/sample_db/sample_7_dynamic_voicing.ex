@@ -21,7 +21,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
       sample_entries: [
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{
+              type: :open,
+              inversion_resolution_mode: :anchor_then_wander
+            },
             root: :c,
             quality: :min7,
             octave: 2,
@@ -44,7 +47,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
         },
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{
+              type: :open,
+              inversion_resolution_mode: :anchor_then_wander
+            },
             root: :f,
             quality: :dom7,
             octave: 2,
@@ -56,7 +62,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           },
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
-              direction: :up,
+              direction: :down,
               number_of_inversions: 8,
               modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
@@ -67,7 +73,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
         },
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{
+              type: :open,
+              inversion_resolution_mode: :anchor_then_wander
+            },
             root: :b_flat,
             quality: :maj7,
             octave: 2,
@@ -90,7 +99,10 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
         },
         %{
           chord_spec: %ChordSpec{
-            voicing: %ChordSpec.Voicing{},
+            voicing: %ChordSpec.Voicing{
+              type: :open,
+              inversion_resolution_mode: :anchor_then_wander
+            },
             root: :g,
             quality: :min7,
             octave: 2,
@@ -102,7 +114,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
           },
           machine: %DynamicVoicing{
             params: %DynamicVoicingParams{
-              direction: :up,
+              direction: :down,
               number_of_inversions: 8,
               modulation_strategy: %DynamicVoicingEnvelopedPressure{
                 error_prefix: "dynamic_voicing",
