@@ -17,8 +17,6 @@ Purpose:
 - Interactive UI lab: `lib/mensch_web/live/chord_lab_live.ex`
 - Tests: `test/mensch/harmony/resolver_test.exs`
 
-The legacy engine remains unchanged in `lib/mensch/chord_spec.ex`.
-
 ---
 
 ## 2. Conceptual Model
