@@ -7,13 +7,16 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     frame_mbeats = 20
 
-    %{
+    %SampleDefinition{
       id: "sample-10-dynamic-voicing-bb-i-ii-iv-v",
       folder: "Dynamic Voicing",
       name: "Bb Major (I-ii-IV-V) · cycle_up 2",
@@ -21,7 +24,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :a_sharp,
@@ -44,7 +47,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :c,
@@ -67,7 +70,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :d_sharp,
@@ -90,7 +93,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :f,

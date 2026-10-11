@@ -7,9 +7,12 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %DynamicVoicing{
@@ -23,7 +26,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
         }
       }
 
-    %{
+    %SampleDefinition{
       id: "sample-8-dynamic-voicing-one-bar",
       folder: "Dynamic Voicing",
       name: "Bbmaj7 · One Bar",
@@ -31,7 +34,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :a_sharp,

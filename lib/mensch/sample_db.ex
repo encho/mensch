@@ -8,6 +8,8 @@ defmodule Mensch.SampleDb do
   """
 
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
   alias Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv
   alias Mensch.SampleDb.Sample11DynamicVoicingEMajorIIiivv
@@ -29,6 +31,8 @@ defmodule Mensch.SampleDb do
 
   alias Mensch.SampleDb.GeneratedChordListGeneratedSample35
 
+  alias Mensch.SampleDb.GeneratedChordListGeneratedSample43
+
   @default_frame_mbeats 50
 
   @samples [
@@ -46,12 +50,17 @@ defmodule Mensch.SampleDb do
     GeneratedChordListGeneratedSample22.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample23.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample35.sample(@default_frame_mbeats),
+    GeneratedChordListGeneratedSample43.sample(@default_frame_mbeats),
   ]
 
   @doc "Returns sample total length in mbeats, honoring optional `:total_length_bars` or `:total_length_mbeats`."
-  @spec sample_total_length_mbeats(map()) :: non_neg_integer()
+  @spec sample_total_length_mbeats(SampleDefinition.t()) :: non_neg_integer()
   def sample_total_length_mbeats(
-        %{sample_entries: entries, sample_context: %SampleContext{} = sample_context} = sample
+        %SampleDefinition{
+          sample_entries: entries,
+          sample_context: %SampleContext{} = sample_context
+        } =
+          sample
       )
       when is_list(entries) do
     natural_end_mbeat = natural_sample_end_mbeat(entries, sample_context)
@@ -67,16 +76,17 @@ defmodule Mensch.SampleDb do
 
   def sample_total_length_mbeats(_sample), do: 0
 
-  defp with_normalized_total_length(
-         %{sample_entries: _entries, sample_context: %SampleContext{}} = sample
-       ) do
-    Map.put(sample, :total_length_mbeats, sample_total_length_mbeats(sample))
+  defp with_normalized_total_length(%SampleDefinition{} = sample) do
+    %SampleDefinition{sample | total_length_mbeats: sample_total_length_mbeats(sample)}
   end
 
   defp with_normalized_total_length(sample), do: sample
 
-  defp configured_total_mbeats_from_bars(sample, %SampleContext{} = sample_context) do
-    case Map.get(sample, :total_length_bars) do
+  defp configured_total_mbeats_from_bars(
+         %SampleDefinition{} = sample,
+         %SampleContext{} = sample_context
+       ) do
+    case sample.total_length_bars do
       value when is_integer(value) and value >= 0 ->
         value * SampleContext.mbeats_per_bar(sample_context)
 
@@ -87,7 +97,7 @@ defmodule Mensch.SampleDb do
 
   defp natural_sample_end_mbeat(entries, %SampleContext{} = sample_context) do
     entries
-    |> Enum.map(fn %{timeline_context: timeline_context} ->
+    |> Enum.map(fn %SampleEntry{timeline_context: timeline_context} ->
       TimelineContext.end_mbeat(timeline_context, sample_context)
     end)
     |> Enum.max(fn -> 0 end)
@@ -110,7 +120,7 @@ defmodule Mensch.SampleDb do
   end
 
   @doc "Returns all built-in samples for selection in the UI."
-  @spec default_samples() :: [map()]
+  @spec default_samples() :: [SampleDefinition.t()]
   def default_samples do
     Enum.map(@samples, &with_normalized_total_length/1)
   end

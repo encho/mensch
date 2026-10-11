@@ -7,11 +7,14 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   alias Mensch.Machines.RootNote.NoteModulationStrategies.RootNoteEnvelopedPressure
   alias Mensch.Machines.RootNoteParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
-    %{
+    %SampleDefinition{
       id: "sample-12-root-note",
       folder: "Root Note",
       name: "Root Note Offsets",
@@ -19,7 +22,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -45,7 +48,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :f,
@@ -71,7 +74,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :a_sharp,
@@ -97,7 +100,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -123,7 +126,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,

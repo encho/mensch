@@ -7,9 +7,12 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
   alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
   alias Mensch.Machines.StrumParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %Strum{
@@ -25,7 +28,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
         }
       }
 
-    %{
+    %SampleDefinition{
       id: "sample-15-strum-c-major-i-vi-ii-v-progression",
       folder: "Strum",
       name: "Cmajor I-vi-ii-V Progression",
@@ -33,7 +36,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -47,7 +50,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -61,7 +64,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -75,7 +78,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -89,7 +92,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :a,
@@ -103,7 +106,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :a,
@@ -117,7 +120,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :a,
@@ -131,7 +134,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :a,
@@ -145,7 +148,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -159,7 +162,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -173,7 +176,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -187,7 +190,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -201,7 +204,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -215,7 +218,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -229,7 +232,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -243,7 +246,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,

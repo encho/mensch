@@ -6,7 +6,8 @@ defmodule Mensch.SampleBlueprints.Blueprint do
   construction from normalized chords and global timing settings.
   """
 
-  alias Mensch.ChordSpec
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.SampleEntry
   alias Mensch.SampleContext
 
   @type additional_field_type :: :int | :float | :enum
@@ -39,5 +40,5 @@ defmodule Mensch.SampleBlueprints.Blueprint do
   @callback label() :: String.t()
   @callback additional_param_schema() :: [additional_param_schema_field()]
   @callback default_additional_params() :: map()
-  @callback build_sample_entries(build_input()) :: {:ok, [map()]} | {:error, String.t()}
+  @callback build_sample_entries(build_input()) :: {:ok, [SampleEntry.t()]} | {:error, String.t()}
 end

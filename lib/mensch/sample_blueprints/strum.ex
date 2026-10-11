@@ -6,6 +6,7 @@ defmodule Mensch.SampleBlueprints.Strum do
   alias Mensch.Machines.Strum
   alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
   alias Mensch.Machines.StrumParams
+  alias Mensch.SampleEntry
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -84,7 +85,7 @@ defmodule Mensch.SampleBlueprints.Strum do
             }
           }
 
-        entry = %{
+        entry = %SampleEntry{
           chord_spec: chord_spec,
           timeline_context: %TimelineContext{
             start_beat: SampleContext.mbeat_to_position(sample_context, cursor),

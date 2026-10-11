@@ -9,7 +9,9 @@ defmodule Mensch.SampleBlueprint do
 
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.ChordSpec.Parameters
+  alias Mensch.SampleDefinition
   alias Mensch.SampleBlueprints.Registry
+  alias Mensch.SampleEntry
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -37,14 +39,14 @@ defmodule Mensch.SampleBlueprint do
     end
   end
 
-  @spec build(map()) :: {:ok, map()} | {:error, String.t()}
+  @spec build(map()) :: {:ok, SampleDefinition.t()} | {:error, String.t()}
   def build(opts) when is_map(opts) do
     with {:ok, normalized} <- normalize_build_opts(opts) do
       build_from_normalized(normalized)
     end
   end
 
-  @spec build!(map()) :: map()
+  @spec build!(map()) :: SampleDefinition.t()
   def build!(opts) do
     case build(opts) do
       {:ok, sample} -> sample
@@ -136,7 +138,7 @@ defmodule Mensch.SampleBlueprint do
          :ok <- validate_entries(entries),
          total_length_mbeats <- total_length_mbeats(entries, sample_context) do
       {:ok,
-       %{
+       SampleDefinition.new!(%{
          id: normalized.id,
          folder: normalized.folder,
          name: normalized.name,
@@ -152,17 +154,22 @@ defmodule Mensch.SampleBlueprint do
            silence_after_chord_mbeats: normalized.silence_after_chord_mbeats,
            blueprint_additional_params: normalized.blueprint_additional_params
          }
-       }}
+       })}
     end
   rescue
     error in [ArgumentError, RuntimeError] -> {:error, Exception.message(error)}
   end
 
   defp validate_entries(entries) when is_list(entries) do
-    if entries == [] do
-      {:error, "generated sample has no entries"}
-    else
-      :ok
+    cond do
+      entries == [] ->
+        {:error, "generated sample has no entries"}
+
+      Enum.any?(entries, &(not match?(%SampleEntry{}, &1))) ->
+        {:error, "generated sample entries must be typed sample entries"}
+
+      true ->
+        :ok
     end
   end
 
@@ -418,8 +425,11 @@ defmodule Mensch.SampleBlueprint do
         @moduledoc false
 
         alias Mensch.SampleBlueprint
+        alias Mensch.SampleDefinition
 
-        @spec sample(pos_integer()) :: map()
+        @behaviour Mensch.SampleDefinition.Provider
+
+        @spec sample(pos_integer()) :: SampleDefinition.t()
         def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
           SampleBlueprint.build!(%{
             id: #{inspect(normalized.id)},

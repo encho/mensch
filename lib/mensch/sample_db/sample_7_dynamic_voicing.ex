@@ -7,11 +7,14 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
-    %{
+    %SampleDefinition{
       id: "sample-7-dynamic-voicing",
       folder: "Dynamic Voicing",
       name: "Bb Major Jazz Cycle (ii-V-I-vi)",
@@ -19,7 +22,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
       sample_context:
         SampleContext.new!(%{bpm: 120, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{
               type: :open,
@@ -45,7 +48,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{
               type: :open,
@@ -71,7 +74,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{
               type: :open,
@@ -97,7 +100,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{
               type: :open,

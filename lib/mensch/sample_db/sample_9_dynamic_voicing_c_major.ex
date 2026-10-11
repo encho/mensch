@@ -7,11 +7,14 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicingParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
-    %{
+    %SampleDefinition{
       id: "sample-9-dynamic-voicing-c-major",
       folder: "Dynamic Voicing",
       name: "C Major Jazz Cycle (ii-V-I-vi)",
@@ -19,7 +22,7 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :d,
@@ -42,7 +45,7 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :g,
@@ -65,7 +68,7 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :c,
@@ -88,7 +91,7 @@ defmodule Mensch.SampleDb.Sample9DynamicVoicingCMajor do
             }
           }
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{inversion_resolution_mode: :anchor_then_wander},
             root: :a,

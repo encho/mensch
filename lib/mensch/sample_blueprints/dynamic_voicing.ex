@@ -6,6 +6,7 @@ defmodule Mensch.SampleBlueprints.DynamicVoicing do
   alias Mensch.Machines.DynamicVoicing
   alias Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure
   alias Mensch.Machines.DynamicVoicingParams
+  alias Mensch.SampleEntry
   alias Mensch.SampleContext
   alias Mensch.TimelineContext
 
@@ -87,7 +88,7 @@ defmodule Mensch.SampleBlueprints.DynamicVoicing do
             }
           }
 
-        entry = %{
+        entry = %SampleEntry{
           chord_spec: chord_spec,
           timeline_context: %TimelineContext{
             start_beat: SampleContext.mbeat_to_position(sample_context, cursor),

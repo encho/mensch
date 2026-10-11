@@ -2,8 +2,11 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample22 do
   @moduledoc false
 
   alias Mensch.SampleBlueprint
+  alias Mensch.SampleDefinition
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     SampleBlueprint.build!(%{
       id: "chord_list_generated_sample-22",

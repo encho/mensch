@@ -7,9 +7,12 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
   alias Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure
   alias Mensch.Machines.StrumParams
   alias Mensch.SampleContext
+  alias Mensch.SampleDefinition
+  alias Mensch.SampleEntry
   alias Mensch.TimelineContext
 
-  @spec sample(pos_integer()) :: map()
+  @behaviour Mensch.SampleDefinition.Provider
+  @spec sample(pos_integer()) :: SampleDefinition.t()
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     machine =
       %Strum{
@@ -25,7 +28,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         }
       }
 
-    %{
+    %SampleDefinition{
       id: "sample-14-strum-c-major-16-chords",
       folder: "Strum",
       name: "C Major 16-Chord Palette (2 Bars + 2 Bars Rest)",
@@ -33,7 +36,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
       sample_context:
         SampleContext.new!(%{bpm: 100, time_signature: {4, 4}, frame_mbeats: frame_mbeats}),
       sample_entries: [
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -47,7 +50,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -61,7 +64,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -75,7 +78,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :d,
@@ -89,7 +92,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -103,7 +106,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -117,7 +120,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -131,7 +134,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :g,
@@ -145,7 +148,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :f,
@@ -159,7 +162,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :f,
@@ -173,7 +176,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :f,
@@ -187,7 +190,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :f,
@@ -201,7 +204,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -215,7 +218,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -229,7 +232,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
@@ -243,7 +246,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
           },
           machine: machine
         },
-        %{
+        %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
             root: :c,
