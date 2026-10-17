@@ -575,7 +575,7 @@ defmodule MenschWeb.ChordLabLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status}>
+    <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab}>
       <section class="mx-auto w-full max-w-7xl space-y-6">
         <div class="space-y-2">
           <h1 class="font-mono text-2xl text-zinc-100">Chord Lab</h1>

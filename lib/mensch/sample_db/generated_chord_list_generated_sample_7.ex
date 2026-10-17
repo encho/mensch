@@ -15,18 +15,18 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample7 do
       name: "Chord List Generated Sample",
       total_length_mbeats: 12000,
       blueprint_meta: %{
-  bpm: 120,
-  time_signature: {4, 4},
-  frame_mbeats: 50,
-  chord_duration_mbeats: 4000,
-  silence_after_chord_mbeats: 0,
-  blueprint_additional_params: %{
-    "direction_mode" => "alternate",
-    "number_of_inversions" => 8,
-    "pressure_attack_mbeats" => 50.0
-  },
-  blueprint_id: "progression__alternating_wander__dv1"
-},
+        bpm: 120,
+        time_signature: {4, 4},
+        frame_mbeats: 50,
+        chord_duration_mbeats: 4000,
+        silence_after_chord_mbeats: 0,
+        blueprint_additional_params: %{
+          "direction_mode" => "alternate",
+          "number_of_inversions" => 8,
+          "pressure_attack_mbeats" => 50.0
+        },
+        blueprint_id: "progression__alternating_wander__dv1"
+      },
       sample_context:
         SampleContext.new!(%{
           bpm: 120,
@@ -61,20 +61,21 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample7 do
             params: %Mensch.Machines.DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 8,
-              modulation_strategy: %Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure{
-                pressure_attack_mbeats: 50.0,
-                pressure_decay_mbeats: 280.0,
-                pressure_release_mbeats: 120.0,
-                pressure_sustain_level: 0.68,
-                pressure_curve: :sine,
-                pressure_curve_min: 0.0,
-                pressure_curve_max: 0.0,
-                pressure_curve_cycles_per_bar: 10.0,
-                pressure_curve_shift_mbeats: 0.0,
-                pressure_curve_anchor: :sample,
-                pressure_mode: :add,
-                error_prefix: "dynamic_voicing"
-              }
+              modulation_strategy:
+                %Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure{
+                  pressure_attack_mbeats: 50.0,
+                  pressure_decay_mbeats: 280.0,
+                  pressure_release_mbeats: 120.0,
+                  pressure_sustain_level: 0.68,
+                  pressure_curve: :sine,
+                  pressure_curve_min: 0.0,
+                  pressure_curve_max: 0.0,
+                  pressure_curve_cycles_per_bar: 10.0,
+                  pressure_curve_shift_mbeats: 0.0,
+                  pressure_curve_anchor: :sample,
+                  pressure_mode: :add,
+                  error_prefix: "dynamic_voicing"
+                }
             }
           }
         },
@@ -105,20 +106,21 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample7 do
             params: %Mensch.Machines.DynamicVoicingParams{
               direction: :down,
               number_of_inversions: 8,
-              modulation_strategy: %Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure{
-                pressure_attack_mbeats: 50.0,
-                pressure_decay_mbeats: 280.0,
-                pressure_release_mbeats: 120.0,
-                pressure_sustain_level: 0.68,
-                pressure_curve: :sine,
-                pressure_curve_min: 0.0,
-                pressure_curve_max: 0.0,
-                pressure_curve_cycles_per_bar: 10.0,
-                pressure_curve_shift_mbeats: 0.0,
-                pressure_curve_anchor: :sample,
-                pressure_mode: :add,
-                error_prefix: "dynamic_voicing"
-              }
+              modulation_strategy:
+                %Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure{
+                  pressure_attack_mbeats: 50.0,
+                  pressure_decay_mbeats: 280.0,
+                  pressure_release_mbeats: 120.0,
+                  pressure_sustain_level: 0.68,
+                  pressure_curve: :sine,
+                  pressure_curve_min: 0.0,
+                  pressure_curve_max: 0.0,
+                  pressure_curve_cycles_per_bar: 10.0,
+                  pressure_curve_shift_mbeats: 0.0,
+                  pressure_curve_anchor: :sample,
+                  pressure_mode: :add,
+                  error_prefix: "dynamic_voicing"
+                }
             }
           }
         },
@@ -149,20 +151,21 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample7 do
             params: %Mensch.Machines.DynamicVoicingParams{
               direction: :up,
               number_of_inversions: 8,
-              modulation_strategy: %Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure{
-                pressure_attack_mbeats: 50.0,
-                pressure_decay_mbeats: 280.0,
-                pressure_release_mbeats: 120.0,
-                pressure_sustain_level: 0.68,
-                pressure_curve: :sine,
-                pressure_curve_min: 0.0,
-                pressure_curve_max: 0.0,
-                pressure_curve_cycles_per_bar: 10.0,
-                pressure_curve_shift_mbeats: 0.0,
-                pressure_curve_anchor: :sample,
-                pressure_mode: :add,
-                error_prefix: "dynamic_voicing"
-              }
+              modulation_strategy:
+                %Mensch.Machines.DynamicVoicing.NoteModulationStrategies.DynamicVoicingEnvelopedPressure{
+                  pressure_attack_mbeats: 50.0,
+                  pressure_decay_mbeats: 280.0,
+                  pressure_release_mbeats: 120.0,
+                  pressure_sustain_level: 0.68,
+                  pressure_curve: :sine,
+                  pressure_curve_min: 0.0,
+                  pressure_curve_max: 0.0,
+                  pressure_curve_cycles_per_bar: 10.0,
+                  pressure_curve_shift_mbeats: 0.0,
+                  pressure_curve_anchor: :sample,
+                  pressure_mode: :add,
+                  error_prefix: "dynamic_voicing"
+                }
             }
           }
         }

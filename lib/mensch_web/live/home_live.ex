@@ -317,7 +317,7 @@ defmodule MenschWeb.HomeLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status}>
+    <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:samples}>
       <div class="w-full">
         <div id="render-section" class="min-w-0 space-y-4">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

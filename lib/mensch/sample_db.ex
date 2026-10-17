@@ -60,7 +60,7 @@ defmodule Mensch.SampleDb do
     GeneratedChordListGeneratedSample43.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample3.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample7.sample(@default_frame_mbeats),
-    GeneratedChordListGeneratedSample49.sample(@default_frame_mbeats),
+    GeneratedChordListGeneratedSample49.sample(@default_frame_mbeats)
   ]
 
   @doc "Returns sample total length in mbeats, honoring optional `:total_length_bars` or `:total_length_mbeats`."

@@ -543,7 +543,8 @@ defmodule Mensch.SampleBlueprint do
     )
   end
 
-  defp indent_multiline(value, spaces) when is_binary(value) and is_integer(spaces) and spaces >= 0 do
+  defp indent_multiline(value, spaces)
+       when is_binary(value) and is_integer(spaces) and spaces >= 0 do
     indent = String.duplicate(" ", spaces)
 
     value

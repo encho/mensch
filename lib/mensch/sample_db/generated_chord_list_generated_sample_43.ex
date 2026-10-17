@@ -15,18 +15,18 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample43 do
       name: "Chord List Generated Sample",
       total_length_mbeats: 12000,
       blueprint_meta: %{
-  bpm: 120,
-  time_signature: {4, 4},
-  frame_mbeats: 50,
-  chord_duration_mbeats: 4000,
-  silence_after_chord_mbeats: 0,
-  blueprint_additional_params: %{
-    "pressure_attack_mbeats" => 50.0,
-    "pressure_curve" => "sine",
-    "velocity" => 100
-  },
-  blueprint_id: "progression__steady_strum__strum1"
-},
+        bpm: 120,
+        time_signature: {4, 4},
+        frame_mbeats: 50,
+        chord_duration_mbeats: 4000,
+        silence_after_chord_mbeats: 0,
+        blueprint_additional_params: %{
+          "pressure_attack_mbeats" => 50.0,
+          "pressure_curve" => "sine",
+          "velocity" => 100
+        },
+        blueprint_id: "progression__steady_strum__strum1"
+      },
       sample_context:
         SampleContext.new!(%{
           bpm: 120,
@@ -60,21 +60,22 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample43 do
           machine: %Mensch.Machines.Strum{
             params: %Mensch.Machines.StrumParams{
               velocity: 100,
-              modulation_strategy: %Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure{
-                pressure_attack_mbeats: 50.0,
-                pressure_decay_mbeats: 280.0,
-                pressure_release_mbeats: 120.0,
-                pressure_sustain_level: 0.68,
-                slide_peak_value: 125.0,
-                pressure_curve: :sine,
-                pressure_curve_min: 0.0,
-                pressure_curve_max: 0.0,
-                pressure_curve_cycles_per_bar: 10.0,
-                pressure_curve_shift_mbeats: 0.0,
-                pressure_curve_anchor: :sample,
-                pressure_mode: :add,
-                error_prefix: "strum"
-              }
+              modulation_strategy:
+                %Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure{
+                  pressure_attack_mbeats: 50.0,
+                  pressure_decay_mbeats: 280.0,
+                  pressure_release_mbeats: 120.0,
+                  pressure_sustain_level: 0.68,
+                  slide_peak_value: 125.0,
+                  pressure_curve: :sine,
+                  pressure_curve_min: 0.0,
+                  pressure_curve_max: 0.0,
+                  pressure_curve_cycles_per_bar: 10.0,
+                  pressure_curve_shift_mbeats: 0.0,
+                  pressure_curve_anchor: :sample,
+                  pressure_mode: :add,
+                  error_prefix: "strum"
+                }
             }
           }
         },
@@ -104,21 +105,22 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample43 do
           machine: %Mensch.Machines.Strum{
             params: %Mensch.Machines.StrumParams{
               velocity: 100,
-              modulation_strategy: %Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure{
-                pressure_attack_mbeats: 50.0,
-                pressure_decay_mbeats: 280.0,
-                pressure_release_mbeats: 120.0,
-                pressure_sustain_level: 0.68,
-                slide_peak_value: 125.0,
-                pressure_curve: :sine,
-                pressure_curve_min: 0.0,
-                pressure_curve_max: 0.0,
-                pressure_curve_cycles_per_bar: 10.0,
-                pressure_curve_shift_mbeats: 0.0,
-                pressure_curve_anchor: :sample,
-                pressure_mode: :add,
-                error_prefix: "strum"
-              }
+              modulation_strategy:
+                %Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure{
+                  pressure_attack_mbeats: 50.0,
+                  pressure_decay_mbeats: 280.0,
+                  pressure_release_mbeats: 120.0,
+                  pressure_sustain_level: 0.68,
+                  slide_peak_value: 125.0,
+                  pressure_curve: :sine,
+                  pressure_curve_min: 0.0,
+                  pressure_curve_max: 0.0,
+                  pressure_curve_cycles_per_bar: 10.0,
+                  pressure_curve_shift_mbeats: 0.0,
+                  pressure_curve_anchor: :sample,
+                  pressure_mode: :add,
+                  error_prefix: "strum"
+                }
             }
           }
         },
@@ -148,21 +150,22 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample43 do
           machine: %Mensch.Machines.Strum{
             params: %Mensch.Machines.StrumParams{
               velocity: 100,
-              modulation_strategy: %Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure{
-                pressure_attack_mbeats: 50.0,
-                pressure_decay_mbeats: 280.0,
-                pressure_release_mbeats: 120.0,
-                pressure_sustain_level: 0.68,
-                slide_peak_value: 125.0,
-                pressure_curve: :sine,
-                pressure_curve_min: 0.0,
-                pressure_curve_max: 0.0,
-                pressure_curve_cycles_per_bar: 10.0,
-                pressure_curve_shift_mbeats: 0.0,
-                pressure_curve_anchor: :sample,
-                pressure_mode: :add,
-                error_prefix: "strum"
-              }
+              modulation_strategy:
+                %Mensch.Machines.Strum.NoteModulationStrategies.StrumEnvelopedPressure{
+                  pressure_attack_mbeats: 50.0,
+                  pressure_decay_mbeats: 280.0,
+                  pressure_release_mbeats: 120.0,
+                  pressure_sustain_level: 0.68,
+                  slide_peak_value: 125.0,
+                  pressure_curve: :sine,
+                  pressure_curve_min: 0.0,
+                  pressure_curve_max: 0.0,
+                  pressure_curve_cycles_per_bar: 10.0,
+                  pressure_curve_shift_mbeats: 0.0,
+                  pressure_curve_anchor: :sample,
+                  pressure_mode: :add,
+                  error_prefix: "strum"
+                }
             }
           }
         }

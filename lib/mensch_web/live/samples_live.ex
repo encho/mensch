@@ -36,7 +36,7 @@ defmodule MenschWeb.SamplesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} midi_status={Mensch.Midi.Connection.status()}>
+    <Layouts.app flash={@flash} midi_status={Mensch.Midi.Connection.status()} nav_active={:samples}>
       <section class="mx-auto w-full max-w-7xl space-y-4">
         <div class="space-y-1">
           <h1 class="font-mono text-2xl text-zinc-100">Samples</h1>

@@ -35,9 +35,9 @@ defmodule MenschWeb.Layouts do
     default: nil,
     doc: "current MIDI connection status, e.g. {:connected, name} or :disconnected"
 
-  attr :show_samples_button, :boolean,
-    default: false,
-    doc: "shows the Sample Library button in the navbar"
+  attr :nav_active, :atom,
+    default: nil,
+    doc: "active navbar destination (:samples or :chord_lab)"
 
   attr :bpm, :integer,
     default: nil,
@@ -58,12 +58,6 @@ defmodule MenschWeb.Layouts do
             <img src={~p"/images/logo.svg"} width="20" />
             <span class="text-base font-bold text-white">mensch:maschine</span>
           </a>
-          <.link
-            navigate={~p"/chord-lab"}
-            class="ui-radius-btn border border-white/20 px-2.5 py-1 text-[11px] font-mono uppercase tracking-wide text-white/75 transition-colors duration-150 hover:border-white/40 hover:text-white"
-          >
-            Chord Lab
-          </.link>
         </div>
         <div class="flex items-center justify-center">{render_slot(@navbar_center)}</div>
         <div class="flex items-center gap-3">
@@ -84,6 +78,28 @@ defmodule MenschWeb.Layouts do
             />
           </form>
           <div class="ui-gap-control flex items-center">
+            <.link
+              navigate={~p"/samples"}
+              title="Sample library"
+              aria-label="Sample library"
+              class={[
+                "ui-radius-btn relative flex size-9 items-center justify-center border text-white/70 transition-colors duration-150",
+                nav_button_class(@nav_active == :samples)
+              ]}
+            >
+              <.icon name="hero-queue-list" class="size-4" />
+            </.link>
+            <.link
+              navigate={~p"/chord-lab"}
+              title="Chord Lab"
+              aria-label="Chord Lab"
+              class={[
+                "ui-radius-btn relative flex size-9 items-center justify-center border text-white/70 transition-colors duration-150",
+                nav_button_class(@nav_active == :chord_lab)
+              ]}
+            >
+              <.icon name="hero-beaker" class="size-4" />
+            </.link>
             <div :if={@midi_status} class="relative">
               <button
                 type="button"
@@ -124,16 +140,6 @@ defmodule MenschWeb.Layouts do
                 </button>
               </div>
             </div>
-            <button
-              :if={@show_samples_button}
-              type="button"
-              id="open-samples-modal"
-              phx-click="open_samples_modal"
-              aria-label="Open sample library"
-              class="ui-radius-btn flex size-9 items-center justify-center border border-white/20 text-white/70 transition-colors duration-150 hover:border-white/40 hover:text-white"
-            >
-              <.icon name="hero-bars-3" class="size-4" />
-            </button>
           </div>
         </div>
       </div>
@@ -151,6 +157,9 @@ defmodule MenschWeb.Layouts do
 
   defp midi_status_dot_class({:connected, _name}), do: "bg-emerald-400"
   defp midi_status_dot_class(:disconnected), do: "bg-red-500"
+
+  defp nav_button_class(true), do: "border-white/55 bg-white/12 text-white"
+  defp nav_button_class(false), do: "border-white/20 hover:border-white/40 hover:text-white"
 
   defp midi_status_label({:connected, name}), do: "Connected: #{name}"
   defp midi_status_label(:disconnected), do: "Disconnected"
