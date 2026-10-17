@@ -38,10 +38,7 @@ defmodule MenschWeb.SamplesLive do
     ~H"""
     <Layouts.app flash={@flash} midi_status={Mensch.Midi.Connection.status()} nav_active={:samples}>
       <section class="mx-auto w-full max-w-7xl space-y-4">
-        <div class="space-y-1">
-          <h1 class="font-mono text-2xl text-zinc-100">Samples</h1>
-          <p class="font-mono text-xs text-zinc-400">Sample library with sortable metadata.</p>
-        </div>
+        <.page_heading title="Samples" subtitle="Sample library with sortable metadata." />
 
         <div class="ui-radius-table overflow-x-auto border border-zinc-700/60">
           <table class="w-full min-w-[980px] text-left font-mono text-[11px] text-zinc-200">

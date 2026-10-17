@@ -124,6 +124,26 @@ defmodule MenschWeb.CoreComponents do
   end
 
   @doc """
+  Renders a consistent page heading block.
+
+  ## Examples
+
+      <.page_heading title="Samples" subtitle="Sample library with sortable metadata." />
+  """
+  attr :title, :string, required: true
+  attr :subtitle, :string, required: true
+  attr :class, :string, default: nil
+
+  def page_heading(assigns) do
+    ~H"""
+    <div class={["space-y-1", @class]}>
+      <h1 class="font-mono text-2xl text-zinc-100">{@title}</h1>
+      <p class="font-mono text-xs text-zinc-400">{@subtitle}</p>
+    </div>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,

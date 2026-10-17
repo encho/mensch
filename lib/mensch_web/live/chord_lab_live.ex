@@ -576,13 +576,11 @@ defmodule MenschWeb.ChordLabLive do
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab}>
-      <section class="mx-auto w-full max-w-7xl space-y-6">
-        <div class="space-y-2">
-          <h1 class="font-mono text-2xl text-zinc-100">Chord Lab</h1>
-          <p class="font-mono text-xs text-zinc-400">
-            Define a chord spec and inspect each step of the new isolated harmony resolver.
-          </p>
-        </div>
+      <section class="mx-auto w-full max-w-7xl space-y-4">
+        <.page_heading
+          title="Chord Lab"
+          subtitle="Define a chord spec and inspect each step of the new isolated harmony resolver."
+        />
 
         <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
