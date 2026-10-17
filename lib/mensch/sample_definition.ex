@@ -11,6 +11,7 @@ defmodule Mensch.SampleDefinition do
     :id,
     :folder,
     :name,
+    :created_at,
     :sample_context,
     :sample_entries,
     :total_length_bars,
@@ -22,6 +23,7 @@ defmodule Mensch.SampleDefinition do
           id: String.t(),
           folder: String.t(),
           name: String.t(),
+          created_at: DateTime.t() | nil,
           sample_context: SampleContext.t(),
           sample_entries: [SampleEntry.t()],
           total_length_bars: non_neg_integer() | nil,
@@ -42,6 +44,9 @@ defmodule Mensch.SampleDefinition do
 
       not is_binary(definition.name) or String.trim(definition.name) == "" ->
         {:error, {:invalid_name, definition.name}}
+
+      not is_nil(definition.created_at) and not match?(%DateTime{}, definition.created_at) ->
+        {:error, {:invalid_created_at, definition.created_at}}
 
       not match?(%SampleContext{}, definition.sample_context) ->
         {:error, {:invalid_sample_context, definition.sample_context}}

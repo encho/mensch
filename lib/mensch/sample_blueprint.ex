@@ -72,6 +72,7 @@ defmodule Mensch.SampleBlueprint do
     with {:ok, name} <- parse_required_string(opts[:name] || opts["name"], "name"),
          {:ok, folder} <- parse_optional_string(opts[:folder] || opts["folder"], @default_folder),
          {:ok, id} <- parse_optional_string(opts[:id] || opts["id"], generated_id(name)),
+         {:ok, created_at} <- parse_created_at(opts[:created_at] || opts["created_at"]),
          {:ok, blueprint_id} <-
            parse_required_string(opts[:blueprint_id] || opts["blueprint_id"], "blueprint_id"),
          {:ok, blueprint_module} <- Registry.fetch(blueprint_id),
@@ -104,6 +105,7 @@ defmodule Mensch.SampleBlueprint do
       {:ok,
        %{
          id: id,
+         created_at: created_at,
          folder: folder,
          name: name,
          blueprint_id: blueprint_id,
@@ -140,6 +142,7 @@ defmodule Mensch.SampleBlueprint do
       {:ok,
        SampleDefinition.new!(%{
          id: normalized.id,
+         created_at: normalized.created_at,
          folder: normalized.folder,
          name: normalized.name,
          sample_context: sample_context,
@@ -311,6 +314,20 @@ defmodule Mensch.SampleBlueprint do
   defp parse_optional_string(nil, default), do: {:ok, default}
   defp parse_optional_string(_, default), do: {:ok, default}
 
+  defp parse_created_at(nil), do: {:ok, DateTime.utc_now() |> DateTime.truncate(:second)}
+
+  defp parse_created_at(%DateTime{} = created_at),
+    do: {:ok, DateTime.truncate(created_at, :second)}
+
+  defp parse_created_at(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, created_at, _offset} -> {:ok, DateTime.truncate(created_at, :second)}
+      _ -> {:error, "created_at must be an ISO8601 timestamp"}
+    end
+  end
+
+  defp parse_created_at(_), do: {:error, "created_at must be a DateTime or ISO8601 timestamp"}
+
   defp parse_positive_integer(value, _field) when is_integer(value) and value > 0,
     do: {:ok, value}
 
@@ -433,6 +450,7 @@ defmodule Mensch.SampleBlueprint do
         def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
           SampleBlueprint.build!(%{
             id: #{inspect(normalized.id)},
+            created_at: #{inspect(normalized.created_at)},
             folder: #{inspect(normalized.folder)},
             name: #{inspect(normalized.name)},
             blueprint_id: #{inspect(normalized.blueprint_id)},

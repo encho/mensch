@@ -35,7 +35,10 @@ defmodule Mensch.SampleDb do
 
   alias Mensch.SampleDb.GeneratedChordListGeneratedSample3
 
+  alias Mensch.SampleDb.GeneratedChordListGeneratedSample7
+
   @default_frame_mbeats 50
+  @legacy_created_at ~U[2026-01-01 00:00:00Z]
 
   @samples [
     Sample7DynamicVoicing.sample(@default_frame_mbeats),
@@ -54,6 +57,7 @@ defmodule Mensch.SampleDb do
     GeneratedChordListGeneratedSample35.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample43.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample3.sample(@default_frame_mbeats),
+    GeneratedChordListGeneratedSample7.sample(@default_frame_mbeats)
   ]
 
   @doc "Returns sample total length in mbeats, honoring optional `:total_length_bars` or `:total_length_mbeats`."
@@ -80,6 +84,13 @@ defmodule Mensch.SampleDb do
   def sample_total_length_mbeats(_sample), do: 0
 
   defp with_normalized_total_length(%SampleDefinition{} = sample) do
+    sample =
+      if is_nil(Map.get(sample, :created_at)) do
+        Map.put(sample, :created_at, @legacy_created_at)
+      else
+        sample
+      end
+
     %SampleDefinition{sample | total_length_mbeats: sample_total_length_mbeats(sample)}
   end
 
@@ -115,7 +126,7 @@ defmodule Mensch.SampleDb do
   end
 
   @doc "Returns sample-1 entries."
-  @spec default_sample_entries() :: [map()]
+  @spec default_sample_entries() :: [SampleEntry.t()]
   def default_sample_entries do
     default_samples()
     |> Enum.at(0, %{})

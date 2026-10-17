@@ -643,6 +643,9 @@ defmodule MenschWeb.HomeLive do
                       SampleDb.sample_total_length_mbeats(sample)
                     )}
                   </div>
+                  <div class="font-mono text-[10px] text-zinc-500">
+                    Created: {sample_created_at_label(Map.get(sample, :created_at))}
+                  </div>
                 </button>
               </div>
             </div>
@@ -1228,6 +1231,14 @@ defmodule MenschWeb.HomeLive do
     {num, den} = sample_context.time_signature
     "#{sample_context.bpm} bpm · #{num}/#{den}"
   end
+
+  defp sample_created_at_label(%DateTime{} = created_at) do
+    created_at
+    |> DateTime.shift_zone!("Etc/UTC")
+    |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
+  end
+
+  defp sample_created_at_label(_), do: "-"
 
   defp table_chord_label(%ChordSpec{} = chord_spec) do
     "#{ChordSpec.symbol_label(chord_spec)} · o#{chord_spec.octave} i#{chord_spec.inversion}"

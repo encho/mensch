@@ -19,65 +19,65 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample3 do
       chord_duration_mbeats: 4000,
       silence_after_chord_mbeats: 0,
       blueprint_additional_params: %{
-  "direction_mode" => "alternate",
-  "number_of_inversions" => 8,
-  "pressure_attack_mbeats" => 50.0
-},
+        "direction_mode" => "alternate",
+        "number_of_inversions" => 8,
+        "pressure_attack_mbeats" => 50.0
+      },
       chords: [
         %{
-  root: :c,
-  octave: 3,
-  inversion: 0,
-  foreign_bass: nil,
-  min_voice_count: 4,
-  quality: :maj7,
-  tones: nil,
-  voicing: %Mensch.Harmony.ChordSpec.Voicing{
-    type: :close,
-    center_note: 60,
-    range_min: nil,
-    range_max: nil,
-    voice_count: nil,
-    doubling: :auto,
-    inversion_resolution_mode: :per_step_centered
-  }
-},
-      %{
-  root: :c,
-  octave: 3,
-  inversion: 0,
-  foreign_bass: nil,
-  min_voice_count: 5,
-  quality: :min7_add11,
-  tones: nil,
-  voicing: %Mensch.Harmony.ChordSpec.Voicing{
-    type: :close,
-    center_note: 60,
-    range_min: nil,
-    range_max: nil,
-    voice_count: nil,
-    doubling: :auto,
-    inversion_resolution_mode: :per_step_centered
-  }
-},
-      %{
-  root: :e_flat,
-  octave: 3,
-  inversion: 0,
-  foreign_bass: nil,
-  min_voice_count: 4,
-  quality: :maj7,
-  tones: nil,
-  voicing: %Mensch.Harmony.ChordSpec.Voicing{
-    type: :close,
-    center_note: 60,
-    range_min: nil,
-    range_max: nil,
-    voice_count: nil,
-    doubling: :auto,
-    inversion_resolution_mode: :per_step_centered
-  }
-}
+          root: :c,
+          octave: 3,
+          inversion: 0,
+          foreign_bass: nil,
+          min_voice_count: 4,
+          quality: :maj7,
+          tones: nil,
+          voicing: %Mensch.Harmony.ChordSpec.Voicing{
+            type: :close,
+            center_note: 60,
+            range_min: nil,
+            range_max: nil,
+            voice_count: nil,
+            doubling: :auto,
+            inversion_resolution_mode: :per_step_centered
+          }
+        },
+        %{
+          root: :c,
+          octave: 3,
+          inversion: 0,
+          foreign_bass: nil,
+          min_voice_count: 5,
+          quality: :min7_add11,
+          tones: nil,
+          voicing: %Mensch.Harmony.ChordSpec.Voicing{
+            type: :close,
+            center_note: 60,
+            range_min: nil,
+            range_max: nil,
+            voice_count: nil,
+            doubling: :auto,
+            inversion_resolution_mode: :per_step_centered
+          }
+        },
+        %{
+          root: :e_flat,
+          octave: 3,
+          inversion: 0,
+          foreign_bass: nil,
+          min_voice_count: 4,
+          quality: :maj7,
+          tones: nil,
+          voicing: %Mensch.Harmony.ChordSpec.Voicing{
+            type: :close,
+            center_note: 60,
+            range_min: nil,
+            range_max: nil,
+            voice_count: nil,
+            doubling: :auto,
+            inversion_resolution_mode: :per_step_centered
+          }
+        }
       ]
     })
   end
