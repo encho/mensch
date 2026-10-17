@@ -30,6 +30,7 @@ defmodule Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression do
 
     %SampleDefinition{
       id: "sample-15-strum-c-major-i-vi-ii-v-progression",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Strum",
       name: "Cmajor I-vi-ii-V Progression",
       total_length_bars: 64,

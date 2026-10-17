@@ -16,6 +16,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     %SampleDefinition{
       id: "sample-7-dynamic-voicing",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Dynamic Voicing",
       name: "Bb Major Jazz Cycle (ii-V-I-vi)",
       total_length_bars: 4,

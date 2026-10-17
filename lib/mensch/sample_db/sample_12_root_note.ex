@@ -16,6 +16,7 @@ defmodule Mensch.SampleDb.Sample12RootNote do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     %SampleDefinition{
       id: "sample-12-root-note",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Root Note",
       name: "Root Note Offsets",
       total_length_bars: 5,

@@ -37,6 +37,8 @@ defmodule Mensch.SampleDb do
 
   alias Mensch.SampleDb.GeneratedChordListGeneratedSample7
 
+  alias Mensch.SampleDb.GeneratedChordListGeneratedSample49
+
   @default_frame_mbeats 50
   @legacy_created_at ~U[2026-01-01 00:00:00Z]
 
@@ -57,7 +59,8 @@ defmodule Mensch.SampleDb do
     GeneratedChordListGeneratedSample35.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample43.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample3.sample(@default_frame_mbeats),
-    GeneratedChordListGeneratedSample7.sample(@default_frame_mbeats)
+    GeneratedChordListGeneratedSample7.sample(@default_frame_mbeats),
+    GeneratedChordListGeneratedSample49.sample(@default_frame_mbeats),
   ]
 
   @doc "Returns sample total length in mbeats, honoring optional `:total_length_bars` or `:total_length_mbeats`."

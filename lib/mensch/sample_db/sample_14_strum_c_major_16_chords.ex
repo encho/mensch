@@ -30,6 +30,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
 
     %SampleDefinition{
       id: "sample-14-strum-c-major-16-chords",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Strum",
       name: "C Major 16-Chord Palette (2 Bars + 2 Bars Rest)",
       total_length_bars: 64,

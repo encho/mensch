@@ -30,6 +30,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
 
     %SampleDefinition{
       id: "sample-13-strum",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Strum",
       name: "Bb Strum Progression With Rests",
       total_length_bars: 16,

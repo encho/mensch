@@ -18,6 +18,7 @@ defmodule Mensch.SampleDb.Sample10DynamicVoicingBFlatIIiivv do
 
     %SampleDefinition{
       id: "sample-10-dynamic-voicing-bb-i-ii-iv-v",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Dynamic Voicing",
       name: "Bb Major (I-ii-IV-V) · cycle_up 2",
       total_length_bars: 4,

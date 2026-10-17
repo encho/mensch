@@ -17,7 +17,9 @@ defmodule MenschWeb.Router do
   scope "/", MenschWeb do
     pipe_through :browser
 
-    live "/", HomeLive
+    get "/", HomeRedirectController, :index
+    live "/samples", SamplesLive
+    live "/samples/:sample_id", HomeLive
     live "/chord-lab", ChordLabLive
     get "/exports/sample/:index/bitwig-mpe.mid", ExportController, :bitwig_mpe_midi
     get "/exports/sample/:index/mpe-events.txt", ExportController, :mpe_report

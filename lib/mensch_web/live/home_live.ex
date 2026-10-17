@@ -57,10 +57,7 @@ defmodule MenschWeb.HomeLive do
   def mount(_params, _session, socket) do
     samples = SampleDb.default_samples()
 
-    active_sample_index =
-      Enum.find_index(samples, fn sample ->
-        Map.get(sample, :folder) == "Dynamic Voicing"
-      end) || 0
+    active_sample_index = 0
 
     active_sample = Enum.at(samples, active_sample_index, %{})
     sample_entries = Map.get(active_sample, :sample_entries, [])
@@ -94,7 +91,6 @@ defmodule MenschWeb.HomeLive do
       |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
       |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
       |> assign(:samples, samples)
-      |> assign(:sample_folders, build_sample_folders(samples))
       |> assign(:active_sample_index, active_sample_index)
       |> assign(:sample_entries, sample_entries)
       |> assign(:active_chord_indices, all_chord_indices(sample_entries))
@@ -108,7 +104,6 @@ defmodule MenschWeb.HomeLive do
       |> assign(:render_scope, :full_sample)
       |> assign(:loop_full_sample, false)
       |> assign(:show_detail_panel, true)
-      |> assign(:show_samples_modal, false)
       |> assign(:selected_sample_entry_index, nil)
       |> assign(:selected_note_key, nil)
       |> assign(:debug_on_filter, :no_filter)
@@ -121,21 +116,21 @@ defmodule MenschWeb.HomeLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    sample_param = Map.get(params, "sample")
+    sample_id = Map.get(params, "sample_id")
 
-    socket =
-      case sample_index_from_param(socket.assigns.samples, sample_param) do
-        nil ->
-          socket
+    case sample_index_from_param(socket.assigns.samples, sample_id) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Sample not found")
+         |> push_navigate(to: ~p"/samples")}
 
-        index when index == socket.assigns.active_sample_index ->
-          socket
+      index when index == socket.assigns.active_sample_index ->
+        {:noreply, socket}
 
-        index ->
-          assign_active_sample(socket, index)
-      end
-
-    {:noreply, socket}
+      index ->
+        {:noreply, assign_active_sample(socket, index)}
+    end
   end
 
   @impl true
@@ -155,30 +150,6 @@ defmodule MenschWeb.HomeLive do
 
   def handle_event("toggle_detail_panel", _params, socket) do
     {:noreply, update(socket, :show_detail_panel, &(!&1))}
-  end
-
-  def handle_event("open_samples_modal", _params, socket) do
-    {:noreply, assign(socket, :show_samples_modal, true)}
-  end
-
-  def handle_event("close_samples_modal", _params, socket) do
-    {:noreply, assign(socket, :show_samples_modal, false)}
-  end
-
-  def handle_event("activate_sample", %{"index" => index_str}, socket) do
-    case Integer.parse(index_str) do
-      {index, ""} ->
-        case Enum.at(socket.assigns.samples, index) do
-          %{id: sample_id} when is_binary(sample_id) and sample_id != "" ->
-            {:noreply, push_patch(socket, to: ~p"/?sample=#{sample_id}")}
-
-          _ ->
-            {:noreply, socket}
-        end
-
-      _ ->
-        {:noreply, socket}
-    end
   end
 
   def handle_event("toggle_note_focus", params, socket) do
@@ -346,7 +317,7 @@ defmodule MenschWeb.HomeLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} midi_status={@midi_status} show_samples_button={true}>
+    <Layouts.app flash={@flash} midi_status={@midi_status}>
       <div class="w-full">
         <div id="render-section" class="min-w-0 space-y-4">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -585,71 +556,6 @@ defmodule MenschWeb.HomeLive do
             sample_entry_index={@selected_sample_entry_index}
             sample_context={@sample_context}
           />
-        </div>
-
-        <div
-          :if={@show_samples_modal}
-          id="samples-modal"
-          class="fixed inset-0 z-40 flex items-start justify-end bg-black/45 p-3 sm:p-4"
-        >
-          <button
-            type="button"
-            aria-label="Close sample library"
-            phx-click="close_samples_modal"
-            class="absolute inset-0"
-          ></button>
-
-          <div class="ui-radius-modal relative w-full max-w-md border border-zinc-700/70 bg-zinc-950/95 p-4 shadow-2xl">
-            <div class="mb-3 flex items-center justify-between">
-              <div class="flex items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-300">
-                <.icon name="hero-queue-list" class="size-4" /> Sample Library
-              </div>
-              <button
-                type="button"
-                phx-click="close_samples_modal"
-                class="ui-radius-btn flex size-8 items-center justify-center border border-zinc-700 text-zinc-300 transition-colors duration-150 hover:border-zinc-500 hover:text-white"
-              >
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
-            </div>
-
-            <div class="max-h-[78vh] space-y-4 overflow-y-auto pr-1">
-              <div :for={folder <- @sample_folders} class="space-y-2">
-                <div class="text-[10px] uppercase tracking-wide text-zinc-500">{folder.name}</div>
-
-                <button
-                  :for={{sample, index} <- folder.samples}
-                  type="button"
-                  id={"activate-sample-#{index}"}
-                  phx-click="activate_sample"
-                  phx-value-index={index}
-                  class={[
-                    "ui-radius-btn w-full space-y-1 border px-3 py-2 text-left transition-colors duration-150",
-                    (@active_sample_index == index &&
-                       "border-[#2fd5c8] bg-[#2fd5c8]/10") ||
-                      "border-zinc-700/80 bg-zinc-950/55 hover:border-[#2fd5c8]/80"
-                  ]}
-                >
-                  <div class="font-mono text-[12px] text-zinc-100">
-                    {Map.get(sample, :name, "Unnamed")}
-                  </div>
-                  <div class="font-mono text-[10px] text-zinc-400">
-                    {Map.get(sample.sample_context, :bpm, 0)} bpm · {elem(
-                      sample.sample_context.time_signature,
-                      0
-                    )}/{elem(sample.sample_context.time_signature, 1)} · {sample_duration_label(
-                      Map.get(sample, :sample_entries, []),
-                      Map.get(sample, :sample_context, @sample_context),
-                      SampleDb.sample_total_length_mbeats(sample)
-                    )}
-                  </div>
-                  <div class="font-mono text-[10px] text-zinc-500">
-                    Created: {sample_created_at_label(Map.get(sample, :created_at))}
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </Layouts.app>
@@ -945,7 +851,6 @@ defmodule MenschWeb.HomeLive do
         |> assign(:render_data, render_data)
         |> assign(:render_scope, :full_sample)
         |> assign(:selected_sample_entry_index, nil)
-        |> assign(:show_samples_modal, false)
         |> assign(:player_status, Player.status())
         |> clear_playback_state(true)
         |> assign(:selected_note_key, nil)
@@ -1232,14 +1137,6 @@ defmodule MenschWeb.HomeLive do
     "#{sample_context.bpm} bpm · #{num}/#{den}"
   end
 
-  defp sample_created_at_label(%DateTime{} = created_at) do
-    created_at
-    |> DateTime.shift_zone!("Etc/UTC")
-    |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
-  end
-
-  defp sample_created_at_label(_), do: "-"
-
   defp table_chord_label(%ChordSpec{} = chord_spec) do
     "#{ChordSpec.symbol_label(chord_spec)} · o#{chord_spec.octave} i#{chord_spec.inversion}"
   end
@@ -1251,30 +1148,6 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp machine_icon_name(_machine), do: "hero-cpu-chip"
-
-  defp build_sample_folders(samples) when is_list(samples) do
-    indexed_samples = Enum.with_index(samples)
-
-    grouped_by_folder =
-      Enum.group_by(indexed_samples, fn {sample, _index} ->
-        Map.get(sample, :folder, "Unfiled")
-      end)
-
-    preferred_order = ["Root Note", "Dynamic Voicing"]
-
-    folder_names =
-      preferred_order ++
-        (grouped_by_folder
-         |> Map.keys()
-         |> Enum.reject(&(&1 in preferred_order))
-         |> Enum.sort())
-
-    folder_names
-    |> Enum.map(fn folder_name ->
-      %{name: folder_name, samples: Map.get(grouped_by_folder, folder_name, [])}
-    end)
-    |> Enum.reject(fn folder -> folder.samples == [] end)
-  end
 
   defp table_start_label(%SampleContext{} = sample_context, %BeatPosition{} = start_beat) do
     mbeat = SampleContext.position_to_mbeat(sample_context, start_beat)

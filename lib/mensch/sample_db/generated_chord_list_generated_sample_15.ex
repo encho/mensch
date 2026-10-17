@@ -10,6 +10,7 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample15 do
   def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
     SampleBlueprint.build!(%{
       id: "chord_list_generated_sample-15",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Generated",
       name: "Chord List Generated Sample",
       blueprint_id: "progression__alternating_wander__dv1",

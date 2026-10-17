@@ -28,6 +28,7 @@ defmodule Mensch.SampleDb.Sample8DynamicVoicingOneBar do
 
     %SampleDefinition{
       id: "sample-8-dynamic-voicing-one-bar",
+      created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Dynamic Voicing",
       name: "Bbmaj7 · One Bar",
       total_length_bars: 1,
