@@ -62,10 +62,51 @@ defmodule Mensch.SampleBlueprint do
     with {:ok, normalized} <- normalize_build_opts(opts),
          {:ok, sample} <- build_from_normalized(normalized),
          {:ok, module_name, file_name} <- module_and_file_name(sample, module_suffix),
-         :ok <- write_export_module(module_name, file_name, normalized),
+         :ok <- write_export_module(module_name, file_name, sample),
          :ok <- maybe_register_module(module_name, register?) do
       {:ok, %{sample: sample, module: module_name, file: file_name, registered: register?}}
     end
+  end
+
+  @doc """
+  Rewrites all generated sample provider modules as static materialized data.
+
+  This removes runtime blueprint building from generated sample files while
+  preserving the `sample(frame_mbeats)` provider contract.
+  """
+  @spec migrate_generated_sample_modules(keyword()) :: {:ok, [String.t()]} | {:error, String.t()}
+  def migrate_generated_sample_modules(opts \\ []) when is_list(opts) do
+    frame_mbeats = Keyword.get(opts, :frame_mbeats, @default_frame_mbeats)
+    generated_files = Path.wildcard("lib/mensch/sample_db/generated_*.ex")
+
+    generated_files
+    |> Enum.reduce_while({:ok, []}, fn file, {:ok, acc} ->
+      module = module_for_generated_file(file)
+
+      with {:ok, _module} <- ensure_loaded(module),
+           true <- function_exported?(module, :sample, 1),
+           %SampleDefinition{} = sample <- module.sample(frame_mbeats),
+           :ok <- write_export_module(module, file, sample) do
+        {:cont, {:ok, [file | acc]}}
+      else
+        false ->
+          {:halt, {:error, "generated module does not export sample/1: #{inspect(module)}"}}
+
+        {:error, reason} ->
+          {:halt, {:error, reason}}
+
+        other ->
+          {:halt,
+           {:error,
+            "failed to materialize generated module #{inspect(module)}: #{inspect(other)}"}}
+      end
+    end)
+    |> case do
+      {:ok, files} -> {:ok, Enum.reverse(files)}
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    error in [ArgumentError, RuntimeError] -> {:error, Exception.message(error)}
   end
 
   defp normalize_build_opts(opts) do
@@ -426,50 +467,102 @@ defmodule Mensch.SampleBlueprint do
     end
   end
 
-  defp write_export_module(module_name, file_name, normalized) do
-    chords_literal =
-      normalized.chords
-      |> Enum.map(fn chord_spec ->
-        chord_spec
-        |> Map.from_struct()
-        |> inspect(pretty: true, limit: :infinity, charlists: :as_lists)
-      end)
-      |> Enum.join(",\n      ")
+  defp write_export_module(module_name, file_name, %SampleDefinition{} = sample) do
+    module_name = normalize_module_name(module_name)
+    sample_context = Map.fetch!(sample, :sample_context)
+    sample_entries_literal = sample.sample_entries |> inspect_literal() |> indent_multiline(6)
+
+    total_length_bars_line =
+      if is_integer(sample.total_length_bars) and sample.total_length_bars >= 0 do
+        "\n      total_length_bars: #{sample.total_length_bars},"
+      else
+        ""
+      end
+
+    total_length_mbeats_line =
+      if is_integer(sample.total_length_mbeats) and sample.total_length_mbeats >= 0 do
+        "\n      total_length_mbeats: #{sample.total_length_mbeats},"
+      else
+        ""
+      end
+
+    blueprint_meta_line =
+      if is_map(sample.blueprint_meta) do
+        "\n      blueprint_meta: #{inspect_literal(sample.blueprint_meta)},"
+      else
+        ""
+      end
 
     module_body =
       """
       defmodule #{module_name} do
         @moduledoc false
 
-        alias Mensch.SampleBlueprint
+        alias Mensch.SampleContext
         alias Mensch.SampleDefinition
 
         @behaviour Mensch.SampleDefinition.Provider
 
         @spec sample(pos_integer()) :: SampleDefinition.t()
         def sample(frame_mbeats) when is_integer(frame_mbeats) and frame_mbeats > 0 do
-          SampleBlueprint.build!(%{
-            id: #{inspect(normalized.id)},
-            created_at: #{inspect(normalized.created_at)},
-            folder: #{inspect(normalized.folder)},
-            name: #{inspect(normalized.name)},
-            blueprint_id: #{inspect(normalized.blueprint_id)},
-            bpm: #{inspect(normalized.bpm)},
-            time_signature: #{inspect(normalized.time_signature)},
-            frame_mbeats: frame_mbeats,
-            chord_duration_mbeats: #{inspect(normalized.chord_duration_mbeats)},
-            silence_after_chord_mbeats: #{inspect(normalized.silence_after_chord_mbeats)},
-            blueprint_additional_params: #{inspect(normalized.blueprint_additional_params, pretty: true, charlists: :as_lists)},
-            chords: [
-              #{chords_literal}
-            ]
-          })
+          %SampleDefinition{
+            id: #{inspect(sample.id)},
+            created_at: #{inspect(sample.created_at)},
+            folder: #{inspect(sample.folder)},
+            name: #{inspect(sample.name)},#{total_length_bars_line}#{total_length_mbeats_line}#{blueprint_meta_line}
+            sample_context:
+              SampleContext.new!(%{
+                bpm: #{sample_context.bpm},
+                time_signature: #{inspect(sample_context.time_signature)},
+                frame_mbeats: frame_mbeats
+              }),
+            sample_entries: #{sample_entries_literal}
+          }
         end
       end
       """
 
-    :ok = File.write!(file_name, module_body)
+    File.write!(file_name, module_body)
     :ok
+  end
+
+  defp normalize_module_name(module_name) when is_atom(module_name) do
+    module_name
+    |> Module.split()
+    |> Enum.join(".")
+  end
+
+  defp normalize_module_name(module_name) when is_binary(module_name), do: module_name
+
+  defp inspect_literal(term) do
+    inspect(term,
+      pretty: true,
+      limit: :infinity,
+      charlists: :as_lists,
+      width: 98
+    )
+  end
+
+  defp indent_multiline(value, spaces) when is_binary(value) and is_integer(spaces) and spaces >= 0 do
+    indent = String.duplicate(" ", spaces)
+
+    value
+    |> String.split("\n")
+    |> Enum.join("\n" <> indent)
+  end
+
+  defp module_for_generated_file(file_path) when is_binary(file_path) do
+    file_path
+    |> Path.basename(".ex")
+    |> Macro.camelize()
+    |> then(&Module.concat([Mensch, SampleDb, &1]))
+  end
+
+  defp ensure_loaded(module) when is_atom(module) do
+    case Code.ensure_loaded(module) do
+      {:module, loaded} -> {:ok, loaded}
+      {:error, reason} -> {:error, "could not load #{inspect(module)}: #{inspect(reason)}"}
+    end
   end
 
   defp maybe_register_module(_module_name, false), do: :ok
