@@ -64,6 +64,56 @@ defmodule MenschWeb.ChordLabDiatonicLive do
   end
 
   @impl true
+  def handle_event("set_tonic_pitch_class", %{"pitch_class" => tonic}, socket) do
+    values =
+      if Map.has_key?(@pitch_class_from_param, tonic) do
+        Map.put(socket.assigns.values, "tonic", tonic)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_mode", %{"mode" => mode}, socket) do
+    values =
+      if Map.has_key?(@mode_from_param, mode) do
+        Map.put(socket.assigns.values, "mode", mode)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_chord_kind", %{"chord_kind" => chord_kind}, socket) do
+    values =
+      if Map.has_key?(@chord_kind_from_param, chord_kind) do
+        Map.put(socket.assigns.values, "chord_kind", chord_kind)
+      else
+        socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("set_degree", %{"degree" => degree}, socket) do
+    values =
+      case Integer.parse(to_string(degree)) do
+        {parsed_degree, ""} when parsed_degree >= 1 and parsed_degree <= 7 ->
+          Map.put(socket.assigns.values, "degree", Integer.to_string(parsed_degree))
+
+        _ ->
+          socket.assigns.values
+      end
+
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
   def handle_event("reconnect_midi", _params, socket) do
     {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
   end
@@ -84,6 +134,9 @@ defmodule MenschWeb.ChordLabDiatonicLive do
 
   @impl true
   def render(assigns) do
+    assigns =
+      assign(assigns, :selected_tonic_keyboard_key, selected_tonic_keyboard_key(assigns.values))
+
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab_diatonic}>
       <section class="mx-auto w-full max-w-5xl space-y-4">
@@ -98,38 +151,67 @@ defmodule MenschWeb.ChordLabDiatonicLive do
               <h3 class="mb-2 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
                 Diatonic Identity
               </h3>
-              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <.input
-                  field={@form[:tonic]}
-                  type="select"
+              <div class="space-y-3">
+                <MenschWeb.PitchClassKeyboard.mini
+                  id="diatonic-tonic-keyboard"
                   label="Tonic"
-                  options={pitch_class_options()}
-                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                  event="set_tonic_pitch_class"
+                  selected_key={@selected_tonic_keyboard_key}
+                  selected_key_color="#9bf25a"
                 />
 
-                <.input
-                  field={@form[:mode]}
-                  type="select"
-                  label="Mode"
-                  options={mode_options()}
-                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
-                />
+                <div class="space-y-1">
+                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                    Mode
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      :for={mode <- modes()}
+                      type="button"
+                      phx-click="set_mode"
+                      phx-value-mode={Atom.to_string(mode)}
+                      class={toggle_button_classes(@values["mode"] == Atom.to_string(mode))}
+                    >
+                      {mode_label(mode)}
+                    </button>
+                  </div>
+                </div>
 
-                <.input
-                  field={@form[:degree]}
-                  type="select"
-                  label="Degree"
-                  options={degree_options()}
-                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
-                />
+                <div class="space-y-1">
+                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                    Chord Form
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      :for={chord_kind <- chord_kinds()}
+                      type="button"
+                      phx-click="set_chord_kind"
+                      phx-value-chord_kind={Atom.to_string(chord_kind)}
+                      class={
+                        toggle_button_classes(@values["chord_kind"] == Atom.to_string(chord_kind))
+                      }
+                    >
+                      {chord_kind_label(chord_kind)}
+                    </button>
+                  </div>
+                </div>
 
-                <.input
-                  field={@form[:chord_kind]}
-                  type="select"
-                  label="Chord Form"
-                  options={chord_kind_options()}
-                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
-                />
+                <div class="space-y-1">
+                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                    Degree
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      :for={degree <- 1..7}
+                      type="button"
+                      phx-click="set_degree"
+                      phx-value-degree={degree}
+                      class={toggle_button_classes(@values["degree"] == Integer.to_string(degree))}
+                    >
+                      {degree}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -174,6 +256,12 @@ defmodule MenschWeb.ChordLabDiatonicLive do
                 </h3>
                 <p class="mt-1 font-mono text-lg text-zinc-100">
                   {ChordSpec.symbol_label(@chord_spec)}
+                </p>
+                <p class="mt-1 font-mono text-xs text-cyan-200">
+                  Scale: {scale_label(@values)}
+                </p>
+                <p class="mt-1 font-mono text-xs text-emerald-200">
+                  Roman: {roman_numeral(@values, @chord_spec)}
                 </p>
                 <p class="mt-1 font-mono text-xs text-zinc-400">
                   Root: {ChordSpec.root_label(ChordSpec.root(@chord_spec))} · Quality: {quality_display(
@@ -420,34 +508,100 @@ defmodule MenschWeb.ChordLabDiatonicLive do
     |> Enum.join("  ")
   end
 
-  defp pitch_class_options do
-    Enum.map(@pitch_classes, fn pitch_class ->
-      {ChordSpec.root_label(pitch_class), Atom.to_string(pitch_class)}
-    end)
+  defp selected_tonic_keyboard_key(values) do
+    case Map.get(values, "tonic", "c") do
+      "c_sharp" -> "d_flat"
+      "d_sharp" -> "e_flat"
+      "f_sharp" -> "g_flat"
+      "g_sharp" -> "a_flat"
+      "a_sharp" -> "b_flat"
+      tonic -> tonic
+    end
   end
 
-  defp mode_options do
-    [
-      {"Major", "major"},
-      {"Natural Minor", "natural_minor"},
-      {"Harmonic Minor", "harmonic_minor"}
-    ]
+  defp mode_label(:major), do: "Major"
+  defp mode_label(:natural_minor), do: "Natural Minor"
+  defp mode_label(:harmonic_minor), do: "Harmonic Minor"
+
+  defp mode_label("major"), do: "Major"
+  defp mode_label("natural_minor"), do: "Natural Minor"
+  defp mode_label("harmonic_minor"), do: "Harmonic Minor"
+
+  defp chord_kind_label(:triad), do: "Triad"
+  defp chord_kind_label(:seventh), do: "Seventh"
+  defp chord_kind_label(:add6), do: "Add 6"
+  defp chord_kind_label(:six_nine), do: "6/9"
+  defp chord_kind_label(:ninth), do: "9th"
+  defp chord_kind_label(:eleventh), do: "11th"
+  defp chord_kind_label(:thirteenth), do: "13th"
+
+  defp modes, do: @modes
+  defp chord_kinds, do: @chord_kinds
+
+  defp scale_label(values) do
+    tonic =
+      values
+      |> Map.get("tonic", "c")
+      |> pitch_class_label()
+
+    mode =
+      values
+      |> Map.get("mode", "major")
+      |> mode_label()
+
+    "#{tonic} #{mode}"
   end
 
-  defp chord_kind_options do
-    [
-      {"Triad", "triad"},
-      {"Seventh", "seventh"},
-      {"Add 6", "add6"},
-      {"6/9", "six_nine"},
-      {"9th", "ninth"},
-      {"11th", "eleventh"},
-      {"13th", "thirteenth"}
-    ]
+  defp pitch_class_label(value) when is_binary(value) do
+    case Map.get(@pitch_class_from_param, value) do
+      nil -> "C"
+      tonic -> ChordSpec.root_label(tonic)
+    end
   end
 
-  defp degree_options do
-    Enum.map(1..7, fn degree -> {Integer.to_string(degree), Integer.to_string(degree)} end)
+  defp pitch_class_label(_value), do: "C"
+
+  defp roman_numeral(values, %ChordSpec{} = spec) do
+    degree = parse_degree_for_display(Map.get(values, "degree", "1"))
+    base = Enum.at(["I", "II", "III", "IV", "V", "VI", "VII"], degree - 1, "I")
+    quality = ChordSpec.quality(spec)
+
+    cond do
+      quality in [:dim, :dim7] ->
+        String.downcase(base) <> "°"
+
+      quality == :half_dim ->
+        String.downcase(base) <> "ø"
+
+      quality == :aug ->
+        base <> "+"
+
+      quality in [:min, :min6, :min7, :min9, :min11, :min7_add11, :min_maj7] ->
+        String.downcase(base)
+
+      true ->
+        base
+    end
+  end
+
+  defp parse_degree_for_display(value) when is_integer(value) and value >= 1 and value <= 7,
+    do: value
+
+  defp parse_degree_for_display(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {degree, ""} when degree >= 1 and degree <= 7 -> degree
+      _ -> 1
+    end
+  end
+
+  defp parse_degree_for_display(_value), do: 1
+
+  defp toggle_button_classes(true) do
+    "rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
+  end
+
+  defp toggle_button_classes(false) do
+    "rounded-sm border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 font-mono text-xs text-zinc-200 transition-colors duration-150 hover:border-zinc-500"
   end
 
   defp default_values do
