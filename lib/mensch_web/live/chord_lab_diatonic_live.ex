@@ -135,7 +135,10 @@ defmodule MenschWeb.ChordLabDiatonicLive do
   @impl true
   def render(assigns) do
     assigns =
-      assign(assigns, :selected_tonic_keyboard_key, selected_tonic_keyboard_key(assigns.values))
+      assigns
+      |> assign(:selected_tonic_keyboard_key, selected_tonic_keyboard_key(assigns.values))
+      |> assign(:keyboard_keys, piano_keys(assigns.resolved_notes))
+      |> assign(:keyboard_degree_labels, keyboard_degree_labels(assigns.chord_spec, assigns.resolved_notes))
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab_diatonic}>
@@ -305,6 +308,75 @@ defmodule MenschWeb.ChordLabDiatonicLive do
               </button>
             </div>
           </div>
+        </div>
+
+        <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-mono text-sm text-zinc-200">Final Notes Keyboard</h2>
+            <p class="font-mono text-[11px] text-zinc-400">
+              Highlighted: {highlighted_count(@resolved_notes)} / 88
+            </p>
+          </div>
+
+          <div class="relative h-40 rounded-md border border-zinc-700/70 bg-zinc-950">
+            <%= for key <- @keyboard_keys do %>
+              <div
+                :if={key.kind == :white}
+                title={key.label}
+                class={[
+                  "absolute bottom-6 top-0 border-r border-zinc-900 transition-colors duration-150",
+                  key.active && "bg-[#9bf25a]",
+                  !key.active && "bg-zinc-100"
+                ]}
+                style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
+              >
+                <span class={[
+                  "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                  key.active && "text-zinc-900",
+                  !key.active && "text-zinc-500"
+                ]}>
+                  {key.midi}
+                </span>
+              </div>
+            <% end %>
+
+            <%= for key <- @keyboard_keys do %>
+              <div
+                :if={key.kind == :black}
+                title={key.label}
+                class={[
+                  "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
+                  key.active && "bg-[#9bf25a]",
+                  !key.active && "bg-zinc-900"
+                ]}
+                style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
+              >
+                <span class={[
+                  "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
+                  key.active && "text-zinc-900",
+                  !key.active && "text-zinc-300"
+                ]}>
+                  {key.midi}
+                </span>
+              </div>
+            <% end %>
+
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-6">
+              <%= for key <- @keyboard_keys do %>
+                <span
+                  :if={Map.has_key?(@keyboard_degree_labels, key.midi)}
+                  class="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] font-semibold text-[#9bf25a]"
+                  style={"left: calc(#{key.left_pct}% + #{key.width_pct / 2}%);"}
+                >
+                  {Map.get(@keyboard_degree_labels, key.midi)}
+                </span>
+              <% end %>
+            </div>
+          </div>
+
+          <p class="font-mono text-[11px] text-zinc-400">
+            Labels show interval distance from chord root (for example 1, b3, 5, b7).
+          </p>
         </div>
       </section>
     </Layouts.app>
@@ -595,6 +667,91 @@ defmodule MenschWeb.ChordLabDiatonicLive do
   end
 
   defp parse_degree_for_display(_value), do: 1
+
+  defp highlighted_count(notes) when is_list(notes) do
+    notes
+    |> Enum.uniq()
+    |> Enum.count(&(&1 >= 21 and &1 <= 108))
+  end
+
+  defp highlighted_count(_notes), do: 0
+
+  defp keyboard_degree_labels(nil, _notes), do: %{}
+  defp keyboard_degree_labels(_spec, notes) when not is_list(notes), do: %{}
+
+  defp keyboard_degree_labels(%ChordSpec{} = spec, notes) do
+    root_semitone =
+      spec
+      |> ChordSpec.root()
+      |> ChordSpec.pitch_class_to_semitone()
+
+    notes
+    |> Enum.uniq()
+    |> Enum.reduce(%{}, fn midi, acc ->
+      distance = rem(rem(midi, 12) - root_semitone + 12, 12)
+      Map.put(acc, midi, interval_label(distance))
+    end)
+  end
+
+  defp interval_label(0), do: "1"
+  defp interval_label(1), do: "b2"
+  defp interval_label(2), do: "2"
+  defp interval_label(3), do: "b3"
+  defp interval_label(4), do: "3"
+  defp interval_label(5), do: "4"
+  defp interval_label(6), do: "b5"
+  defp interval_label(7), do: "5"
+  defp interval_label(8), do: "#5"
+  defp interval_label(9), do: "6"
+  defp interval_label(10), do: "b7"
+  defp interval_label(11), do: "7"
+
+  defp piano_keys(active_notes) when is_list(active_notes) do
+    min_midi = 21
+    max_midi = 108
+
+    white_midis = Enum.filter(min_midi..max_midi, &(not black_key?(&1)))
+    total_whites = length(white_midis)
+    white_width = 100.0 / total_whites
+    black_width = white_width * 0.62
+    active_set = MapSet.new(active_notes)
+
+    Enum.map(min_midi..max_midi, fn midi ->
+      white_before_or_at =
+        Enum.count(min_midi..midi, &(not black_key?(&1)))
+
+      if black_key?(midi) do
+        %{
+          midi: midi,
+          kind: :black,
+          active: MapSet.member?(active_set, midi),
+          left_pct: white_before_or_at * white_width - black_width / 2,
+          width_pct: black_width,
+          label: note_label(midi)
+        }
+      else
+        left_pct = (white_before_or_at - 1) * white_width
+
+        %{
+          midi: midi,
+          kind: :white,
+          active: MapSet.member?(active_set, midi),
+          left_pct: left_pct,
+          width_pct: white_width,
+          label: note_label(midi)
+        }
+      end
+    end)
+  end
+
+  defp piano_keys(_active_notes), do: []
+
+  defp note_label(midi_note) when is_integer(midi_note) do
+    {name, octave} = ChordSpec.note_name(midi_note)
+    "#{ChordSpec.root_label(name)}#{octave}"
+  end
+
+  defp black_key?(midi_note), do: rem(midi_note, 12) in [1, 3, 6, 8, 10]
 
   defp toggle_button_classes(true) do
     "rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
