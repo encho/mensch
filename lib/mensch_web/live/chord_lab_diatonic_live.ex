@@ -145,7 +145,7 @@ defmodule MenschWeb.ChordLabDiatonicLive do
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab_diatonic}>
-      <section class="mx-auto w-full max-w-5xl space-y-4">
+      <section class="mx-auto w-full max-w-7xl space-y-4">
         <.page_heading
           title="Chord Lab Diatonic"
           subtitle="Generate a diatonic chord spec from tonic, mode, and degree."
@@ -158,13 +158,15 @@ defmodule MenschWeb.ChordLabDiatonicLive do
                 Diatonic Identity
               </h3>
               <div class="space-y-3">
-                <MenschWeb.PitchClassKeyboard.mini
-                  id="diatonic-tonic-keyboard"
-                  label="Tonic"
-                  event="set_tonic_pitch_class"
-                  selected_key={@selected_tonic_keyboard_key}
-                  selected_key_color="#9bf25a"
-                />
+                <div class="max-w-xl">
+                  <MenschWeb.PitchClassKeyboard.mini
+                    id="diatonic-tonic-keyboard"
+                    label="Tonic"
+                    event="set_tonic_pitch_class"
+                    selected_key={@selected_tonic_keyboard_key}
+                    selected_key_color="#9bf25a"
+                  />
+                </div>
 
                 <div class="space-y-1">
                   <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
