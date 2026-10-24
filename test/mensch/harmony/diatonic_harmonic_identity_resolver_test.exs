@@ -1,12 +1,12 @@
-defmodule Mensch.Harmony.DiatonicChordBuilderTest do
+defmodule Mensch.Harmony.DiatonicHarmonicIdentityResolverTest do
   use ExUnit.Case, async: true
 
   alias Mensch.Harmony.ChordSpec
-  alias Mensch.Harmony.DiatonicChordBuilder
+  alias Mensch.Harmony.DiatonicHarmonicIdentityResolver
 
   test "builds major scale triad by degree" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 2,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 2,
                octave: 3,
                inversion: 0
              )
@@ -19,7 +19,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "defaults chord kind to triad when octave and inversion are provided" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 5,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 5,
                octave: 3,
                inversion: 0
              )
@@ -29,7 +29,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "builds major scale sevenths" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 5,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 5,
                chord_kind: :seventh,
                octave: 3,
                inversion: 0
@@ -42,7 +42,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "builds natural minor triad degree two as diminished" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :natural_minor}, 2,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :natural_minor}, 2,
                octave: 3,
                inversion: 0
              )
@@ -53,7 +53,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "builds harmonic minor fifth as major triad" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :harmonic_minor}, 5,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :harmonic_minor}, 5,
                octave: 3,
                inversion: 0
              )
@@ -64,7 +64,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "builds harmonic minor first seventh as min_maj7 quality" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :harmonic_minor}, 1,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :harmonic_minor}, 1,
                chord_kind: :seventh,
                octave: 3,
                inversion: 0
@@ -77,7 +77,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "builds harmonic minor third seventh as maj7_sharp5 quality" do
     assert {:ok, spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :harmonic_minor}, 3,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :harmonic_minor}, 3,
                chord_kind: :seventh,
                octave: 4,
                inversion: 1
@@ -90,7 +90,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "supports added and extended forms" do
     assert {:ok, add6_spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 1,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 1,
                chord_kind: :add6,
                octave: 3,
                inversion: 0
@@ -99,7 +99,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
     assert ChordSpec.quality(add6_spec) == :maj6
 
     assert {:ok, six_nine_spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 4,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 4,
                chord_kind: :six_nine,
                octave: 3,
                inversion: 0
@@ -108,7 +108,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
     assert ChordSpec.quality(six_nine_spec) == :six_nine
 
     assert {:ok, ninth_spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 5,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 5,
                chord_kind: :ninth,
                octave: 3,
                inversion: 0
@@ -117,7 +117,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
     assert ChordSpec.quality(ninth_spec) == :dom9
 
     assert {:ok, eleventh_spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :natural_minor}, 4,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :natural_minor}, 4,
                chord_kind: :eleventh,
                octave: 3,
                inversion: 0
@@ -126,7 +126,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
     assert ChordSpec.quality(eleventh_spec) == :min11
 
     assert {:ok, thirteenth_spec} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :harmonic_minor}, 5,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :harmonic_minor}, 5,
                chord_kind: :thirteenth,
                octave: 3,
                inversion: 0
@@ -139,7 +139,7 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
     assert {:error,
             {:unsupported_chord_kind_for_degree,
              %{mode: :major, chord_kind: :thirteenth, degree: 1}}} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 1,
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 1,
                chord_kind: :thirteenth,
                octave: 3,
                inversion: 0
@@ -148,25 +148,25 @@ defmodule Mensch.Harmony.DiatonicChordBuilderTest do
 
   test "requires caller to pass octave and inversion" do
     assert {:error, {:missing_opt, :octave}} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 1, inversion: 0)
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 1, inversion: 0)
 
     assert {:error, {:missing_opt, :inversion}} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 1, octave: 3)
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 1, octave: 3)
   end
 
   test "returns error for invalid degree" do
     assert {:error, {:invalid_degree, 0}} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :major}, 0)
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :major}, 0)
   end
 
   test "returns error for invalid mode" do
     assert {:error, {:invalid_mode, :dorian}} =
-             DiatonicChordBuilder.build(%{tonic: :c, mode: :dorian}, 1)
+             DiatonicHarmonicIdentityResolver.build(%{tonic: :c, mode: :dorian}, 1)
   end
 
   test "build! raises for invalid request" do
     assert_raise ArgumentError, fn ->
-      DiatonicChordBuilder.build!(%{tonic: :c, mode: :major}, 12)
+      DiatonicHarmonicIdentityResolver.build!(%{tonic: :c, mode: :major}, 12)
     end
   end
 end

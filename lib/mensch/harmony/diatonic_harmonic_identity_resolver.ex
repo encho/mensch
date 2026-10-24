@@ -1,4 +1,4 @@
-defmodule Mensch.Harmony.DiatonicChordBuilder do
+defmodule Mensch.Harmony.DiatonicHarmonicIdentityResolver do
   @moduledoc """
   Builds diatonic `%Mensch.Harmony.ChordSpec{}` values from a scale tonic, mode, and degree.
 

@@ -2,7 +2,7 @@ defmodule MenschWeb.ChordLabDiatonicLive do
   use MenschWeb, :live_view
 
   alias Mensch.Harmony.ChordSpec
-  alias Mensch.Harmony.DiatonicChordBuilder
+  alias Mensch.Harmony.DiatonicHarmonicIdentityResolver
   alias Mensch.Harmony.Resolver
 
   @pitch_classes [
@@ -25,8 +25,8 @@ defmodule MenschWeb.ChordLabDiatonicLive do
     :b_flat
   ]
 
-  @modes DiatonicChordBuilder.scale_modes()
-  @chord_kinds DiatonicChordBuilder.chord_kinds()
+  @modes DiatonicHarmonicIdentityResolver.scale_modes()
+  @chord_kinds DiatonicHarmonicIdentityResolver.chord_kinds()
 
   @pitch_class_from_param Map.new(@pitch_classes, fn pitch_class ->
                             {Atom.to_string(pitch_class), pitch_class}
@@ -231,7 +231,7 @@ defmodule MenschWeb.ChordLabDiatonicLive do
          {:ok, octave} <- parse_integer(Map.get(values, "octave"), "octave"),
          {:ok, inversion} <- parse_integer(Map.get(values, "inversion"), "inversion"),
          {:ok, chord_spec} <-
-           DiatonicChordBuilder.build(
+           DiatonicHarmonicIdentityResolver.build(
              %{tonic: tonic, mode: mode},
              degree,
              chord_kind: chord_kind,
