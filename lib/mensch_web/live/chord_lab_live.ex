@@ -971,6 +971,33 @@ defmodule MenschWeb.ChordLabLive do
 
         <div class="grid gap-4 lg:grid-cols-3">
           <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
+            <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-3">
+              <div class="flex items-center justify-between">
+                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Harmonic Identity
+                </h3>
+                <div class="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    class="rounded-sm border border-emerald-300 bg-emerald-400/25 px-2 py-1 font-mono text-[10px] font-semibold text-emerald-100"
+                  >
+                    Manual
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    class="cursor-not-allowed rounded-sm border border-zinc-800 bg-zinc-950/70 px-2 py-1 font-mono text-[10px] font-semibold text-zinc-600 opacity-60"
+                    title="Diatonic identity resolver input is coming next"
+                  >
+                    Diatonic
+                  </button>
+                </div>
+              </div>
+              <p class="font-mono text-[11px] text-zinc-300">
+                {identity_summary(@values)}
+              </p>
+            </div>
+
             <MenschWeb.PitchClassKeyboard.mini
               id="root-pitch-class-keyboard"
               label="Root"
@@ -979,31 +1006,41 @@ defmodule MenschWeb.ChordLabLive do
               selected_key_color="#9bf25a"
             />
 
-            <form
-              phx-change="set_octave"
-              class="space-y-1 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2"
-            >
-              <div class="flex items-center justify-between">
-                <label
-                  for="root-octave-slider"
-                  class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
-                >
-                  Octave
-                </label>
-                <span class="font-mono text-xs text-zinc-200">{@values["octave"]}</span>
-              </div>
-              <input
-                id="root-octave-slider"
-                name="octave"
-                type="range"
-                min="-1"
-                max="9"
-                step="1"
-                value={@values["octave"]}
-                class="w-full accent-emerald-400"
-              />
-            </form>
+            <div class="space-y-1">
+              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
+              <div class="rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                <div class="mb-1 grid grid-cols-5 gap-1">
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Major</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Minor</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dominant</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Suspended</span>
+                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dim/Aug</span>
+                </div>
 
+                <div class="grid grid-cols-5 grid-rows-6 gap-1">
+                  <button
+                    :for={tile <- quality_tiles()}
+                    type="button"
+                    phx-click="set_quality"
+                    phx-value-quality={tile.value}
+                    class={[
+                      "h-9 rounded-md border font-mono text-[10px] font-semibold transition-colors duration-150",
+                      tile.position,
+                      @values["quality"] == tile.value &&
+                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                      @values["quality"] != tile.value &&
+                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                    ]}
+                    title={tile.value}
+                  >
+                    {tile.label}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
             <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
               <MenschWeb.PitchClassKeyboard.mini
                 id="foreign-bass-pitch-class-keyboard"
@@ -1078,41 +1115,6 @@ defmodule MenschWeb.ChordLabLive do
           </div>
 
           <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
-            <div class="space-y-1">
-              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">Quality</label>
-              <div class="rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
-                <div class="mb-1 grid grid-cols-5 gap-1">
-                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Major</span>
-                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Minor</span>
-                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dominant</span>
-                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Suspended</span>
-                  <span class="px-1 font-mono text-[9px] uppercase tracking-wide text-zinc-500">Dim/Aug</span>
-                </div>
-
-                <div class="grid grid-cols-5 grid-rows-6 gap-1">
-                  <button
-                    :for={tile <- quality_tiles()}
-                    type="button"
-                    phx-click="set_quality"
-                    phx-value-quality={tile.value}
-                    class={[
-                      "h-9 rounded-md border font-mono text-[10px] font-semibold transition-colors duration-150",
-                      tile.position,
-                      @values["quality"] == tile.value &&
-                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                      @values["quality"] != tile.value &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                    title={tile.value}
-                  >
-                    {tile.label}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
               <input type="hidden" name={@form[:root].name} value={@values["root"]} />
               <input type="hidden" name={@form[:quality].name} value={@values["quality"]} />
@@ -1131,7 +1133,6 @@ defmodule MenschWeb.ChordLabLive do
                 name={@form[:foreign_bass_octave].name}
                 value={@values["foreign_bass_octave"]}
               />
-              <input type="hidden" name={@form[:octave].name} value={@values["octave"]} />
               <input
                 type="hidden"
                 name={@form[:inversion_resolution_mode].name}
@@ -1154,6 +1155,28 @@ defmodule MenschWeb.ChordLabLive do
                 value={@values["range_max"]}
               />
               <input type="hidden" name={@form[:voice_count].name} value={@values["voice_count"]} />
+
+              <div class="space-y-1 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
+                <div class="flex items-center justify-between">
+                  <label
+                    for="root-octave-slider"
+                    class="font-mono text-[11px] uppercase tracking-wide text-zinc-400"
+                  >
+                    Octave
+                  </label>
+                  <span class="font-mono text-xs text-zinc-200">{@values["octave"]}</span>
+                </div>
+                <input
+                  id="root-octave-slider"
+                  name={@form[:octave].name}
+                  type="range"
+                  min="-1"
+                  max="9"
+                  step="1"
+                  value={@values["octave"]}
+                  class="w-full accent-emerald-400"
+                />
+              </div>
 
               <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
                 <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
@@ -1817,6 +1840,20 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_integer_or_nil(_value), do: nil
 
   defp quality_tiles, do: @quality_tiles
+
+  defp identity_summary(values) when is_map(values) do
+    root_label =
+      case parse_pitch_class(Map.get(values, "root")) do
+        {:ok, root} -> ChordSpec.root_label(root)
+        _ -> "?"
+      end
+
+    quality = Map.get(values, "quality", "?")
+    symbol = "#{root_label}#{quality}"
+    "#{symbol} | Root #{root_label} | Quality #{quality}"
+  end
+
+  defp identity_summary(_values), do: "? | Root ? | Quality ?"
 
   defp slider_note_value(values, key, default_value) when is_map(values) and is_binary(key) do
     case Map.get(values, key) do
