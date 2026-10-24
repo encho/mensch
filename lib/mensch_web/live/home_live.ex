@@ -249,7 +249,12 @@ defmodule MenschWeb.HomeLive do
     with {:ok, normalized_sample_id} <- normalize_required_string(sample_id, "sample id"),
          {:ok, normalized_title} <- normalize_sample_title(raw_title),
          :ok <- SampleDb.rename_sample_title(normalized_sample_id, normalized_title) do
-      updated_samples = update_sample_name_in_memory(socket.assigns.samples, normalized_sample_id, normalized_title)
+      updated_samples =
+        update_sample_name_in_memory(
+          socket.assigns.samples,
+          normalized_sample_id,
+          normalized_title
+        )
 
       socket =
         socket
@@ -1130,7 +1135,7 @@ defmodule MenschWeb.HomeLive do
   end
 
   defp preferred_note_spelling(sample_entries) when is_list(sample_entries) do
-    roots = Enum.map(sample_entries, fn entry -> entry.chord_spec.root end)
+    roots = Enum.map(sample_entries, fn entry -> ChordSpec.root(entry.chord_spec) end)
 
     has_flat_class_root? =
       Enum.any?(

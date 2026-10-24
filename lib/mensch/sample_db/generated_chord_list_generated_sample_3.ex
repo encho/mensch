@@ -36,9 +36,10 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample3 do
       sample_entries: [
         %Mensch.SampleEntry{
           chord_spec: %Mensch.Harmony.ChordSpec{
-            root: :c,
-            tones: nil,
-            quality: :maj7,
+            harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+              root: :c,
+              quality: :maj7
+            },
             octave: 3,
             inversion: 0,
             voicing: %Mensch.Harmony.ChordSpec.Voicing{
@@ -81,9 +82,10 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample3 do
         },
         %Mensch.SampleEntry{
           chord_spec: %Mensch.Harmony.ChordSpec{
-            root: :c,
-            tones: nil,
-            quality: :min7_add11,
+            harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+              root: :c,
+              quality: :min7_add11
+            },
             octave: 3,
             inversion: 0,
             voicing: %Mensch.Harmony.ChordSpec.Voicing{
@@ -126,9 +128,10 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample3 do
         },
         %Mensch.SampleEntry{
           chord_spec: %Mensch.Harmony.ChordSpec{
-            root: :e_flat,
-            tones: nil,
-            quality: :maj7,
+            harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+              root: :e_flat,
+              quality: :maj7
+            },
             octave: 3,
             inversion: 0,
             voicing: %Mensch.Harmony.ChordSpec.Voicing{

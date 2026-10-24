@@ -4,7 +4,7 @@ defmodule Mensch.Harmony.ChordSpec do
 
   This module models four independent concepts:
 
-  1. Harmonic identity (`root` + `quality`/`tones`)
+  1. Harmonic identity (`root` + `quality`)
   2. Inversion (`inversion`)
   3. Voicing (`voicing`)
   4. Independent optional foreign bass (`foreign_bass`)
@@ -43,7 +43,9 @@ defmodule Mensch.Harmony.ChordSpec do
           | :min
           | :maj6
           | :maj7
+          | :maj7_sharp5
           | :min7
+          | :min_maj7
           | :dom7
           | :sus2
           | :sus4
@@ -60,6 +62,23 @@ defmodule Mensch.Harmony.ChordSpec do
           | :dim7
           | :aug
           | :min7_add11
+
+  defmodule HarmonicIdentity do
+    @moduledoc """
+    Harmonic identity for a chord spec.
+
+    This is the semantic essence of a chord and excludes rendering concerns
+    such as octave, inversion, and voicing.
+    """
+
+    @enforce_keys [:root, :quality]
+    defstruct root: nil, quality: nil
+
+    @type t :: %__MODULE__{
+            root: Mensch.Harmony.ChordSpec.pitch_class(),
+            quality: Mensch.Harmony.ChordSpec.quality()
+          }
+  end
 
   defmodule Voicing do
     @moduledoc """
@@ -111,10 +130,8 @@ defmodule Mensch.Harmony.ChordSpec do
           }
   end
 
-  @enforce_keys [:root, :octave, :inversion]
-  defstruct root: nil,
-            tones: nil,
-            quality: nil,
+  @enforce_keys [:harmonic_identity, :octave, :inversion]
+  defstruct harmonic_identity: nil,
             octave: nil,
             inversion: nil,
             voicing: nil,
@@ -122,9 +139,7 @@ defmodule Mensch.Harmony.ChordSpec do
             foreign_bass: nil
 
   @type t :: %__MODULE__{
-          root: pitch_class(),
-          tones: [tone()] | nil,
-          quality: quality() | nil,
+          harmonic_identity: HarmonicIdentity.t(),
           octave: integer(),
           inversion: integer(),
           voicing: Voicing.t(),
@@ -163,7 +178,9 @@ defmodule Mensch.Harmony.ChordSpec do
     min: ["1", "b3", "5"],
     maj6: ["1", "3", "5", "6"],
     maj7: ["1", "3", "5", "7"],
+    maj7_sharp5: ["1", "3", "#5", "7"],
     min7: ["1", "b3", "5", "b7"],
+    min_maj7: ["1", "b3", "5", "7"],
     dom7: ["1", "3", "5", "b7"],
     sus2: ["1", "2", "5"],
     sus4: ["1", "4", "5"],
@@ -190,6 +207,7 @@ defmodule Mensch.Harmony.ChordSpec do
   def new(attrs) when is_map(attrs) do
     spec =
       struct(__MODULE__, attrs)
+      |> normalize_harmonic_identity()
       |> normalize_voicing()
       |> normalize_foreign_bass()
       |> set_min_voice_count()
@@ -213,21 +231,14 @@ defmodule Mensch.Harmony.ChordSpec do
   @spec validate(t()) :: :ok | {:error, term()}
   def validate(%__MODULE__{} = spec) do
     cond do
-      not valid_pitch_class?(spec.root) ->
-        {:error, {:invalid_root, spec.root}}
+      not match?(%HarmonicIdentity{}, spec.harmonic_identity) ->
+        {:error, {:invalid_harmonic_identity, spec.harmonic_identity}}
 
-      is_nil(spec.tones) and is_nil(spec.quality) ->
-        {:error, {:missing_chord_content, :tones_or_quality_required}}
+      not valid_pitch_class?(spec.harmonic_identity.root) ->
+        {:error, {:invalid_root, spec.harmonic_identity.root}}
 
-      not is_nil(spec.quality) and not Map.has_key?(@quality_tones, spec.quality) ->
-        {:error, {:invalid_quality, spec.quality}}
-
-      not is_nil(spec.tones) and (not is_list(spec.tones) or spec.tones == []) ->
-        {:error, {:invalid_tones, spec.tones}}
-
-      not is_nil(spec.tones) and
-          Enum.any?(spec.tones, &(not (is_binary(&1) and Map.has_key?(@tone_intervals, &1)))) ->
-        {:error, {:invalid_tones, spec.tones}}
+      not Map.has_key?(@quality_tones, spec.harmonic_identity.quality) ->
+        {:error, {:invalid_quality, spec.harmonic_identity.quality}}
 
       not is_integer(spec.octave) ->
         {:error, {:invalid_octave, spec.octave}}
@@ -260,15 +271,19 @@ defmodule Mensch.Harmony.ChordSpec do
     |> length()
   end
 
-  @doc "Returns resolved tones. Explicit tones override quality-derived tones."
+  @doc "Returns resolved tones derived from quality."
   @spec tones(t()) :: [tone()]
   def tones(%__MODULE__{} = spec) do
-    cond do
-      is_list(spec.tones) and spec.tones != [] -> spec.tones
-      is_atom(spec.quality) -> Map.fetch!(@quality_tones, spec.quality)
-      true -> []
-    end
+    Map.fetch!(@quality_tones, spec.harmonic_identity.quality)
   end
+
+  @doc "Returns the harmonic root pitch class for the given spec."
+  @spec root(t()) :: pitch_class()
+  def root(%__MODULE__{} = spec), do: spec.harmonic_identity.root
+
+  @doc "Returns the harmonic quality for the given spec."
+  @spec quality(t()) :: quality()
+  def quality(%__MODULE__{} = spec), do: spec.harmonic_identity.quality
 
   @doc "Returns semitone intervals for resolved tones."
   @spec tone_intervals(t()) :: [integer()]
@@ -368,7 +383,7 @@ defmodule Mensch.Harmony.ChordSpec do
   @doc "Compact human-readable chord symbol with optional foreign bass."
   @spec symbol_label(t()) :: String.t()
   def symbol_label(%__MODULE__{} = spec) do
-    root = root_label(spec.root)
+    root = root_label(root(spec))
     tones = spec |> tones() |> Enum.uniq()
     quality = symbol_quality_suffix(tones)
     explicit = "(" <> Enum.map_join(tones, ",", &display_tone/1) <> ")"
@@ -396,7 +411,9 @@ defmodule Mensch.Harmony.ChordSpec do
       set == MapSet.new(["1", "4", "5"]) -> "sus4"
       set == MapSet.new(["1", "2", "5"]) -> "sus2"
       set == MapSet.new(["1", "3", "5", "7"]) -> "maj7"
+      set == MapSet.new(["1", "3", "#5", "7"]) -> "maj7(#5)"
       set == MapSet.new(["1", "b3", "5", "b7"]) -> "m7"
+      set == MapSet.new(["1", "b3", "5", "7"]) -> "m(maj7)"
       set == MapSet.new(["1", "3", "5", "b7"]) -> "7"
       set == MapSet.new(["1", "b3", "b5", "b7"]) -> "m7♭5"
       set == MapSet.new(["1", "b3", "b5", "bb7"]) -> "dim7"
@@ -420,8 +437,22 @@ defmodule Mensch.Harmony.ChordSpec do
     |> String.replace("#", "♯")
   end
 
-  defp valid_pitch_class?(root) when is_atom(root), do: not is_nil(pitch_class_to_semitone(root))
-  defp valid_pitch_class?(_root), do: false
+  defp valid_pitch_class?(root_name) when is_atom(root_name),
+    do: not is_nil(pitch_class_to_semitone(root_name))
+
+  defp valid_pitch_class?(_root_name), do: false
+
+  defp normalize_harmonic_identity(
+         %__MODULE__{harmonic_identity: %HarmonicIdentity{} = identity} = spec
+       ),
+       do: %{spec | harmonic_identity: identity}
+
+  defp normalize_harmonic_identity(%__MODULE__{harmonic_identity: identity} = spec)
+       when is_map(identity) do
+    %{spec | harmonic_identity: struct(HarmonicIdentity, identity)}
+  end
+
+  defp normalize_harmonic_identity(%__MODULE__{} = spec), do: spec
 
   defp normalize_voicing(%__MODULE__{voicing: %Voicing{} = voicing} = spec),
     do: %{spec | voicing: voicing}

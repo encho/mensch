@@ -40,8 +40,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :d,
-            quality: :min,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min},
             octave: 3,
             inversion: 0
           },
@@ -54,8 +53,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :d,
-            quality: :min7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min7},
             octave: 3,
             inversion: 0
           },
@@ -68,8 +66,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :d,
-            quality: :min9,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min9},
             octave: 3,
             inversion: 0
           },
@@ -82,8 +79,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :d,
-            quality: :min11,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min11},
             octave: 3,
             inversion: 0
           },
@@ -96,8 +92,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :g,
-            quality: :maj,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :maj},
             octave: 3,
             inversion: 0
           },
@@ -110,8 +105,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :g,
-            quality: :dom7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :dom7},
             octave: 3,
             inversion: 0
           },
@@ -124,8 +118,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :g,
-            quality: :dom9,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :dom9},
             octave: 3,
             inversion: 0
           },
@@ -138,8 +131,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :g,
-            quality: :dom13,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :dom13},
             octave: 3,
             inversion: 0
           },
@@ -152,8 +144,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :f,
-            quality: :maj,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :maj},
             octave: 3,
             inversion: 0
           },
@@ -166,8 +157,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :f,
-            quality: :maj7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :maj7},
             octave: 3,
             inversion: 0
           },
@@ -180,8 +170,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :f,
-            quality: :maj9,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :maj9},
             octave: 3,
             inversion: 0
           },
@@ -194,8 +183,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :f,
-            quality: :six_nine,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :six_nine},
             octave: 3,
             inversion: 0
           },
@@ -208,8 +196,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :c,
-            quality: :maj,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
             octave: 3,
             inversion: 0
           },
@@ -222,8 +209,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :c,
-            quality: :maj7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
             octave: 3,
             inversion: 0
           },
@@ -236,8 +222,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :c,
-            quality: :maj9,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj9},
             octave: 3,
             inversion: 0
           },
@@ -250,8 +235,7 @@ defmodule Mensch.SampleDb.Sample14StrumCMajorSixteenChords do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :c,
-            quality: :six_nine,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :six_nine},
             octave: 3,
             inversion: 0
           },

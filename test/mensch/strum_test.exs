@@ -20,8 +20,7 @@ defmodule Mensch.StrumTest do
 
     chord_spec = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :c,
-      tones: ["1", "3", "5"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
       octave: 4,
       inversion: 0
     }

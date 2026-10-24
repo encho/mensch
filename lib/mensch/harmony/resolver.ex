@@ -178,7 +178,7 @@ defmodule Mensch.Harmony.Resolver do
   end
 
   defp build_final_note_details(%ChordSpec{} = spec, final_notes, foreign_bass_note) do
-    root_pc = ChordSpec.pitch_class_to_semitone(spec.root)
+    root_pc = ChordSpec.pitch_class_to_semitone(ChordSpec.root(spec))
 
     preferred_tokens_by_pc =
       spec
@@ -209,7 +209,7 @@ defmodule Mensch.Harmony.Resolver do
             spell_from_pitch_class_atom(spec.foreign_bass.pitch_class, midi_note)
 
           is_binary(token) ->
-            spell_from_root_and_token(spec.root, token, midi_note)
+            spell_from_root_and_token(ChordSpec.root(spec), token, midi_note)
 
           true ->
             spell_from_midi_fallback(midi_note)
@@ -411,7 +411,7 @@ defmodule Mensch.Harmony.Resolver do
   end
 
   defp resolve_chord_tones(%ChordSpec{} = spec) do
-    root_midi = ChordSpec.midi_note_number(spec.root, spec.octave)
+    root_midi = ChordSpec.midi_note_number(ChordSpec.root(spec), spec.octave)
 
     spec
     |> ChordSpec.tone_intervals()
@@ -473,7 +473,7 @@ defmodule Mensch.Harmony.Resolver do
     additions =
       case doubling do
         :root ->
-          root_pc = ChordSpec.pitch_class_to_semitone(spec.root)
+          root_pc = ChordSpec.pitch_class_to_semitone(ChordSpec.root(spec))
           build_additions_by_pitch_class(notes, [root_pc], additional)
 
         :top ->

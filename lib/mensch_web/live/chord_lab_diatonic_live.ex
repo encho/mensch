@@ -1,0 +1,463 @@
+defmodule MenschWeb.ChordLabDiatonicLive do
+  use MenschWeb, :live_view
+
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.DiatonicChordBuilder
+  alias Mensch.Harmony.Resolver
+
+  @pitch_classes [
+    :c,
+    :c_sharp,
+    :d,
+    :d_sharp,
+    :e,
+    :f,
+    :f_sharp,
+    :g,
+    :g_sharp,
+    :a,
+    :a_sharp,
+    :b,
+    :d_flat,
+    :e_flat,
+    :g_flat,
+    :a_flat,
+    :b_flat
+  ]
+
+  @modes DiatonicChordBuilder.scale_modes()
+  @chord_kinds DiatonicChordBuilder.chord_kinds()
+
+  @pitch_class_from_param Map.new(@pitch_classes, fn pitch_class ->
+                            {Atom.to_string(pitch_class), pitch_class}
+                          end)
+
+  @mode_from_param Map.new(@modes, fn mode -> {Atom.to_string(mode), mode} end)
+
+  @chord_kind_from_param Map.new(@chord_kinds, fn chord_kind ->
+                           {Atom.to_string(chord_kind), chord_kind}
+                         end)
+
+  @impl true
+  def mount(_params, _session, socket) do
+    values = default_values()
+
+    socket =
+      socket
+      |> assign(:midi_status, Mensch.Midi.Connection.status())
+      |> assign(:values, values)
+      |> assign(:form, to_form(values, as: :diatonic))
+      |> assign(:chord_spec, nil)
+      |> assign(:resolved_notes, [])
+      |> assign(:preview_note_channels, [])
+      |> assign(:preview_stop_ref, nil)
+      |> assign(:error_message, nil)
+      |> resolve_preview(values)
+
+    {:ok, socket}
+  end
+
+  @impl true
+  def handle_event("validate", %{"diatonic" => params}, socket) do
+    values = Map.merge(default_values(), params)
+    {:noreply, assign_form_values_and_preview(socket, values)}
+  end
+
+  @impl true
+  def handle_event("reconnect_midi", _params, socket) do
+    {:noreply, assign(socket, :midi_status, Mensch.Midi.Connection.reconnect())}
+  end
+
+  @impl true
+  def handle_event("play_current_chord", _params, socket) do
+    play_notes_for_3s(socket, socket.assigns.resolved_notes)
+  end
+
+  @impl true
+  def handle_info({:stop_preview_notes, stop_ref}, socket) do
+    if socket.assigns.preview_stop_ref == stop_ref do
+      {:noreply, stop_preview(socket)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab_diatonic}>
+      <section class="mx-auto w-full max-w-5xl space-y-4">
+        <.page_heading
+          title="Chord Lab Diatonic"
+          subtitle="Generate a diatonic chord spec from tonic, mode, and degree."
+        />
+
+        <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
+          <.form for={@form} id="diatonic-builder-form" phx-change="validate" class="space-y-3">
+            <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3">
+              <h3 class="mb-2 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Diatonic Identity
+              </h3>
+              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <.input
+                  field={@form[:tonic]}
+                  type="select"
+                  label="Tonic"
+                  options={pitch_class_options()}
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+
+                <.input
+                  field={@form[:mode]}
+                  type="select"
+                  label="Mode"
+                  options={mode_options()}
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+
+                <.input
+                  field={@form[:degree]}
+                  type="select"
+                  label="Degree"
+                  options={degree_options()}
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+
+                <.input
+                  field={@form[:chord_kind]}
+                  type="select"
+                  label="Chord Form"
+                  options={chord_kind_options()}
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+              </div>
+            </div>
+
+            <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3">
+              <h3 class="mb-1 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Render / Playback
+              </h3>
+              <p class="mb-2 font-mono text-[11px] text-zinc-500">
+                These do not change the diatonic identity. They only control how the generated chord is voiced for preview/playback.
+              </p>
+              <div class="grid gap-3 md:grid-cols-2">
+                <.input
+                  field={@form[:octave]}
+                  type="number"
+                  label="Octave"
+                  min="-1"
+                  max="9"
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+
+                <.input
+                  field={@form[:inversion]}
+                  type="number"
+                  label="Inversion"
+                  min="0"
+                  max="6"
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                />
+              </div>
+            </div>
+          </.form>
+
+          <div :if={@error_message} class="rounded-sm border border-rose-500/40 bg-rose-950/30 p-3">
+            <p class="font-mono text-xs text-rose-200">{@error_message}</p>
+          </div>
+
+          <div :if={@chord_spec} class="space-y-3">
+            <div class="grid gap-3 md:grid-cols-2">
+              <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Chord Symbol
+                </h3>
+                <p class="mt-1 font-mono text-lg text-zinc-100">
+                  {ChordSpec.symbol_label(@chord_spec)}
+                </p>
+                <p class="mt-1 font-mono text-xs text-zinc-400">
+                  Root: {ChordSpec.root_label(ChordSpec.root(@chord_spec))} · Quality: {quality_display(
+                    @chord_spec
+                  )}
+                </p>
+              </div>
+
+              <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Resolved Notes
+                </h3>
+                <p class="mt-1 font-mono text-sm text-zinc-200">
+                  MIDI: {join_integers(@resolved_notes)}
+                </p>
+                <p class="mt-1 font-mono text-sm text-zinc-300">
+                  Named: {join_named_notes(@resolved_notes)}
+                </p>
+              </div>
+            </div>
+
+            <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+              <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">ChordSpec</h3>
+              <pre class="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-zinc-100">{inspect(@chord_spec, pretty: true, limit: :infinity)}</pre>
+            </div>
+
+            <div class="flex justify-end">
+              <button
+                type="button"
+                phx-click="play_current_chord"
+                disabled={@resolved_notes == []}
+                class={[
+                  "rounded-sm border px-3 py-2 font-mono text-xs font-semibold transition-colors duration-150",
+                  @resolved_notes == [] &&
+                    "cursor-not-allowed border-zinc-800 bg-zinc-950/70 text-zinc-600 opacity-50",
+                  @resolved_notes != [] &&
+                    "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30"
+                ]}
+              >
+                Play ChordSpec
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </Layouts.app>
+    """
+  end
+
+  defp resolve_preview(socket, values) do
+    with {:ok, tonic} <- parse_tonic(Map.get(values, "tonic")),
+         {:ok, mode} <- parse_mode(Map.get(values, "mode")),
+         {:ok, degree} <- parse_degree(Map.get(values, "degree")),
+         {:ok, chord_kind} <- parse_chord_kind(Map.get(values, "chord_kind")),
+         {:ok, octave} <- parse_integer(Map.get(values, "octave"), "octave"),
+         {:ok, inversion} <- parse_integer(Map.get(values, "inversion"), "inversion"),
+         {:ok, chord_spec} <-
+           DiatonicChordBuilder.build(
+             %{tonic: tonic, mode: mode},
+             degree,
+             chord_kind: chord_kind,
+             octave: octave,
+             inversion: inversion
+           ) do
+      resolved_notes = Resolver.resolve(chord_spec)
+
+      socket
+      |> assign(:chord_spec, chord_spec)
+      |> assign(:resolved_notes, resolved_notes)
+      |> assign(:error_message, nil)
+    else
+      {:error, reason} ->
+        socket
+        |> assign(:chord_spec, nil)
+        |> assign(:resolved_notes, [])
+        |> assign(:error_message, format_error(reason))
+    end
+  rescue
+    error in [ArgumentError] ->
+      socket
+      |> assign(:chord_spec, nil)
+      |> assign(:resolved_notes, [])
+      |> assign(:error_message, Exception.message(error))
+  end
+
+  defp assign_form_values_and_preview(socket, values) do
+    socket
+    |> assign(:values, values)
+    |> assign(:form, to_form(values, as: :diatonic))
+    |> resolve_preview(values)
+  end
+
+  defp play_notes_for_3s(socket, notes) do
+    final_notes = Enum.filter(notes, &is_integer/1)
+
+    cond do
+      final_notes == [] ->
+        {:noreply, put_flash(socket, :error, "No notes to play")}
+
+      true ->
+        socket = stop_preview(socket)
+
+        channels = Mensch.Midi.Connection.member_channels()
+
+        note_channels =
+          final_notes
+          |> Enum.uniq()
+          |> Enum.take(length(channels))
+          |> Enum.zip(channels)
+
+        if note_channels == [] do
+          {:noreply, put_flash(socket, :error, "No MIDI channels available")}
+        else
+          on_messages =
+            Enum.flat_map(note_channels, fn {note, channel} ->
+              [
+                <<0x90 + channel, note, 100>>,
+                <<0xD0 + channel, 100>>,
+                <<0xE0 + channel, 0, 64>>,
+                <<0xB0 + channel, 74, 64>>
+              ]
+            end)
+
+          case Mensch.Midi.Connection.send_messages(on_messages) do
+            :ok ->
+              stop_ref = make_ref()
+              Process.send_after(self(), {:stop_preview_notes, stop_ref}, 3000)
+
+              {:noreply,
+               socket
+               |> assign(:preview_note_channels, note_channels)
+               |> assign(:preview_stop_ref, stop_ref)}
+
+            {:error, :disconnected} ->
+              {:noreply, put_flash(socket, :error, "MIDI is disconnected")}
+          end
+        end
+    end
+  end
+
+  defp stop_preview(socket) do
+    off_messages =
+      Enum.flat_map(socket.assigns.preview_note_channels, fn {note, channel} ->
+        [
+          <<0x80 + channel, note, 0>>,
+          <<0x90 + channel, note, 0>>,
+          <<0xD0 + channel, 0>>,
+          <<0xB0 + channel, 74, 0>>
+        ]
+      end)
+
+    if off_messages != [] do
+      _ = Mensch.Midi.Connection.send_messages(off_messages)
+    end
+
+    socket
+    |> assign(:preview_note_channels, [])
+    |> assign(:preview_stop_ref, nil)
+  end
+
+  defp parse_tonic(value) when is_binary(value) do
+    case Map.get(@pitch_class_from_param, value) do
+      nil -> {:error, "invalid tonic"}
+      tonic -> {:ok, tonic}
+    end
+  end
+
+  defp parse_tonic(_value), do: {:error, "invalid tonic"}
+
+  defp parse_mode(value) when is_binary(value) do
+    case Map.get(@mode_from_param, value) do
+      nil -> {:error, "invalid mode"}
+      mode -> {:ok, mode}
+    end
+  end
+
+  defp parse_mode(_value), do: {:error, "invalid mode"}
+
+  defp parse_chord_kind(value) when is_binary(value) do
+    case Map.get(@chord_kind_from_param, value) do
+      nil -> {:error, "invalid chord kind"}
+      chord_kind -> {:ok, chord_kind}
+    end
+  end
+
+  defp parse_chord_kind(_value), do: {:error, "invalid chord kind"}
+
+  defp parse_degree(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, ""} when number >= 1 and number <= 7 -> {:ok, number}
+      _ -> {:error, "degree must be between 1 and 7"}
+    end
+  end
+
+  defp parse_degree(value) when is_integer(value) and value >= 1 and value <= 7, do: {:ok, value}
+  defp parse_degree(_value), do: {:error, "degree must be between 1 and 7"}
+
+  defp parse_integer(value, _field_name) when is_integer(value), do: {:ok, value}
+
+  defp parse_integer(value, field_name) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, ""} -> {:ok, number}
+      _ -> {:error, "#{field_name} must be an integer"}
+    end
+  end
+
+  defp parse_integer(_value, field_name), do: {:error, "#{field_name} must be an integer"}
+
+  defp format_error({:invalid_tonic, tonic}), do: "Invalid tonic: #{inspect(tonic)}"
+  defp format_error({:invalid_mode, mode}), do: "Invalid mode: #{inspect(mode)}"
+
+  defp format_error({:invalid_degree, degree}),
+    do: "Invalid degree: #{inspect(degree)} (allowed: 1..7)"
+
+  defp format_error({:invalid_chord_kind, chord_kind}),
+    do: "Invalid chord kind: #{inspect(chord_kind)}"
+
+  defp format_error({:missing_opt, key}), do: "Missing required option: #{key}"
+
+  defp format_error({:invalid_opt, key, value}),
+    do: "Invalid option #{key}: #{inspect(value)}"
+
+  defp format_error(
+         {:unsupported_chord_kind_for_degree,
+          %{mode: mode, chord_kind: chord_kind, degree: degree}}
+       ),
+       do: "#{chord_kind} is not available for degree #{degree} in #{mode}"
+
+  defp format_error(other), do: inspect(other)
+
+  defp quality_display(%ChordSpec{} = spec) do
+    quality = ChordSpec.quality(spec)
+    Atom.to_string(quality)
+  end
+
+  defp join_integers(notes), do: Enum.join(notes, ", ")
+
+  defp join_named_notes(notes) do
+    notes
+    |> Enum.map(fn note ->
+      {name, octave} = ChordSpec.note_name(note)
+      "#{ChordSpec.root_label(name)}#{octave}"
+    end)
+    |> Enum.join("  ")
+  end
+
+  defp pitch_class_options do
+    Enum.map(@pitch_classes, fn pitch_class ->
+      {ChordSpec.root_label(pitch_class), Atom.to_string(pitch_class)}
+    end)
+  end
+
+  defp mode_options do
+    [
+      {"Major", "major"},
+      {"Natural Minor", "natural_minor"},
+      {"Harmonic Minor", "harmonic_minor"}
+    ]
+  end
+
+  defp chord_kind_options do
+    [
+      {"Triad", "triad"},
+      {"Seventh", "seventh"},
+      {"Add 6", "add6"},
+      {"6/9", "six_nine"},
+      {"9th", "ninth"},
+      {"11th", "eleventh"},
+      {"13th", "thirteenth"}
+    ]
+  end
+
+  defp degree_options do
+    Enum.map(1..7, fn degree -> {Integer.to_string(degree), Integer.to_string(degree)} end)
+  end
+
+  defp default_values do
+    %{
+      "tonic" => "c",
+      "mode" => "major",
+      "degree" => "1",
+      "chord_kind" => "triad",
+      "octave" => "3",
+      "inversion" => "0"
+    }
+  end
+end

@@ -9,8 +9,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "defaults preserve close voicing behavior when optional fields are omitted" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0
       })
@@ -21,8 +20,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "applies inversion before voicing" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 1,
         voicing: %Voicing{type: :close, center_note: 60}
@@ -40,8 +38,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "open voicing keeps inversion bass and opens upper voices" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 1,
         voicing: %Voicing{type: :open, center_note: 60}
@@ -54,8 +51,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "major 6 quality resolves with added sixth" do
     spec =
       ChordSpec.new!(%{
-        root: :g,
-        quality: :maj6,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :g, quality: :maj6},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60}
@@ -67,8 +63,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "voice_count expansion with auto doubling is deterministic" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :auto}
@@ -80,8 +75,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "voice_count expansion with third doubling repeats third pitch class" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :third}
@@ -93,8 +87,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "voice_count expansion with fifth doubling repeats fifth family pitch class" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :fifth}
@@ -106,8 +99,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "voice_count expansion with bass doubling repeats current lowest voice pitch class" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 1,
         voicing: %Voicing{type: :close, center_note: 60, voice_count: 6, doubling: :bass}
@@ -119,8 +111,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "guide_tones doubling fails hard when no third or seventh is present" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :sus2,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :sus2},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60, voice_count: 5, doubling: :guide_tones}
@@ -134,8 +125,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "fails hard when foreign bass is not foreign" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         foreign_bass: %ForeignBass{pitch_class: :e, mode: :relative, octave: 0}
@@ -149,8 +139,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "relative foreign bass offset 0 auto-shifts one octave lower when needed" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60},
@@ -165,8 +154,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "relative foreign bass offset tracks lowest voiced chord octave" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 1,
         voicing: %Voicing{type: :open, center_note: 60},
@@ -182,8 +170,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "fails hard when constraints are unsatisfiable" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 3,
         voicing: %Voicing{type: :open, center_note: 84, range_min: 48, range_max: 52}
@@ -197,8 +184,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "fails hard when explicit foreign bass is above or equal to lowest chord voice" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60},
@@ -213,8 +199,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "per-step centered mode can wrap back after enough inversions" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 4,
         voicing: %Voicing{
@@ -230,8 +215,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "anchor-then-wander mode keeps inversion drift without re-centering each step" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 4,
         voicing: %Voicing{
@@ -247,8 +231,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "sequence export follows inversion path from zero to target" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 4,
         voicing: %Voicing{
@@ -274,8 +257,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "final note details expose simple and compound degree context" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj9,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj9},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60}
@@ -299,8 +281,7 @@ defmodule Mensch.Harmony.ResolverTest do
   test "final note details mark foreign bass role" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60},

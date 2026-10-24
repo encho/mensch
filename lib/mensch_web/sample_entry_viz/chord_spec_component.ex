@@ -12,7 +12,7 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
     assigns =
       assigns
       |> assign(:chord_spec, chord_spec)
-      |> assign(:root_label, root_label(chord_spec.root))
+      |> assign(:root_label, root_label(ChordSpec.root(chord_spec)))
       |> assign(:quality_label, quality_label(chord_spec))
       |> assign(:tone_labels, ChordSpec.tones(chord_spec))
       |> assign(:note_labels, midi_note_labels(chord_spec))
@@ -77,10 +77,8 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
     ChordSpec.root_label(root)
   end
 
-  defp quality_label(%ChordSpec{quality: nil}), do: "-"
-
-  defp quality_label(%ChordSpec{quality: quality}) when is_atom(quality),
-    do: Atom.to_string(quality)
+  defp quality_label(%ChordSpec{} = chord_spec),
+    do: chord_spec |> ChordSpec.quality() |> Atom.to_string()
 
   defp foreign_bass_label(nil), do: "-"
 

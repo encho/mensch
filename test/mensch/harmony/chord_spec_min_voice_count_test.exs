@@ -7,8 +7,7 @@ defmodule Mensch.Harmony.ChordSpecMinVoiceCountTest do
   test "persists min_voice_count derived from chord quality" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj11,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj11},
         octave: 3,
         inversion: 0
       })
@@ -20,8 +19,7 @@ defmodule Mensch.Harmony.ChordSpecMinVoiceCountTest do
   test "allows nil voice_count as auto/min behavior" do
     spec =
       ChordSpec.new!(%{
-        root: :c,
-        quality: :maj7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
         octave: 3,
         inversion: 0,
         voicing: %Voicing{voice_count: nil}
@@ -34,8 +32,10 @@ defmodule Mensch.Harmony.ChordSpecMinVoiceCountTest do
   test "rejects explicit voice_count below chord minimum" do
     assert {:error, {:invalid_voice_count_below_min, {3, 4}}} =
              ChordSpec.new(%{
-               root: :c,
-               quality: :maj7,
+               harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+                 root: :c,
+                 quality: :maj7
+               },
                octave: 3,
                inversion: 0,
                voicing: %Voicing{voice_count: 3}

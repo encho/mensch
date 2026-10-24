@@ -29,8 +29,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
               type: :open,
               inversion_resolution_mode: :anchor_then_wander
             },
-            root: :c,
-            quality: :min7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :min7},
             octave: 2,
             inversion: 0
           },
@@ -55,8 +54,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
               type: :open,
               inversion_resolution_mode: :anchor_then_wander
             },
-            root: :f,
-            quality: :dom7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :dom7},
             octave: 2,
             inversion: 0
           },
@@ -81,8 +79,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
               type: :open,
               inversion_resolution_mode: :anchor_then_wander
             },
-            root: :b_flat,
-            quality: :maj7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :b_flat, quality: :maj7},
             octave: 2,
             inversion: 0
           },
@@ -107,8 +104,7 @@ defmodule Mensch.SampleDb.Sample7DynamicVoicing do
               type: :open,
               inversion_resolution_mode: :anchor_then_wander
             },
-            root: :g,
-            quality: :min7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :min7},
             octave: 2,
             inversion: 0
           },

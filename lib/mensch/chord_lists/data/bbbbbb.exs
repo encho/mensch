@@ -6,8 +6,7 @@
     %{
       id: "40",
       parameters: %Mensch.Harmony.ChordSpec.Parameters{
-        root: :d,
-        quality: :min7,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :d, quality: :min7},
         octave: 3,
         inversion: 0,
         voicing_type: :close,
@@ -26,8 +25,7 @@
     %{
       id: "38",
       parameters: %Mensch.Harmony.ChordSpec.Parameters{
-        root: :f,
-        quality: :maj9,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :f, quality: :maj9},
         octave: 3,
         inversion: 0,
         voicing_type: :close,
@@ -46,8 +44,10 @@
     %{
       id: "37",
       parameters: %Mensch.Harmony.ChordSpec.Parameters{
-        root: :b_flat,
-        quality: :maj9,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :b_flat,
+          quality: :maj9
+        },
         octave: 3,
         inversion: 0,
         voicing_type: :close,

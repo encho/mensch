@@ -1921,8 +1921,10 @@ defmodule MenschWeb.ChordLabLive do
              values["foreign_bass_octave"]
            ) do
       attrs = %{
-        root: root,
-        quality: quality,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: root,
+          quality: quality
+        },
         octave: octave,
         inversion: inversion,
         voicing: %Voicing{

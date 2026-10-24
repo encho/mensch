@@ -117,8 +117,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
   @spec to_chord_spec_attrs(t()) :: map()
   def to_chord_spec_attrs(%__MODULE__{} = params) do
     %{
-      root: params.root,
-      quality: params.quality,
+      harmonic_identity: %{root: params.root, quality: params.quality},
       octave: params.octave,
       inversion: params.inversion,
       voicing: %Voicing{
@@ -193,7 +192,9 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
              :min,
              :maj6,
              :maj7,
+             :maj7_sharp5,
              :min7,
+             :min_maj7,
              :dom7,
              :sus2,
              :sus4,

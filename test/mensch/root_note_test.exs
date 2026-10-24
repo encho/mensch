@@ -23,16 +23,14 @@ defmodule Mensch.RootNoteTest do
 
     chord_inversion_0 = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :c,
-      tones: ["1", "3", "5"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
       octave: 3,
       inversion: 0
     }
 
     chord_inversion_2 = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :c,
-      tones: ["1", "3", "5"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
       octave: 3,
       inversion: 2
     }
@@ -72,8 +70,7 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :c,
-      tones: ["1", "3", "5"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
       octave: 3,
       inversion: 2
     }
@@ -107,8 +104,7 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :f,
-      tones: ["1", "3", "5", "b7"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :dom7},
       octave: 3,
       inversion: 3
     }
@@ -160,8 +156,7 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :c,
-      tones: ["1", "3", "5"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
       octave: 3,
       inversion: 1
     }
@@ -211,8 +206,7 @@ defmodule Mensch.RootNoteTest do
 
     chord_spec = %ChordSpec{
       voicing: %ChordSpec.Voicing{},
-      root: :c,
-      tones: ["1", "3", "5"],
+      harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
       octave: 3,
       inversion: 0
     }

@@ -21,6 +21,7 @@ defmodule MenschWeb.Router do
     live "/samples", SamplesLive
     live "/samples/:sample_id", HomeLive
     live "/chord-lab", ChordLabLive
+    live "/chord-lab-diatonic", ChordLabDiatonicLive
     get "/exports/sample/:index/bitwig-mpe.mid", ExportController, :bitwig_mpe_midi
     get "/exports/sample/:index/mpe-events.txt", ExportController, :mpe_report
   end

@@ -132,11 +132,12 @@ defmodule Mensch.Machines.RootNote do
     chord_spec = normalize_chord_spec(chord_spec)
 
     midi_note =
-      ChordSpec.midi_note_number(chord_spec.root, chord_spec.octave) + octave_offset * 12
+      ChordSpec.midi_note_number(ChordSpec.root(chord_spec), chord_spec.octave) +
+        octave_offset * 12
 
     if midi_note < 0 or midi_note > 127 do
       raise ArgumentError,
-            "root_note produced out-of-range midi note #{midi_note} from root #{inspect(chord_spec.root)} octave #{inspect(chord_spec.octave)} with octave_offset #{inspect(octave_offset)}"
+            "root_note produced out-of-range midi note #{midi_note} from root #{inspect(ChordSpec.root(chord_spec))} octave #{inspect(chord_spec.octave)} with octave_offset #{inspect(octave_offset)}"
     end
 
     midi_note

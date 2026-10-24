@@ -217,9 +217,12 @@ defmodule Mensch.SampleDb do
       replacement_name_literal = inspect(new_title)
 
       updated_content =
-        Regex.replace(pattern, content, fn _match, prefix ->
-          prefix <> replacement_name_literal
-        end,
+        Regex.replace(
+          pattern,
+          content,
+          fn _match, prefix ->
+            prefix <> replacement_name_literal
+          end,
           global: false
         )
 

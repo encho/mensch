@@ -40,8 +40,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :a_sharp,
-            quality: :maj7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :a_sharp, quality: :maj7},
             octave: 3,
             inversion: 0
           },
@@ -54,8 +53,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :g,
-            quality: :min7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :min7},
             octave: 3,
             inversion: 0
           },
@@ -68,8 +66,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :c,
-            quality: :min7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :min7},
             octave: 3,
             inversion: 0
           },
@@ -82,8 +79,7 @@ defmodule Mensch.SampleDb.Sample13Strum do
         %SampleEntry{
           chord_spec: %ChordSpec{
             voicing: %ChordSpec.Voicing{},
-            root: :f,
-            quality: :dom7,
+            harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :dom7},
             octave: 3,
             inversion: 0
           },
