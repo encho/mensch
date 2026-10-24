@@ -138,7 +138,10 @@ defmodule MenschWeb.ChordLabDiatonicLive do
       assigns
       |> assign(:selected_tonic_keyboard_key, selected_tonic_keyboard_key(assigns.values))
       |> assign(:keyboard_keys, piano_keys(assigns.resolved_notes))
-      |> assign(:keyboard_degree_labels, keyboard_degree_labels(assigns.chord_spec, assigns.resolved_notes))
+      |> assign(
+        :keyboard_degree_labels,
+        keyboard_degree_labels(assigns.chord_spec, assigns.resolved_notes)
+      )
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:chord_lab_diatonic}>
