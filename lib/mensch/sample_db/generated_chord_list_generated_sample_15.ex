@@ -12,7 +12,7 @@ defmodule Mensch.SampleDb.GeneratedChordListGeneratedSample15 do
       id: "chord_list_generated_sample-15",
       created_at: ~U[2026-01-01 00:00:00Z],
       folder: "Generated",
-      name: "Chord List Generated Sample",
+      name: "4 chordssssssaaaaaaaaaaaa",
       total_length_mbeats: 16000,
       blueprint_meta: %{
         bpm: 120,

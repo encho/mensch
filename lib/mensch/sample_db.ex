@@ -141,4 +141,91 @@ defmodule Mensch.SampleDb do
   def default_samples do
     Enum.map(@samples, &with_normalized_total_length/1)
   end
+
+  @doc "Updates a sample title in its source file by sample id."
+  @spec rename_sample_title(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def rename_sample_title(sample_id, new_title)
+      when is_binary(sample_id) and is_binary(new_title) do
+    with {:ok, normalized_id} <- normalize_non_empty(sample_id, "sample_id"),
+         {:ok, normalized_title} <- normalize_sample_title(new_title),
+         {:ok, sample_file_path} <- sample_file_path_by_id(normalized_id),
+         {:ok, content} <- File.read(sample_file_path),
+         {:ok, updated_content} <- replace_name_for_id(content, normalized_id, normalized_title) do
+      File.write!(sample_file_path, updated_content)
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    error in [File.Error, ArgumentError] -> {:error, Exception.message(error)}
+  end
+
+  def rename_sample_title(_sample_id, _new_title),
+    do: {:error, "sample_id and title must be strings"}
+
+  defp normalize_non_empty(value, field_name) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if trimmed == "" do
+      {:error, "#{field_name} is required"}
+    else
+      {:ok, trimmed}
+    end
+  end
+
+  defp normalize_sample_title(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    cond do
+      trimmed == "" -> {:error, "sample title is required"}
+      String.length(trimmed) > 120 -> {:error, "sample title must be at most 120 characters"}
+      true -> {:ok, trimmed}
+    end
+  end
+
+  defp sample_file_path_by_id(sample_id) when is_binary(sample_id) do
+    needle = "id: #{inspect(sample_id)}"
+
+    matches =
+      "lib/mensch/sample_db/*.ex"
+      |> Path.wildcard()
+      |> Enum.filter(fn file_path ->
+        case File.read(file_path) do
+          {:ok, content} -> String.contains?(content, needle)
+          {:error, _reason} -> false
+        end
+      end)
+
+    case matches do
+      [file_path] -> {:ok, file_path}
+      [] -> {:error, "sample file not found for id #{sample_id}"}
+      _many -> {:error, "multiple sample files matched id #{sample_id}"}
+    end
+  end
+
+  defp replace_name_for_id(content, sample_id, new_title)
+       when is_binary(content) and is_binary(sample_id) and is_binary(new_title) do
+    id_literal = Regex.escape(inspect(sample_id))
+
+    pattern =
+      Regex.compile!(
+        "(id:\\s*#{id_literal}\\s*,.*?name:\\s*)\"(?:[^\"\\\\]|\\\\.)*\"",
+        [:dotall]
+      )
+
+    if Regex.match?(pattern, content) do
+      replacement_name_literal = inspect(new_title)
+
+      updated_content =
+        Regex.replace(pattern, content, fn _match, prefix ->
+          prefix <> replacement_name_literal
+        end,
+          global: false
+        )
+
+      {:ok, updated_content}
+    else
+      {:error, "could not locate name field for sample id #{sample_id}"}
+    end
+  end
 end

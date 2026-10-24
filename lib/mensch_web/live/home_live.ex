@@ -92,6 +92,7 @@ defmodule MenschWeb.HomeLive do
       |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
       |> assign(:samples, samples)
       |> assign(:active_sample_index, active_sample_index)
+      |> assign(:sample_title_form, sample_title_form(Map.get(active_sample, :name, "")))
       |> assign(:sample_entries, sample_entries)
       |> assign(:active_chord_indices, all_chord_indices(sample_entries))
       |> assign(:sample_context, sample_context)
@@ -241,6 +242,32 @@ defmodule MenschWeb.HomeLive do
      |> assign_detail_content()}
   end
 
+  def handle_event("save_sample_title", %{"sample_title" => %{"name" => raw_title}}, socket) do
+    current_sample = Enum.at(socket.assigns.samples, socket.assigns.active_sample_index, %{})
+    sample_id = Map.get(current_sample, :id)
+
+    with {:ok, normalized_sample_id} <- normalize_required_string(sample_id, "sample id"),
+         {:ok, normalized_title} <- normalize_sample_title(raw_title),
+         :ok <- SampleDb.rename_sample_title(normalized_sample_id, normalized_title) do
+      updated_samples = update_sample_name_in_memory(socket.assigns.samples, normalized_sample_id, normalized_title)
+
+      socket =
+        socket
+        |> assign(:samples, updated_samples)
+        |> assign(:sample_title_form, sample_title_form(normalized_title))
+        |> assign_active_sample(socket.assigns.active_sample_index)
+        |> put_flash(:info, "Sample title saved")
+
+      {:noreply, socket}
+    else
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:sample_title_form, sample_title_form(raw_title || ""))
+         |> put_flash(:error, "Could not save sample title: #{reason}")}
+    end
+  end
+
   @impl true
   def handle_info({:refresh_player, refresh_ref}, socket) do
     if socket.assigns.playback_ref != refresh_ref do
@@ -322,9 +349,24 @@ defmodule MenschWeb.HomeLive do
         <div id="render-section" class="min-w-0 space-y-4">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div class="space-y-1">
-              <div class="font-mono text-xl text-zinc-100 md:text-2xl">
-                {active_sample_name(@samples, @active_sample_index)}
-              </div>
+              <.form for={@sample_title_form} id="sample-title-form" phx-submit="save_sample_title">
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    id={@sample_title_form[:name].id}
+                    name={@sample_title_form[:name].name}
+                    value={@sample_title_form[:name].value}
+                    maxlength="120"
+                    class="h-10 w-[24rem] border-0 border-b border-transparent bg-transparent px-0 font-mono text-xl text-zinc-100 outline-none transition-colors duration-150 placeholder:text-zinc-500 hover:border-zinc-600 focus:border-cyan-300 md:w-[40rem] md:text-2xl"
+                  />
+                  <button
+                    type="submit"
+                    class="ui-radius-btn h-8 border border-emerald-300/70 bg-emerald-400/15 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/28"
+                  >
+                    Save Title
+                  </button>
+                </div>
+              </.form>
 
               <div class="font-mono text-[11px] text-zinc-300">
                 {sample_context_label(@sample_context)} · {sample_duration_label(
@@ -835,6 +877,7 @@ defmodule MenschWeb.HomeLive do
 
         socket
         |> assign(:active_sample_index, index)
+        |> assign(:sample_title_form, sample_title_form(Map.get(sample, :name, "")))
         |> assign(:sample_entries, sample_entries)
         |> assign(:active_chord_indices, all_chord_indices(sample_entries))
         |> assign(:sample_context, sample_context)
@@ -1125,11 +1168,45 @@ defmodule MenschWeb.HomeLive do
     end
   end
 
-  defp active_sample_name(samples, active_sample_index)
-       when is_list(samples) and is_integer(active_sample_index) do
-    samples
-    |> Enum.at(active_sample_index, %{})
-    |> Map.get(:name, "Unnamed")
+  defp sample_title_form(name) when is_binary(name) do
+    to_form(%{"name" => name}, as: :sample_title)
+  end
+
+  defp sample_title_form(_name), do: to_form(%{"name" => ""}, as: :sample_title)
+
+  defp normalize_required_string(value, field_name) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if trimmed == "" do
+      {:error, "#{field_name} is required"}
+    else
+      {:ok, trimmed}
+    end
+  end
+
+  defp normalize_required_string(_value, field_name), do: {:error, "#{field_name} is required"}
+
+  defp normalize_sample_title(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    cond do
+      trimmed == "" -> {:error, "sample title is required"}
+      String.length(trimmed) > 120 -> {:error, "sample title must be at most 120 characters"}
+      true -> {:ok, trimmed}
+    end
+  end
+
+  defp normalize_sample_title(_value), do: {:error, "sample title is required"}
+
+  defp update_sample_name_in_memory(samples, sample_id, new_name)
+       when is_list(samples) and is_binary(sample_id) and is_binary(new_name) do
+    Enum.map(samples, fn sample ->
+      if Map.get(sample, :id) == sample_id do
+        Map.put(sample, :name, new_name)
+      else
+        sample
+      end
+    end)
   end
 
   defp sample_context_label(%SampleContext{} = sample_context) do
