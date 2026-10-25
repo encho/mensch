@@ -1067,20 +1067,6 @@ defmodule MenschWeb.ChordLabLive do
                   <button
                     type="button"
                     phx-click="set_identity_input_mode"
-                    phx-value-mode="manual"
-                    class={[
-                      "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                      @values["identity_input_mode"] == "manual" &&
-                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                      @values["identity_input_mode"] != "manual" &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                  >
-                    Manual
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="set_identity_input_mode"
                     phx-value-mode="diatonic"
                     class={[
                       "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
@@ -1091,6 +1077,20 @@ defmodule MenschWeb.ChordLabLive do
                     ]}
                   >
                     Diatonic
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="set_identity_input_mode"
+                    phx-value-mode="manual"
+                    class={[
+                      "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
+                      @values["identity_input_mode"] == "manual" &&
+                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
+                      @values["identity_input_mode"] != "manual" &&
+                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
+                    ]}
+                  >
+                    Manual
                   </button>
                 </div>
               </div>
@@ -2380,9 +2380,9 @@ defmodule MenschWeb.ChordLabLive do
 
   defp default_values do
     %{
-      "identity_input_mode" => "manual",
+      "identity_input_mode" => "diatonic",
       "root" => "c",
-      "quality" => "maj7",
+      "quality" => "maj",
       "diatonic_tonic" => "c",
       "diatonic_mode" => "major",
       "diatonic_chord_kind" => "triad",
