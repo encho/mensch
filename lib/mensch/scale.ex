@@ -3,6 +3,7 @@ defmodule Mensch.Scale do
   Public API for independent scale engine operations.
   """
 
+  alias Mensch.Scale.ChordGenerator
   alias Mensch.Scale.ModeResolver
   alias Mensch.Scale.ScaleGenerator
   alias Mensch.Scale.ScaleRegistry
@@ -42,4 +43,14 @@ defmodule Mensch.Scale do
   @spec midi_notes_full_octaves(ScaleSpec.t(), integer(), integer()) ::
           {:ok, [integer()]} | {:error, term()}
   defdelegate midi_notes_full_octaves(scale_spec, min_note, max_note), to: ScaleGenerator
+
+  @spec chord_strategy_options() :: [map()]
+  defdelegate chord_strategy_options(), to: ChordGenerator, as: :strategy_options
+
+  @spec chord_shapes(atom()) :: {:ok, [atom()]} | {:error, term()}
+  defdelegate chord_shapes(strategy_id), to: ChordGenerator, as: :strategy_shapes
+
+  @spec generate_chord(ScaleSpec.t(), pos_integer(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  defdelegate generate_chord(scale_spec, degree, opts), to: ChordGenerator, as: :generate
 end
