@@ -37,7 +37,7 @@ defmodule MenschWeb.Layouts do
 
   attr :nav_active, :atom,
     default: nil,
-    doc: "active navbar destination (:samples, :chord_lab, or :chord_lab_diatonic)"
+    doc: "active navbar destination (:samples, :chord_lab, :chord_lab_diatonic, or :progression)"
 
   attr :bpm, :integer,
     default: nil,
@@ -110,6 +110,17 @@ defmodule MenschWeb.Layouts do
               ]}
             >
               <.icon name="hero-adjustments-horizontal" class="size-4" />
+            </.link>
+            <.link
+              navigate={~p"/progression"}
+              title="Progression"
+              aria-label="Progression"
+              class={[
+                "ui-radius-btn relative flex size-9 items-center justify-center border text-white/70 transition-colors duration-150",
+                nav_button_class(@nav_active == :progression)
+              ]}
+            >
+              <.icon name="hero-queue-list" class="size-4" />
             </.link>
             <div :if={@midi_status} class="relative">
               <button

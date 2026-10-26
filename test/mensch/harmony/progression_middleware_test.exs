@@ -1,0 +1,172 @@
+defmodule Mensch.Harmony.ProgressionMiddlewareTest do
+  use ExUnit.Case, async: true
+
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.Progression
+  alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
+  alias Mensch.Harmony.Progression.Middleware.TransposeAll
+  alias Mensch.Harmony.Progression.Source.CreateWithDiatonicDegrees, as: DiatonicSource
+  alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
+  alias Mensch.Harmony.Resolver
+
+  test "diatonic source generates chords for requested degrees" do
+    source =
+      DiatonicSource.source(
+        degrees: [2, 5, 1],
+        scale: %{tonic: :c, mode: :major},
+        chord_kind: :triad,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:ok, chords} = source.()
+    assert length(chords) == 3
+
+    assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
+  end
+
+  test "diatonic source enforces degree range 1..7" do
+    source =
+      DiatonicSource.source(
+        degrees: [1, 8],
+        scale: %{tonic: :c, mode: :major},
+        chord_kind: :triad,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:error, :invalid_degrees} = source.()
+  end
+
+  test "ensure_bass_ascending enforces non-decreasing voiced bass" do
+    first =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0,
+        voicing: %ChordSpec.Voicing{center_note: 60}
+      })
+
+    second =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :e, quality: :min},
+        octave: 3,
+        inversion: 0,
+        voicing: %ChordSpec.Voicing{center_note: 60}
+      })
+
+    third =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min},
+        octave: 3,
+        inversion: 0,
+        voicing: %ChordSpec.Voicing{center_note: 60}
+      })
+
+    middleware = EnsureBassAscending.middleware(include_foreign_bass: false)
+
+    assert {:ok, [a, b, c]} = middleware.([first, second, third])
+
+    basses =
+      [a, b, c]
+      |> Enum.map(fn spec ->
+        steps = Resolver.resolve_steps(spec)
+        Enum.min(steps.voiced_chord_tones)
+      end)
+
+    assert basses == Enum.sort(basses)
+  end
+
+  test "progression.run composes middlewares" do
+    source =
+      DiatonicSource.source(
+        degrees: [2, 5, 1],
+        scale: %{tonic: :c, mode: :major},
+        chord_kind: :triad,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
+
+    assert {:ok, initial} = source.()
+    assert {:ok, chords} = Progression.run(initial, [ensure])
+    assert length(chords) == 3
+  end
+
+  test "progression.run_with_source runs source then transforms" do
+    source =
+      DiatonicSource.source(
+        degrees: [2, 5, 1],
+        scale: %{tonic: :c, mode: :major},
+        chord_kind: :triad,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
+
+    assert {:ok, chords} = Progression.run_with_source(source, [ensure])
+    assert length(chords) == 3
+  end
+
+  test "create_with_fixed_chord source generates repeated chords" do
+    source =
+      CreateWithFixedChord.source(root: :d, quality: :min, count: 4, octave: 3, inversion: 0)
+
+    assert {:ok, chords} = source.()
+    assert length(chords) == 4
+    assert Enum.all?(chords, &(ChordSpec.root(&1) == :d and ChordSpec.quality(&1) == :min))
+  end
+
+  test "transpose_all shifts resolved notes by octave when semitones is 12" do
+    chord =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    middleware = TransposeAll.middleware(semitones: 12)
+
+    assert {:ok, [shifted]} = middleware.([chord])
+
+    original_notes = Resolver.resolve(chord)
+    shifted_notes = Resolver.resolve(shifted)
+
+    assert length(original_notes) == length(shifted_notes)
+
+    assert Enum.zip(original_notes, shifted_notes)
+           |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 12 end)
+  end
+
+  test "transpose_all supports non-octave semitone shifts" do
+    chord =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :min7},
+        octave: 3,
+        inversion: 1
+      })
+
+    middleware = TransposeAll.middleware(semitones: 5)
+
+    assert {:ok, [shifted]} = middleware.([chord])
+
+    original_notes = Resolver.resolve(chord)
+    shifted_notes = Resolver.resolve(shifted)
+
+    assert length(original_notes) == length(shifted_notes)
+
+    assert Enum.zip(original_notes, shifted_notes)
+           |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 5 end)
+  end
+
+  test "run_with_source wraps source and transform failures" do
+    bad_source = fn -> {:error, :bad_source} end
+    bad_transform = fn _chords -> {:error, :bad_transform} end
+
+    assert {:error, {:source_failed, :bad_source}} = Progression.run_with_source(bad_source, [])
+
+    source =
+      CreateWithFixedChord.source(root: :c, quality: :maj, count: 1, octave: 3, inversion: 0)
+
+    assert {:error, {:transform_failed, 0, :bad_transform}} =
+             Progression.run_with_source(source, [bad_transform])
+  end
+end
