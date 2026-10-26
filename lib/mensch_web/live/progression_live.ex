@@ -9,6 +9,7 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.Harmony.Progression.Source.CreateWithDiatonicDegrees
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
   alias Mensch.Harmony.Resolver
+  alias MenschWeb.FullPianoKeyboard
 
   @pitch_classes [
     :c,
@@ -562,49 +563,13 @@ defmodule MenschWeb.ProgressionLive do
 
                   <div class="min-w-0 flex-1 md:max-w-4xl">
                     <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
-                      <div class="relative h-28 overflow-hidden rounded-sm border border-zinc-800 bg-zinc-950">
-                        <%= for key <- card.keyboard_keys do %>
-                          <div
-                            :if={key.kind == :white}
-                            title={key.label}
-                            class={[
-                              "absolute inset-y-0 border-r border-zinc-900 transition-colors duration-150",
-                              key.active && "bg-[#9bf25a]",
-                              !key.active && "bg-zinc-100"
-                            ]}
-                            style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
-                          >
-                            <span class={[
-                              "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                              key.active && "text-zinc-900",
-                              !key.active && "text-zinc-500"
-                            ]}>
-                              {key.midi}
-                            </span>
-                          </div>
-                        <% end %>
-
-                        <%= for key <- card.keyboard_keys do %>
-                          <div
-                            :if={key.kind == :black}
-                            title={key.label}
-                            class={[
-                              "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
-                              key.active && "bg-[#9bf25a]",
-                              !key.active && "bg-zinc-900"
-                            ]}
-                            style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
-                          >
-                            <span class={[
-                              "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                              key.active && "text-zinc-900",
-                              !key.active && "text-zinc-300"
-                            ]}>
-                              {key.midi}
-                            </span>
-                          </div>
-                        <% end %>
-                      </div>
+                      <FullPianoKeyboard.keyboard
+                        id={"progression-keyboard-#{card.index}"}
+                        keys={card.keyboard_keys}
+                        height_class="h-28"
+                        show_bottom_lane={false}
+                        color_mode={:dark}
+                      />
                     </div>
 
                     <p class="mt-2 font-mono text-[11px] text-zinc-400">{card.named_notes}</p>
@@ -892,51 +857,10 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp piano_keys(active_notes) when is_list(active_notes) do
-    min_midi = 21
-    max_midi = 108
-
-    white_midis = Enum.filter(min_midi..max_midi, &(not black_key?(&1)))
-    total_whites = length(white_midis)
-    white_width = 100.0 / total_whites
-    black_width = white_width * 0.62
-    active_set = MapSet.new(active_notes)
-
-    Enum.map(min_midi..max_midi, fn midi ->
-      white_before_or_at =
-        Enum.count(min_midi..midi, &(not black_key?(&1)))
-
-      if black_key?(midi) do
-        %{
-          midi: midi,
-          kind: :black,
-          active: MapSet.member?(active_set, midi),
-          left_pct: white_before_or_at * white_width - black_width / 2,
-          width_pct: black_width,
-          label: note_label(midi)
-        }
-      else
-        left_pct = (white_before_or_at - 1) * white_width
-
-        %{
-          midi: midi,
-          kind: :white,
-          active: MapSet.member?(active_set, midi),
-          left_pct: left_pct,
-          width_pct: white_width,
-          label: note_label(midi)
-        }
-      end
-    end)
+    FullPianoKeyboard.key_maps(active_notes: active_notes)
   end
 
   defp piano_keys(_active_notes), do: []
-
-  defp note_label(midi_note) when is_integer(midi_note) do
-    {name, octave} = ChordSpec.note_name(midi_note)
-    "#{ChordSpec.root_label(name)}#{octave}"
-  end
-
-  defp black_key?(midi_note), do: rem(midi_note, 12) in [1, 3, 6, 8, 10]
 
   defp toggle_button_classes(true) do
     "rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"

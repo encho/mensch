@@ -4,6 +4,7 @@ defmodule MenschWeb.ChordLabDiatonicLive do
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.DiatonicHarmonicIdentityResolver
   alias Mensch.Harmony.Resolver
+  alias MenschWeb.FullPianoKeyboard
 
   @pitch_classes [
     :c,
@@ -323,61 +324,14 @@ defmodule MenschWeb.ChordLabDiatonicLive do
             </p>
           </div>
 
-          <div class="relative h-40 rounded-md border border-zinc-700/70 bg-zinc-950">
-            <%= for key <- @keyboard_keys do %>
-              <div
-                :if={key.kind == :white}
-                title={key.label}
-                class={[
-                  "absolute bottom-6 top-0 border-r border-zinc-900 transition-colors duration-150",
-                  key.active && "bg-[#9bf25a]",
-                  !key.active && "bg-zinc-100"
-                ]}
-                style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
-              >
-                <span class={[
-                  "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                  key.active && "text-zinc-900",
-                  !key.active && "text-zinc-500"
-                ]}>
-                  {key.midi}
-                </span>
-              </div>
-            <% end %>
-
-            <%= for key <- @keyboard_keys do %>
-              <div
-                :if={key.kind == :black}
-                title={key.label}
-                class={[
-                  "absolute top-0 z-10 h-[62%] rounded-b-sm border border-black/70 transition-colors duration-150",
-                  key.active && "bg-[#9bf25a]",
-                  !key.active && "bg-zinc-900"
-                ]}
-                style={"left: #{key.left_pct}%; width: #{key.width_pct}%;"}
-              >
-                <span class={[
-                  "pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono",
-                  key.active && "text-zinc-900",
-                  !key.active && "text-zinc-300"
-                ]}>
-                  {key.midi}
-                </span>
-              </div>
-            <% end %>
-
-            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-6">
-              <%= for key <- @keyboard_keys do %>
-                <span
-                  :if={Map.has_key?(@keyboard_degree_labels, key.midi)}
-                  class="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] font-semibold text-[#9bf25a]"
-                  style={"left: calc(#{key.left_pct}% + #{key.width_pct / 2}%);"}
-                >
-                  {Map.get(@keyboard_degree_labels, key.midi)}
-                </span>
-              <% end %>
-            </div>
-          </div>
+          <FullPianoKeyboard.keyboard
+            id="diatonic-final-keyboard"
+            keys={@keyboard_keys}
+            height_class="h-40"
+            show_bottom_lane={true}
+            bottom_labels={@keyboard_degree_labels}
+            color_mode={:dark}
+          />
 
           <p class="font-mono text-[11px] text-zinc-400">
             Labels show interval distance from chord root (for example 1, b3, 5, b7).
@@ -712,51 +666,10 @@ defmodule MenschWeb.ChordLabDiatonicLive do
   defp interval_label(11), do: "7"
 
   defp piano_keys(active_notes) when is_list(active_notes) do
-    min_midi = 21
-    max_midi = 108
-
-    white_midis = Enum.filter(min_midi..max_midi, &(not black_key?(&1)))
-    total_whites = length(white_midis)
-    white_width = 100.0 / total_whites
-    black_width = white_width * 0.62
-    active_set = MapSet.new(active_notes)
-
-    Enum.map(min_midi..max_midi, fn midi ->
-      white_before_or_at =
-        Enum.count(min_midi..midi, &(not black_key?(&1)))
-
-      if black_key?(midi) do
-        %{
-          midi: midi,
-          kind: :black,
-          active: MapSet.member?(active_set, midi),
-          left_pct: white_before_or_at * white_width - black_width / 2,
-          width_pct: black_width,
-          label: note_label(midi)
-        }
-      else
-        left_pct = (white_before_or_at - 1) * white_width
-
-        %{
-          midi: midi,
-          kind: :white,
-          active: MapSet.member?(active_set, midi),
-          left_pct: left_pct,
-          width_pct: white_width,
-          label: note_label(midi)
-        }
-      end
-    end)
+    FullPianoKeyboard.key_maps(active_notes: active_notes)
   end
 
   defp piano_keys(_active_notes), do: []
-
-  defp note_label(midi_note) when is_integer(midi_note) do
-    {name, octave} = ChordSpec.note_name(midi_note)
-    "#{ChordSpec.root_label(name)}#{octave}"
-  end
-
-  defp black_key?(midi_note), do: rem(midi_note, 12) in [1, 3, 6, 8, 10]
 
   defp toggle_button_classes(true) do
     "rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
