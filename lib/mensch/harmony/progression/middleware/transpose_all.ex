@@ -39,13 +39,16 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
         semitones
       )
 
+    {bass_pitch_class, foreign_bass} =
+      transpose_identity_bass_and_settings(chord_spec, semitones)
+
     harmonic_identity = %HarmonicIdentity{
       root: root,
-      quality: chord_spec.harmonic_identity.quality
+      quality: chord_spec.harmonic_identity.quality,
+      bass_pitch_class: bass_pitch_class
     }
 
     voicing = transpose_voicing(chord_spec.voicing, semitones)
-    foreign_bass = transpose_foreign_bass(chord_spec.foreign_bass, semitones)
 
     %ChordSpec{
       chord_spec
@@ -65,29 +68,42 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
     }
   end
 
-  defp transpose_foreign_bass(nil, _semitones), do: nil
+  defp transpose_identity_bass_and_settings(
+         %ChordSpec{harmonic_identity: %{bass_pitch_class: nil}} = chord_spec,
+         _semitones
+       ),
+       do: {nil, chord_spec.foreign_bass}
 
-  defp transpose_foreign_bass(%ForeignBass{} = foreign_bass, semitones) do
-    case foreign_bass.mode do
+  defp transpose_identity_bass_and_settings(
+         %ChordSpec{harmonic_identity: %{bass_pitch_class: bass_pitch_class}} = chord_spec,
+         semitones
+       ) do
+    bass_settings =
+      case chord_spec.foreign_bass do
+        %ForeignBass{} = foreign_bass -> foreign_bass
+        _ -> %ForeignBass{}
+      end
+
+    case bass_settings.mode do
       :absolute ->
-        {pitch_class, octave} =
+        {new_bass_pitch_class, octave} =
           transpose_pitch_class_with_octave(
-            foreign_bass.pitch_class,
-            foreign_bass.octave,
+            bass_pitch_class,
+            bass_settings.octave,
             semitones
           )
 
-        %ForeignBass{foreign_bass | pitch_class: pitch_class, octave: octave}
+        {new_bass_pitch_class, %ForeignBass{bass_settings | octave: octave}}
 
       :relative ->
-        {pitch_class, _octave_unused} =
+        {new_bass_pitch_class, _octave_unused} =
           transpose_pitch_class_with_octave(
-            foreign_bass.pitch_class,
+            bass_pitch_class,
             0,
             semitones
           )
 
-        %ForeignBass{foreign_bass | pitch_class: pitch_class}
+        {new_bass_pitch_class, bass_settings}
     end
   end
 

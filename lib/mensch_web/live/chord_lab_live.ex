@@ -1220,13 +1220,11 @@ defmodule MenschWeb.ChordLabLive do
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
             <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
               <MenschWeb.PitchClassKeyboard.mini
                 id="foreign-bass-pitch-class-keyboard"
-                label="Foreign Bass"
+                label="Foreign Bass Pitch"
                 event="set_foreign_bass_pitch_class"
                 selected_key={@selected_foreign_bass_keyboard_key}
                 selected_key_color="#ff4d6d"
@@ -1235,7 +1233,11 @@ defmodule MenschWeb.ChordLabLive do
                 header_action_value=""
                 clear_label="No Foreign Bass"
               />
+            </div>
+          </div>
 
+          <div class="ui-radius-table border border-zinc-700/60 bg-black/30 p-4">
+            <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-2">
               <div class="space-y-2">
                 <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
                   Bass Placement
@@ -2047,7 +2049,14 @@ defmodule MenschWeb.ChordLabLive do
       end
 
     quality = Map.get(values, "quality", "?")
-    symbol = "#{root_label}#{quality}"
+
+    slash_bass =
+      case parse_foreign_bass_pitch_class(Map.get(values, "foreign_bass_pitch_class")) do
+        {:ok, bass_pc} -> "/" <> ChordSpec.root_label(bass_pc)
+        _ -> ""
+      end
+
+    symbol = "#{root_label}#{quality}#{slash_bass}"
     "#{symbol} | Root #{root_label} | Quality #{quality}"
   end
 
@@ -2240,16 +2249,19 @@ defmodule MenschWeb.ChordLabLive do
          {:ok, range_max} <- parse_optional_integer(values["range_max"], "range_max"),
          {:ok, voice_count} <- parse_optional_integer(values["voice_count"], "voice_count"),
          {:ok, doubling} <- parse_doubling(values["doubling"]),
+         {:ok, bass_pitch_class} <-
+           parse_foreign_bass_pitch_class(values["foreign_bass_pitch_class"]),
          {:ok, foreign_bass} <-
-           parse_foreign_bass(
-             values["foreign_bass_pitch_class"],
+           parse_foreign_bass_settings(
+             bass_pitch_class,
              values["foreign_bass_mode"],
              values["foreign_bass_octave"]
            ) do
       attrs = %{
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: root,
-          quality: quality
+          quality: quality,
+          bass_pitch_class: bass_pitch_class
         },
         octave: octave,
         inversion: inversion,
@@ -2304,14 +2316,17 @@ defmodule MenschWeb.ChordLabLive do
   defp parse_doubling("bass"), do: {:ok, :bass}
   defp parse_doubling(_), do: {:error, "invalid doubling"}
 
-  defp parse_foreign_bass("", _mode, _octave), do: {:ok, nil}
-  defp parse_foreign_bass(nil, _mode, _octave), do: {:ok, nil}
+  defp parse_foreign_bass_pitch_class(""), do: {:ok, nil}
+  defp parse_foreign_bass_pitch_class(nil), do: {:ok, nil}
 
-  defp parse_foreign_bass(pitch_class, mode_value, octave_value) do
-    with {:ok, parsed_pitch_class} <- parse_pitch_class(pitch_class),
-         {:ok, mode} <- parse_foreign_bass_mode(mode_value),
+  defp parse_foreign_bass_pitch_class(pitch_class), do: parse_pitch_class(pitch_class)
+
+  defp parse_foreign_bass_settings(nil, _mode, _octave), do: {:ok, nil}
+
+  defp parse_foreign_bass_settings(_bass_pitch_class, mode_value, octave_value) do
+    with {:ok, mode} <- parse_foreign_bass_mode(mode_value),
          {:ok, octave} <- parse_foreign_bass_octave(mode, octave_value) do
-      {:ok, %ForeignBass{pitch_class: parsed_pitch_class, mode: mode, octave: octave}}
+      {:ok, %ForeignBass{mode: mode, octave: octave}}
     end
   end
 

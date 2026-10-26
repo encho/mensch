@@ -206,7 +206,7 @@ defmodule Mensch.Harmony.Resolver do
         cond do
           is_integer(foreign_bass_note) and midi_note == foreign_bass_note and
               match?(%ForeignBass{}, spec.foreign_bass) ->
-            spell_from_pitch_class_atom(spec.foreign_bass.pitch_class, midi_note)
+            spell_from_pitch_class_atom(spec.harmonic_identity.bass_pitch_class, midi_note)
 
           is_binary(token) ->
             spell_from_root_and_token(ChordSpec.root(spec), token, midi_note)
@@ -695,26 +695,32 @@ defmodule Mensch.Harmony.Resolver do
     end
   end
 
-  defp resolve_foreign_bass(%ChordSpec{foreign_bass: nil}, _voiced_notes, _resolved_notes),
-    do: nil
+  defp resolve_foreign_bass(
+         %ChordSpec{harmonic_identity: %{bass_pitch_class: nil}},
+         _voiced_notes,
+         _resolved_notes
+       ),
+       do: nil
 
   defp resolve_foreign_bass(
-         %ChordSpec{foreign_bass: %ForeignBass{} = bass, voicing: voicing},
+         %ChordSpec{harmonic_identity: %{bass_pitch_class: bass_pitch_class}, voicing: voicing} =
+           spec,
          voiced_notes,
          resolved_notes
        ) do
+    bass = spec.foreign_bass || %ForeignBass{}
     chord_pitch_classes = resolved_notes |> Enum.map(&rem(&1, 12)) |> MapSet.new()
-    bass_pc = ChordSpec.pitch_class_to_semitone(bass.pitch_class)
+    bass_pc = ChordSpec.pitch_class_to_semitone(bass_pitch_class)
 
     if MapSet.member?(chord_pitch_classes, bass_pc) do
       raise ArgumentError,
-            "foreign_bass #{inspect(bass.pitch_class)} is not foreign: pitch class belongs to chord tones"
+            "foreign_bass #{inspect(bass_pitch_class)} is not foreign: pitch class belongs to chord tones"
     end
 
     bass_note =
       case bass.mode do
         :absolute ->
-          ChordSpec.midi_note_number(bass.pitch_class, bass.octave)
+          ChordSpec.midi_note_number(bass_pitch_class, bass.octave)
 
         :relative ->
           place_foreign_bass_relative(voiced_notes, bass_pc, bass.octave)

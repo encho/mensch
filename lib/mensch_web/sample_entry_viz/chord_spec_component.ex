@@ -17,6 +17,7 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
       |> assign(:tone_labels, ChordSpec.tones(chord_spec))
       |> assign(:note_labels, midi_note_labels(chord_spec))
       |> assign(:voicing_fields, voicing_fields(chord_spec))
+      |> assign(:foreign_bass_pitch_class_label, foreign_bass_pitch_class_label(chord_spec))
       |> assign(:foreign_bass_fields, foreign_bass_fields(chord_spec.foreign_bass))
 
     ~H"""
@@ -33,7 +34,7 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
         <dt class="text-zinc-500">Foreign bass</dt>
         <dd>{foreign_bass_label(@chord_spec.foreign_bass)}</dd>
         <dt class="text-zinc-500">Foreign bass pitch class</dt>
-        <dd>{Map.get(@foreign_bass_fields, "pitch_class")}</dd>
+        <dd>{@foreign_bass_pitch_class_label}</dd>
         <dt class="text-zinc-500">Foreign bass mode</dt>
         <dd>{Map.get(@foreign_bass_fields, "mode")}</dd>
         <dt class="text-zinc-500">Foreign bass octave</dt>
@@ -84,7 +85,14 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
 
   defp foreign_bass_label(%ChordSpec.ForeignBass{} = foreign_bass) do
     mode = Atom.to_string(foreign_bass.mode)
-    "#{root_label(foreign_bass.pitch_class)} o#{foreign_bass.octave} (#{mode})"
+    "o#{foreign_bass.octave} (#{mode})"
+  end
+
+  defp foreign_bass_pitch_class_label(%ChordSpec{} = chord_spec) do
+    case chord_spec.harmonic_identity.bass_pitch_class do
+      pitch_class when is_atom(pitch_class) -> root_label(pitch_class)
+      _ -> "-"
+    end
   end
 
   defp normalize_chord_spec(%ChordSpec{voicing: nil} = chord_spec) do
@@ -108,12 +116,11 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   end
 
   defp foreign_bass_fields(nil) do
-    %{"pitch_class" => "-", "mode" => "-", "octave" => "-"}
+    %{"mode" => "-", "octave" => "-"}
   end
 
   defp foreign_bass_fields(%ChordSpec.ForeignBass{} = foreign_bass) do
     %{
-      "pitch_class" => root_label(foreign_bass.pitch_class),
       "mode" => atom_or_dash(foreign_bass.mode),
       "octave" => integer_or_dash(foreign_bass.octave)
     }

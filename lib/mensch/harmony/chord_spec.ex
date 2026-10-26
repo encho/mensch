@@ -4,10 +4,10 @@ defmodule Mensch.Harmony.ChordSpec do
 
   This module models four independent concepts:
 
-  1. Harmonic identity (`root` + `quality`)
+  1. Harmonic identity (`root` + `quality` + optional `bass_pitch_class`)
   2. Inversion (`inversion`)
   3. Voicing (`voicing`)
-  4. Independent optional foreign bass (`foreign_bass`)
+  4. Optional foreign bass placement settings (`foreign_bass`)
 
   The concrete note generation pipeline is implemented in
   `Mensch.Harmony.Resolver`.
@@ -72,11 +72,12 @@ defmodule Mensch.Harmony.ChordSpec do
     """
 
     @enforce_keys [:root, :quality]
-    defstruct root: nil, quality: nil
+    defstruct root: nil, quality: nil, bass_pitch_class: nil
 
     @type t :: %__MODULE__{
             root: Mensch.Harmony.ChordSpec.pitch_class(),
-            quality: Mensch.Harmony.ChordSpec.quality()
+            quality: Mensch.Harmony.ChordSpec.quality(),
+            bass_pitch_class: Mensch.Harmony.ChordSpec.pitch_class() | nil
           }
   end
 
@@ -113,7 +114,7 @@ defmodule Mensch.Harmony.ChordSpec do
 
   defmodule ForeignBass do
     @moduledoc """
-    Independent foreign bass definition.
+    Foreign bass placement settings.
 
       `mode` controls how octave is interpreted:
 
@@ -121,10 +122,9 @@ defmodule Mensch.Harmony.ChordSpec do
       * `:relative` - octave is an offset below the lowest voiced chord note octave
     """
 
-    defstruct pitch_class: nil, octave: 0, mode: :relative
+    defstruct octave: 0, mode: :relative
 
     @type t :: %__MODULE__{
-            pitch_class: Mensch.Harmony.ChordSpec.pitch_class(),
             octave: integer(),
             mode: :absolute | :relative
           }
@@ -239,6 +239,10 @@ defmodule Mensch.Harmony.ChordSpec do
 
       not Map.has_key?(@quality_tones, spec.harmonic_identity.quality) ->
         {:error, {:invalid_quality, spec.harmonic_identity.quality}}
+
+      not is_nil(spec.harmonic_identity.bass_pitch_class) and
+          not valid_pitch_class?(spec.harmonic_identity.bass_pitch_class) ->
+        {:error, {:invalid_bass_pitch_class, spec.harmonic_identity.bass_pitch_class}}
 
       not is_integer(spec.octave) ->
         {:error, {:invalid_octave, spec.octave}}
@@ -389,8 +393,8 @@ defmodule Mensch.Harmony.ChordSpec do
     explicit = "(" <> Enum.map_join(tones, ",", &display_tone/1) <> ")"
 
     bass =
-      case spec.foreign_bass do
-        %ForeignBass{pitch_class: pitch_class} -> "/" <> root_label(pitch_class)
+      case spec.harmonic_identity.bass_pitch_class do
+        pitch_class when is_atom(pitch_class) -> "/" <> root_label(pitch_class)
         _ -> ""
       end
 
@@ -528,9 +532,6 @@ defmodule Mensch.Harmony.ChordSpec do
 
   defp validate_foreign_bass(:ok, %ForeignBass{} = bass) do
     cond do
-      not valid_pitch_class?(bass.pitch_class) ->
-        {:error, {:invalid_foreign_bass_pitch_class, bass.pitch_class}}
-
       bass.mode not in [:absolute, :relative] ->
         {:error, {:invalid_foreign_bass_mode, bass.mode}}
 

@@ -117,7 +117,11 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
   @spec to_chord_spec_attrs(t()) :: map()
   def to_chord_spec_attrs(%__MODULE__{} = params) do
     %{
-      harmonic_identity: %{root: params.root, quality: params.quality},
+      harmonic_identity: %{
+        root: params.root,
+        quality: params.quality,
+        bass_pitch_class: params.foreign_bass_pitch_class
+      },
       octave: params.octave,
       inversion: params.inversion,
       voicing: %Voicing{
@@ -137,7 +141,6 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
 
   defp to_foreign_bass(%__MODULE__{} = params) do
     %ForeignBass{
-      pitch_class: params.foreign_bass_pitch_class,
       mode: params.foreign_bass_mode,
       octave: params.foreign_bass_octave
     }

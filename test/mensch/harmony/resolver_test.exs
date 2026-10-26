@@ -125,10 +125,14 @@ defmodule Mensch.Harmony.ResolverTest do
   test "fails hard when foreign bass is not foreign" do
     spec =
       ChordSpec.new!(%{
-        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :c,
+          quality: :maj7,
+          bass_pitch_class: :e
+        },
         octave: 3,
         inversion: 0,
-        foreign_bass: %ForeignBass{pitch_class: :e, mode: :relative, octave: 0}
+        foreign_bass: %ForeignBass{mode: :relative, octave: 0}
       })
 
     assert_raise ArgumentError, ~r/not foreign/, fn ->
@@ -139,11 +143,15 @@ defmodule Mensch.Harmony.ResolverTest do
   test "relative foreign bass offset 0 auto-shifts one octave lower when needed" do
     spec =
       ChordSpec.new!(%{
-        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :c,
+          quality: :maj7,
+          bass_pitch_class: :b_flat
+        },
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60},
-        foreign_bass: %ForeignBass{pitch_class: :b_flat, mode: :relative, octave: 0}
+        foreign_bass: %ForeignBass{mode: :relative, octave: 0}
       })
 
     notes = Resolver.resolve(spec)
@@ -154,11 +162,15 @@ defmodule Mensch.Harmony.ResolverTest do
   test "relative foreign bass offset tracks lowest voiced chord octave" do
     spec =
       ChordSpec.new!(%{
-        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :c,
+          quality: :maj7,
+          bass_pitch_class: :f_sharp
+        },
         octave: 3,
         inversion: 1,
         voicing: %Voicing{type: :open, center_note: 60},
-        foreign_bass: %ForeignBass{pitch_class: :f_sharp, mode: :relative, octave: 1}
+        foreign_bass: %ForeignBass{mode: :relative, octave: 1}
       })
 
     notes = Resolver.resolve(spec)
@@ -184,11 +196,15 @@ defmodule Mensch.Harmony.ResolverTest do
   test "fails hard when explicit foreign bass is above or equal to lowest chord voice" do
     spec =
       ChordSpec.new!(%{
-        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :c,
+          quality: :maj7,
+          bass_pitch_class: :f_sharp
+        },
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60},
-        foreign_bass: %ForeignBass{pitch_class: :f_sharp, mode: :absolute, octave: 4}
+        foreign_bass: %ForeignBass{mode: :absolute, octave: 4}
       })
 
     assert_raise ArgumentError, ~r/must be below the lowest voiced chord tone/, fn ->
@@ -281,11 +297,15 @@ defmodule Mensch.Harmony.ResolverTest do
   test "final note details mark foreign bass role" do
     spec =
       ChordSpec.new!(%{
-        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{root: :c, quality: :maj7},
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :c,
+          quality: :maj7,
+          bass_pitch_class: :f_sharp
+        },
         octave: 3,
         inversion: 0,
         voicing: %Voicing{type: :close, center_note: 60},
-        foreign_bass: %ForeignBass{pitch_class: :f_sharp, mode: :relative, octave: 1}
+        foreign_bass: %ForeignBass{mode: :relative, octave: 1}
       })
 
     steps = Resolver.resolve_steps(spec)
