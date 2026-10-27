@@ -4,6 +4,8 @@ defmodule MenschWeb.ScaleChordLabLive do
   alias Mensch.Scale
   alias Mensch.Scale.ScaleRegistry
   alias Mensch.Scale.ScaleSpec
+  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.HarmonicIdentityInference
   alias MenschWeb.FullPianoKeyboard
 
   @tonics [
@@ -49,6 +51,7 @@ defmodule MenschWeb.ScaleChordLabLive do
       |> assign(:scale_spec, nil)
       |> assign(:scale_notes, [])
       |> assign(:generated_chord, nil)
+      |> assign(:resolved_harmonic_identities, [])
       |> assign(:keyboard_notes, [])
       |> assign(:tonic_keyboard_notes, [])
       |> assign(:error_message, nil)
@@ -340,6 +343,36 @@ defmodule MenschWeb.ScaleChordLabLive do
                 Yellow notes mark chord root across octaves. Green notes are other chord tones.
               </p>
             </div>
+
+            <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3 space-y-2">
+              <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                5) Resolved Harmonic Identities
+              </h3>
+
+              <div id="scale-chord-lab-resolved-identities" class="space-y-1">
+                <div
+                  :for={{match, idx} <- Enum.with_index(@resolved_harmonic_identities)}
+                  class="rounded-sm border border-zinc-800 bg-zinc-900/60 px-2 py-1"
+                >
+                  <div class="flex items-center justify-between">
+                    <p class="font-mono text-xs text-zinc-100">
+                      {idx + 1}. {harmonic_identity_label(match, @generated_chord)}
+                    </p>
+                    <p class="font-mono text-[11px] text-zinc-300">
+                      Source {identity_source_label(match)}
+                    </p>
+                  </div>
+                  <div class="mt-1 flex items-center justify-between">
+                    <p class="font-mono text-[11px] text-zinc-400">
+                      {inspect(match.harmonic_identity)}
+                    </p>
+                    <p class="font-mono text-[11px] text-emerald-200">
+                      Quality {format_quality(match.quality || 100.0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           <% end %>
         </div>
       </section>
@@ -368,11 +401,21 @@ defmodule MenschWeb.ScaleChordLabLive do
              shape: shape
            ),
          {:ok, keyboard_notes} <- single_chord_voicing_notes(generated_chord, 21, 108),
+         resolved_harmonic_identities <-
+           resolve_harmonic_identities(
+             generated_chord,
+             scale_spec,
+             keyboard_notes,
+             strategy,
+             shape,
+             degree
+           ),
          {:ok, tonic_keyboard_notes} <- single_root_note(generated_chord, keyboard_notes) do
       socket
       |> assign(:scale_spec, scale_spec)
       |> assign(:scale_notes, scale_notes)
       |> assign(:generated_chord, generated_chord)
+      |> assign(:resolved_harmonic_identities, resolved_harmonic_identities)
       |> assign(:keyboard_notes, keyboard_notes)
       |> assign(:tonic_keyboard_notes, tonic_keyboard_notes)
       |> assign(:error_message, nil)
@@ -382,6 +425,7 @@ defmodule MenschWeb.ScaleChordLabLive do
         |> assign(:scale_spec, nil)
         |> assign(:scale_notes, [])
         |> assign(:generated_chord, nil)
+        |> assign(:resolved_harmonic_identities, [])
         |> assign(:keyboard_notes, [])
         |> assign(:tonic_keyboard_notes, [])
         |> assign(:error_message, format_error(reason))
@@ -675,4 +719,108 @@ defmodule MenschWeb.ScaleChordLabLive do
     do: "Shape #{inspect(shape)} is not supported by #{inspect(strategy)}."
 
   defp format_error(reason), do: inspect(reason)
+
+  defp harmonic_identity_symbol(%ChordSpec.HarmonicIdentity{} = identity) do
+    spec =
+      ChordSpec.new!(%{
+        harmonic_identity: identity,
+        octave: 3,
+        inversion: 0
+      })
+
+    ChordSpec.symbol_label(spec)
+  end
+
+  defp harmonic_identity_label(
+         %{harmonic_identity: %ChordSpec.HarmonicIdentity{} = identity},
+         generated_chord
+       )
+       when is_map(generated_chord) do
+    symbol = harmonic_identity_symbol(identity)
+
+    if harmonic_identity_exact_for_generated_chord?(identity, generated_chord) do
+      symbol
+    else
+      note_list = Enum.join(Map.get(generated_chord, :note_names, []), "-")
+      "#{symbol} (obs: #{note_list})"
+    end
+  end
+
+  defp harmonic_identity_label(%{harmonic_identity: %ChordSpec.HarmonicIdentity{} = identity}, _),
+    do: harmonic_identity_symbol(identity)
+
+  defp harmonic_identity_label(_match, generated_chord) when is_map(generated_chord) do
+    note_list = Enum.join(Map.get(generated_chord, :note_names, []), "-")
+    root = Map.get(generated_chord, :root_note, "?")
+    "#{root}[#{note_list}]"
+  end
+
+  defp harmonic_identity_label(_match, _generated_chord), do: "Unknown"
+
+  defp harmonic_identity_exact_for_generated_chord?(
+         %ChordSpec.HarmonicIdentity{root: root, quality: quality},
+         generated_chord
+       ) do
+    with root_pc when is_integer(root_pc) <- ChordSpec.pitch_class_to_semitone(root),
+         observed when is_list(observed) <- Map.get(generated_chord, :pitch_classes),
+         expected <- quality_pitch_classes(root_pc, quality) do
+      normalize_pitch_classes(observed) == expected
+    else
+      _ -> false
+    end
+  end
+
+  defp quality_pitch_classes(root_pc, quality) when is_integer(root_pc) and is_atom(quality) do
+    quality
+    |> ChordSpec.quality_tones()
+    |> Enum.map(&ChordSpec.tone_interval/1)
+    |> Enum.map(&rem(root_pc + &1, 12))
+    |> normalize_pitch_classes()
+  rescue
+    _ -> []
+  end
+
+  defp normalize_pitch_classes(values) when is_list(values) do
+    values
+    |> Enum.filter(&is_integer/1)
+    |> Enum.map(&rem(&1 + 120, 12))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp format_quality(value) when is_float(value), do: :erlang.float_to_binary(value, decimals: 2)
+  defp format_quality(value), do: to_string(value)
+
+  defp resolve_harmonic_identities(
+         generated_chord,
+         scale_spec,
+         keyboard_notes,
+         strategy,
+         shape,
+         degree
+       ) do
+    bass_pitch_class =
+      case keyboard_notes do
+        [lowest | _] when is_integer(lowest) ->
+          ChordSpec.note_name(lowest)
+          |> elem(0)
+
+        _ ->
+          nil
+      end
+
+    HarmonicIdentityInference.infer(generated_chord.pitch_classes,
+      scale_spec: scale_spec,
+      bass_pitch_class: bass_pitch_class,
+      preferred_root_pitch_class: generated_chord.root_pitch_class,
+      preferred_strategy: strategy,
+      preferred_shape: shape,
+      preferred_degree: degree
+    )
+    |> Enum.map(&Map.put_new(&1, :source, :inferred))
+  end
+
+  defp identity_source_label(%{source: :direct}), do: "direct"
+  defp identity_source_label(%{source: :inferred}), do: "inferred"
+  defp identity_source_label(_match), do: "inferred"
 end

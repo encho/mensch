@@ -39,13 +39,13 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
         semitones
       )
 
-    {bass_pitch_class, foreign_bass} =
+    {foreign_bass_pc, foreign_bass} =
       transpose_identity_bass_and_settings(chord_spec, semitones)
 
     harmonic_identity = %HarmonicIdentity{
       root: root,
       quality: chord_spec.harmonic_identity.quality,
-      bass_pitch_class: bass_pitch_class
+      foreign_bass: foreign_bass_pc
     }
 
     voicing = transpose_voicing(chord_spec.voicing, semitones)
@@ -69,13 +69,13 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
   end
 
   defp transpose_identity_bass_and_settings(
-         %ChordSpec{harmonic_identity: %{bass_pitch_class: nil}} = chord_spec,
+         %ChordSpec{harmonic_identity: %{foreign_bass: nil}} = chord_spec,
          _semitones
        ),
        do: {nil, chord_spec.foreign_bass}
 
   defp transpose_identity_bass_and_settings(
-         %ChordSpec{harmonic_identity: %{bass_pitch_class: bass_pitch_class}} = chord_spec,
+         %ChordSpec{harmonic_identity: %{foreign_bass: foreign_bass_pc}} = chord_spec,
          semitones
        ) do
     bass_settings =
@@ -88,7 +88,7 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
       :absolute ->
         {new_bass_pitch_class, octave} =
           transpose_pitch_class_with_octave(
-            bass_pitch_class,
+            foreign_bass_pc,
             bass_settings.octave,
             semitones
           )
@@ -98,7 +98,7 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
       :relative ->
         {new_bass_pitch_class, _octave_unused} =
           transpose_pitch_class_with_octave(
-            bass_pitch_class,
+            foreign_bass_pc,
             0,
             semitones
           )

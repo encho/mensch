@@ -11,6 +11,8 @@ defmodule MenschWeb.ScaleChordLabLiveTest do
     assert html =~ "2) Chord Strategy"
     assert html =~ "3) Select Degree"
     assert html =~ "4) Generated Chord"
+    assert html =~ "5) Resolved Harmonic Identities"
+    assert html =~ "Quality"
     assert html =~ "Chord:"
   end
 
@@ -29,6 +31,7 @@ defmodule MenschWeb.ScaleChordLabLiveTest do
     assert html =~ "Chord: D"
     assert html =~ "F"
     assert html =~ "A"
+    assert has_element?(view, "#scale-chord-lab-resolved-identities")
   end
 
   test "switching to standalone scale hides mode selector and still generates chord", %{
@@ -101,5 +104,22 @@ defmodule MenschWeb.ScaleChordLabLiveTest do
     assert html =~ "Chord: C"
     assert html =~ "G"
     assert html =~ "D"
+  end
+
+  test "c dorian degree 1 seventh resolves cm7 first", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/scale-chord-lab")
+
+    view
+    |> element("form[phx-change='set_mode']")
+    |> render_change(%{"mode" => "2"})
+
+    view
+    |> element("form[phx-change='set_shape']")
+    |> render_change(%{"shape" => "seventh"})
+
+    html = render(view)
+
+    assert has_element?(view, "#scale-chord-lab-resolved-identities")
+    assert html =~ "1. Cm7"
   end
 end

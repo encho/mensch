@@ -45,9 +45,16 @@ defmodule Mensch.Scale.ScaleGeneratorTest do
   test "strict enharmonic spelling examples" do
     db_major = build_spec!(:d_flat, :major, 1)
     fs_major = build_spec!(:f_sharp, :major, 1)
+    eb_harmonic_minor_mode6 = build_spec!(:e_flat, :harmonic_minor, 6)
 
-    assert {:ok, ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"]} = ScaleGenerator.notes(db_major)
-    assert {:ok, ["F#", "G#", "A#", "B", "C#", "D#", "E#"]} = ScaleGenerator.notes(fs_major)
+    assert {:ok, ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"]} =
+             ScaleGenerator.notes(db_major, :strict)
+
+    assert {:ok, ["F#", "G#", "A#", "B", "C#", "D#", "E#"]} =
+             ScaleGenerator.notes(fs_major, :strict)
+
+    assert {:ok, ["Eb", "F#", "G", "A", "Bb", "C", "D"]} =
+             ScaleGenerator.notes(eb_harmonic_minor_mode6, :strict)
   end
 
   test "midi generation boundaries and membership" do

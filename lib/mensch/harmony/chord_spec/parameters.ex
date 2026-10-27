@@ -120,7 +120,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
       harmonic_identity: %{
         root: params.root,
         quality: params.quality,
-        bass_pitch_class: params.foreign_bass_pitch_class
+        foreign_bass: params.foreign_bass_pitch_class
       },
       octave: params.octave,
       inversion: params.inversion,

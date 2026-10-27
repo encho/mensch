@@ -4,7 +4,7 @@ defmodule Mensch.Harmony.ChordSpec do
 
   This module models four independent concepts:
 
-  1. Harmonic identity (`root` + `quality` + optional `bass_pitch_class`)
+  1. Harmonic identity (`root` + `quality` + optional `foreign_bass`)
   2. Inversion (`inversion`)
   3. Voicing (`voicing`)
   4. Optional foreign bass placement settings (`foreign_bass`)
@@ -52,6 +52,12 @@ defmodule Mensch.Harmony.ChordSpec do
           | :maj9
           | :min9
           | :dom9
+          | :maj7_add_sharp9
+          | :dim7_flat9
+          | :min_maj9
+          | :half_dim_flat9
+          | :maj7_sharp5_9
+          | :dom7_flat9
           | :maj11
           | :min11
           | :dom13
@@ -72,12 +78,12 @@ defmodule Mensch.Harmony.ChordSpec do
     """
 
     @enforce_keys [:root, :quality]
-    defstruct root: nil, quality: nil, bass_pitch_class: nil
+    defstruct root: nil, quality: nil, foreign_bass: nil
 
     @type t :: %__MODULE__{
             root: Mensch.Harmony.ChordSpec.pitch_class(),
             quality: Mensch.Harmony.ChordSpec.quality(),
-            bass_pitch_class: Mensch.Harmony.ChordSpec.pitch_class() | nil
+            foreign_bass: Mensch.Harmony.ChordSpec.pitch_class() | nil
           }
   end
 
@@ -187,6 +193,12 @@ defmodule Mensch.Harmony.ChordSpec do
     maj9: ["1", "3", "5", "7", "9"],
     min9: ["1", "b3", "5", "b7", "9"],
     dom9: ["1", "3", "5", "b7", "9"],
+    maj7_add_sharp9: ["1", "3", "5", "7", "#9"],
+    dim7_flat9: ["1", "b3", "b5", "bb7", "b9"],
+    min_maj9: ["1", "b3", "5", "7", "9"],
+    half_dim_flat9: ["1", "b3", "b5", "b7", "b9"],
+    maj7_sharp5_9: ["1", "3", "#5", "7", "9"],
+    dom7_flat9: ["1", "3", "5", "b7", "b9"],
     maj11: ["1", "3", "5", "7", "9", "11"],
     min11: ["1", "b3", "5", "b7", "9", "11"],
     dom13: ["1", "3", "5", "b7", "9", "13"],
@@ -240,9 +252,9 @@ defmodule Mensch.Harmony.ChordSpec do
       not Map.has_key?(@quality_tones, spec.harmonic_identity.quality) ->
         {:error, {:invalid_quality, spec.harmonic_identity.quality}}
 
-      not is_nil(spec.harmonic_identity.bass_pitch_class) and
-          not valid_pitch_class?(spec.harmonic_identity.bass_pitch_class) ->
-        {:error, {:invalid_bass_pitch_class, spec.harmonic_identity.bass_pitch_class}}
+      not is_nil(spec.harmonic_identity.foreign_bass) and
+          not valid_pitch_class?(spec.harmonic_identity.foreign_bass) ->
+        {:error, {:invalid_foreign_bass, spec.harmonic_identity.foreign_bass}}
 
       not is_integer(spec.octave) ->
         {:error, {:invalid_octave, spec.octave}}
@@ -288,6 +300,16 @@ defmodule Mensch.Harmony.ChordSpec do
   @doc "Returns the harmonic quality for the given spec."
   @spec quality(t()) :: quality()
   def quality(%__MODULE__{} = spec), do: spec.harmonic_identity.quality
+
+  @doc "Returns all supported chord qualities."
+  @spec qualities() :: [quality()]
+  def qualities, do: Map.keys(@quality_tones)
+
+  @doc "Returns tone tokens for a supported quality."
+  @spec quality_tones(quality()) :: [tone()]
+  def quality_tones(quality) when is_atom(quality) do
+    Map.fetch!(@quality_tones, quality)
+  end
 
   @doc "Returns semitone intervals for resolved tones."
   @spec tone_intervals(t()) :: [integer()]
@@ -393,9 +415,12 @@ defmodule Mensch.Harmony.ChordSpec do
     explicit = "(" <> Enum.map_join(tones, ",", &display_tone/1) <> ")"
 
     bass =
-      case spec.harmonic_identity.bass_pitch_class do
-        pitch_class when is_atom(pitch_class) -> "/" <> root_label(pitch_class)
-        _ -> ""
+      case spec.harmonic_identity.foreign_bass do
+        pitch_class when is_atom(pitch_class) and not is_nil(pitch_class) ->
+          if pitch_class != root(spec), do: "/" <> root_label(pitch_class), else: ""
+
+        _ ->
+          ""
       end
 
     case quality do
@@ -424,6 +449,12 @@ defmodule Mensch.Harmony.ChordSpec do
       set == MapSet.new(["1", "3", "5", "7", "9"]) -> "maj9"
       set == MapSet.new(["1", "b3", "5", "b7", "9"]) -> "m9"
       set == MapSet.new(["1", "3", "5", "b7", "9"]) -> "9"
+      set == MapSet.new(["1", "3", "5", "7", "#9"]) -> "maj7(add#9)"
+      set == MapSet.new(["1", "b3", "b5", "bb7", "b9"]) -> "dim7(♭9)"
+      set == MapSet.new(["1", "b3", "5", "7", "9"]) -> "m(maj9)"
+      set == MapSet.new(["1", "b3", "b5", "b7", "b9"]) -> "m7♭5(♭9)"
+      set == MapSet.new(["1", "3", "#5", "7", "9"]) -> "maj7(#5,9)"
+      set == MapSet.new(["1", "3", "5", "b7", "b9"]) -> "7(♭9)"
       set == MapSet.new(["1", "b3", "5", "b7", "9", "11"]) -> "m11"
       set == MapSet.new(["1", "3", "5", "7", "9", "11"]) -> "maj11"
       set == MapSet.new(["1", "3", "5", "b7", "9", "13"]) -> "13"

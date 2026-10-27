@@ -59,18 +59,43 @@ defmodule Mensch.Scale.ScaleGenerator do
     a_sharp: {:a, 1},
     b_flat: {:b, -1},
     b: {:b, 0},
+    d_double_flat: {:d, -2},
+    d_double_sharp: {:d, 2},
+    e_double_flat: {:e, -2},
+    e_double_sharp: {:e, 2},
+    f_double_flat: {:f, -2},
+    f_double_sharp: {:f, 2},
+    g_double_flat: {:g, -2},
+    g_double_sharp: {:g, 2},
+    a_double_flat: {:a, -2},
+    a_double_sharp: {:a, 2},
     c_double_flat: {:c, -2},
     b_double_sharp: {:b, 2}
   }
 
   @spec notes(ScaleSpec.t()) :: {:ok, [String.t()]} | {:error, term()}
   def notes(%ScaleSpec{} = scale_spec) do
+    notes(scale_spec, :practical)
+  end
+
+  @spec notes(ScaleSpec.t(), :practical | :strict) :: {:ok, [String.t()]} | {:error, term()}
+  def notes(%ScaleSpec{} = scale_spec, spelling_mode)
+      when spelling_mode in [:practical, :strict] do
     with {:ok, tonic_pc} <- tonic_pitch_class(scale_spec.tonic),
          {:ok, tonic_letter} <- tonic_spelling(scale_spec.tonic),
          :ok <- validate_intervals(scale_spec.intervals) do
       letter_index = letter_index(tonic_letter)
 
-      case choose_degree_path(scale_spec.intervals, tonic_pc, tonic_letter) do
+      degree_path =
+        case spelling_mode do
+          :strict ->
+            {:ok, Enum.to_list(1..length(scale_spec.intervals))}
+
+          :practical ->
+            choose_degree_path(scale_spec.intervals, tonic_pc, tonic_letter, :practical)
+        end
+
+      case degree_path do
         {:ok, degrees} ->
           named_notes =
             degrees
@@ -215,14 +240,14 @@ defmodule Mensch.Scale.ScaleGenerator do
 
   defp letter_index(letter), do: Enum.find_index(@letters, &(&1 == letter))
 
-  defp choose_degree_path(intervals, tonic_pc, tonic_letter) do
+  defp choose_degree_path(intervals, tonic_pc, tonic_letter, spelling_mode) do
     state = %{best_cost: nil, best_path: nil}
     letter_index = letter_index(tonic_letter)
 
     result =
       intervals
       |> Enum.with_index()
-      |> search_degree_paths(0, nil, [], 0, state, tonic_pc, letter_index)
+      |> search_degree_paths(0, nil, [], 0, state, tonic_pc, letter_index, spelling_mode)
 
     case result.best_path do
       nil -> {:error, :unable_to_spell_scale}
@@ -238,7 +263,8 @@ defmodule Mensch.Scale.ScaleGenerator do
          acc_cost,
          state,
          tonic_pc,
-         tonic_letter_idx
+         tonic_letter_idx,
+         spelling_mode
        ) do
     if idx >= length(indexed_intervals) do
       maybe_store_best(state, acc_cost, Enum.reverse(acc_path))
@@ -257,6 +283,12 @@ defmodule Mensch.Scale.ScaleGenerator do
           double_penalty = if abs(accidental) > 1, do: 5, else: 0
           next_cost = acc_cost + abs(accidental) + repeat_penalty + double_penalty
 
+          next_cost =
+            case spelling_mode do
+              :strict -> next_cost
+              :practical -> next_cost
+            end
+
           if is_nil(st.best_cost) or next_cost <= st.best_cost do
             search_degree_paths(
               indexed_intervals,
@@ -266,7 +298,8 @@ defmodule Mensch.Scale.ScaleGenerator do
               next_cost,
               st,
               tonic_pc,
-              tonic_letter_idx
+              tonic_letter_idx,
+              spelling_mode
             )
           else
             st

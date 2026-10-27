@@ -128,7 +128,7 @@ defmodule Mensch.Harmony.ResolverTest do
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: :c,
           quality: :maj7,
-          bass_pitch_class: :e
+          foreign_bass: :e
         },
         octave: 3,
         inversion: 0,
@@ -146,7 +146,7 @@ defmodule Mensch.Harmony.ResolverTest do
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: :c,
           quality: :maj7,
-          bass_pitch_class: :b_flat
+          foreign_bass: :b_flat
         },
         octave: 3,
         inversion: 0,
@@ -165,7 +165,7 @@ defmodule Mensch.Harmony.ResolverTest do
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: :c,
           quality: :maj7,
-          bass_pitch_class: :f_sharp
+          foreign_bass: :f_sharp
         },
         octave: 3,
         inversion: 1,
@@ -199,7 +199,7 @@ defmodule Mensch.Harmony.ResolverTest do
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: :c,
           quality: :maj7,
-          bass_pitch_class: :f_sharp
+          foreign_bass: :f_sharp
         },
         octave: 3,
         inversion: 0,
@@ -300,7 +300,7 @@ defmodule Mensch.Harmony.ResolverTest do
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: :c,
           quality: :maj7,
-          bass_pitch_class: :f_sharp
+          foreign_bass: :f_sharp
         },
         octave: 3,
         inversion: 0,

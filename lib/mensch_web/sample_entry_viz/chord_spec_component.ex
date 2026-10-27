@@ -89,8 +89,8 @@ defmodule MenschWeb.SampleEntryViz.ChordSpecComponent do
   end
 
   defp foreign_bass_pitch_class_label(%ChordSpec{} = chord_spec) do
-    case chord_spec.harmonic_identity.bass_pitch_class do
-      pitch_class when is_atom(pitch_class) -> root_label(pitch_class)
+    case chord_spec.harmonic_identity.foreign_bass do
+      pitch_class when is_atom(pitch_class) and not is_nil(pitch_class) -> root_label(pitch_class)
       _ -> "-"
     end
   end

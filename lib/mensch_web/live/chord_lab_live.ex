@@ -2042,18 +2042,28 @@ defmodule MenschWeb.ChordLabLive do
   defp diatonic_chord_kinds, do: @diatonic_chord_kinds
 
   defp identity_summary(values) when is_map(values) do
-    root_label =
+    root =
       case parse_pitch_class(Map.get(values, "root")) do
-        {:ok, root} -> ChordSpec.root_label(root)
-        _ -> "?"
+        {:ok, parsed_root} -> parsed_root
+        _ -> nil
+      end
+
+    root_label =
+      case root do
+        nil -> "?"
+        parsed_root -> ChordSpec.root_label(parsed_root)
       end
 
     quality = Map.get(values, "quality", "?")
 
     slash_bass =
       case parse_foreign_bass_pitch_class(Map.get(values, "foreign_bass_pitch_class")) do
-        {:ok, bass_pc} -> "/" <> ChordSpec.root_label(bass_pc)
-        _ -> ""
+        {:ok, bass_pc}
+        when is_atom(root) and is_atom(bass_pc) and not is_nil(bass_pc) and bass_pc != root ->
+          "/" <> ChordSpec.root_label(bass_pc)
+
+        _ ->
+          ""
       end
 
     symbol = "#{root_label}#{quality}#{slash_bass}"
@@ -2261,7 +2271,7 @@ defmodule MenschWeb.ChordLabLive do
         harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
           root: root,
           quality: quality,
-          bass_pitch_class: bass_pitch_class
+          foreign_bass: bass_pitch_class
         },
         octave: octave,
         inversion: inversion,
