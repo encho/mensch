@@ -319,7 +319,7 @@ defmodule MenschWeb.ProgressionLive do
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:progression}>
       <section class="mx-auto w-full max-w-7xl space-y-4">
         <.page_heading
-          title="Progression"
+          title="Chord Progression Lab"
           subtitle="Build a progression pipeline with one source and append-only transforms."
         />
 

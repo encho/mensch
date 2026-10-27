@@ -88,7 +88,7 @@ defmodule MenschWeb.Layouts do
                 nav_button_class(@nav_active == :samples)
               ]}
             >
-              <.icon name="hero-queue-list" class="size-4" />
+              <.icon name="hero-folder-open" class="size-4" />
             </.link>
             <.link
               navigate={~p"/chord-lab"}
@@ -99,18 +99,18 @@ defmodule MenschWeb.Layouts do
                 nav_button_class(@nav_active == :chord_lab)
               ]}
             >
-              <.icon name="hero-beaker" class="size-4" />
+              <.icon name="hero-musical-note" class="size-4" />
             </.link>
             <.link
-              navigate={~p"/progression"}
-              title="Progression"
-              aria-label="Progression"
+              navigate={~p"/chord-progression-lab"}
+              title="Chord Progression Lab"
+              aria-label="Chord Progression Lab"
               class={[
                 "ui-radius-btn relative flex size-9 items-center justify-center border text-white/70 transition-colors duration-150",
                 nav_button_class(@nav_active == :progression)
               ]}
             >
-              <.icon name="hero-queue-list" class="size-4" />
+              <.icon name="hero-arrow-path-rounded-square" class="size-4" />
             </.link>
             <.link
               navigate={~p"/scale-lab"}
@@ -121,7 +121,7 @@ defmodule MenschWeb.Layouts do
                 nav_button_class(@nav_active == :scale_lab)
               ]}
             >
-              <.icon name="hero-bars-3-bottom-left" class="size-4" />
+              <.icon name="hero-scale" class="size-4" />
             </.link>
             <.link
               navigate={~p"/scale-chord-lab"}
@@ -132,7 +132,7 @@ defmodule MenschWeb.Layouts do
                 nav_button_class(@nav_active == :scale_chord_lab)
               ]}
             >
-              <.icon name="hero-rectangle-group" class="size-4" />
+              <.icon name="hero-square-3-stack-3d" class="size-4" />
             </.link>
             <div :if={@midi_status} class="relative">
               <button
