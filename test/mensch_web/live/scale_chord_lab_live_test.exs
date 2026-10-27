@@ -122,4 +122,22 @@ defmodule MenschWeb.ScaleChordLabLiveTest do
     assert has_element?(view, "#scale-chord-lab-resolved-identities")
     assert html =~ "1. Cm7"
   end
+
+  test "thirteenth shape highlights extension tones in the next octave", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/scale-chord-lab")
+
+    view
+    |> element("form[phx-change='set_shape']")
+    |> render_change(%{"shape" => "thirteenth"})
+
+    html = render(view)
+
+    assert html =~ ~r/title="D5"[^>]*bg-\[#9bf25a\]/
+    assert html =~ ~r/title="F5"[^>]*bg-\[#9bf25a\]/
+    assert html =~ ~r/title="A5"[^>]*bg-\[#9bf25a\]/
+
+    refute html =~ ~r/title="D4"[^>]*bg-\[#9bf25a\]/
+    refute html =~ ~r/title="F4"[^>]*bg-\[#9bf25a\]/
+    refute html =~ ~r/title="A4"[^>]*bg-\[#9bf25a\]/
+  end
 end

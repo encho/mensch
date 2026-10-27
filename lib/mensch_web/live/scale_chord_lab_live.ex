@@ -439,11 +439,14 @@ defmodule MenschWeb.ScaleChordLabLive do
     if root_note < min_note or root_note > max_note do
       {:error, :root_out_of_keyboard_range}
     else
-      notes =
-        Enum.reduce(rest_pcs, [root_note], fn pitch_class, acc ->
-          prev_note = List.last(acc)
-          [next_note_for_pitch_class(pitch_class, prev_note) | acc]
+      {notes_reversed, _last_note} =
+        Enum.reduce(rest_pcs, {[root_note], root_note}, fn pitch_class, {acc, prev_note} ->
+          next_note = next_note_for_pitch_class(pitch_class, prev_note)
+          {[next_note | acc], next_note}
         end)
+
+      notes =
+        notes_reversed
         |> Enum.reverse()
         |> Enum.filter(&(&1 >= min_note and &1 <= max_note))
 
