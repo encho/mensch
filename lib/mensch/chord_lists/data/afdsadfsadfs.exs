@@ -1,13 +1,16 @@
 %{
-  id: "klnjklm",
-  name: "klnjklm",
+  id: "afdsadfsadfs",
+  name: "afdsadfsadfs",
   version: 1,
   entries: [
     %{
-      id: "21",
+      id: "43",
       parameters: %Mensch.Harmony.ChordSpec.Parameters{
-        root: :c,
-        quality: :maj,
+        harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+          root: :a,
+          quality: :dom7,
+          foreign_bass: nil
+        },
         octave: 3,
         inversion: 0,
         voicing_type: :close,
@@ -18,12 +21,11 @@
         voice_count: nil,
         doubling: :auto,
         foreign_bass_mode: :relative,
-        foreign_bass_pitch_class: nil,
         foreign_bass_octave: 0
       },
-      inserted_at: "2026-10-27T10:01:54Z"
+      inserted_at: "2026-10-27T13:49:45Z"
     }
   ],
-  inserted_at: "2026-10-27T10:01:40Z",
-  updated_at: "2026-10-27T10:01:54Z"
+  inserted_at: "2026-10-27T13:49:44Z",
+  updated_at: "2026-10-27T13:49:45Z"
 }

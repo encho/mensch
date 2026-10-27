@@ -8,10 +8,10 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
 
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.ChordSpec.ForeignBass
+  alias Mensch.Harmony.ChordSpec.HarmonicIdentity
   alias Mensch.Harmony.ChordSpec.Voicing
 
-  defstruct root: :c,
-            quality: :maj7,
+  defstruct harmonic_identity: %HarmonicIdentity{root: :c, quality: :maj7, foreign_bass: nil},
             octave: 3,
             inversion: 0,
             voicing_type: :close,
@@ -22,12 +22,10 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
             voice_count: nil,
             doubling: :auto,
             foreign_bass_mode: :relative,
-            foreign_bass_pitch_class: nil,
             foreign_bass_octave: 0
 
   @type t :: %__MODULE__{
-          root: ChordSpec.pitch_class(),
-          quality: ChordSpec.quality(),
+          harmonic_identity: HarmonicIdentity.t(),
           octave: integer(),
           inversion: integer(),
           voicing_type: :close | :open,
@@ -38,7 +36,6 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
           voice_count: pos_integer() | nil,
           doubling: :root | :top | :auto | :third | :fifth | :guide_tones | :bass,
           foreign_bass_mode: :relative | :absolute,
-          foreign_bass_pitch_class: ChordSpec.pitch_class() | nil,
           foreign_bass_octave: integer()
         }
 
@@ -69,8 +66,11 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
            parse_integer(Map.get(values, "foreign_bass_octave", 0), "foreign_bass_octave") do
       {:ok,
        %__MODULE__{
-         root: root,
-         quality: quality,
+         harmonic_identity: %HarmonicIdentity{
+           root: root,
+           quality: quality,
+           foreign_bass: foreign_bass_pitch_class
+         },
          octave: octave,
          inversion: inversion,
          voicing_type: voicing_type,
@@ -81,7 +81,6 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
          voice_count: voice_count,
          doubling: doubling,
          foreign_bass_mode: foreign_bass_mode,
-         foreign_bass_pitch_class: foreign_bass_pitch_class,
          foreign_bass_octave: foreign_bass_octave
        }}
     end
@@ -89,9 +88,11 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
 
   @spec to_values_map(t()) :: map()
   def to_values_map(%__MODULE__{} = params) do
+    harmonic_identity = params.harmonic_identity || %HarmonicIdentity{root: :c, quality: :maj7}
+
     %{
-      "root" => Atom.to_string(params.root),
-      "quality" => Atom.to_string(params.quality),
+      "root" => Atom.to_string(harmonic_identity.root),
+      "quality" => Atom.to_string(harmonic_identity.quality),
       "octave" => Integer.to_string(params.octave),
       "inversion" => Integer.to_string(params.inversion),
       "voicing_type" => Atom.to_string(params.voicing_type),
@@ -106,8 +107,8 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
       "doubling" => Atom.to_string(params.doubling),
       "foreign_bass_mode" => Atom.to_string(params.foreign_bass_mode),
       "foreign_bass_pitch_class" =>
-        if(is_atom(params.foreign_bass_pitch_class),
-          do: Atom.to_string(params.foreign_bass_pitch_class),
+        if(is_atom(harmonic_identity.foreign_bass),
+          do: Atom.to_string(harmonic_identity.foreign_bass),
           else: ""
         ),
       "foreign_bass_octave" => Integer.to_string(params.foreign_bass_octave)
@@ -117,11 +118,7 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
   @spec to_chord_spec_attrs(t()) :: map()
   def to_chord_spec_attrs(%__MODULE__{} = params) do
     %{
-      harmonic_identity: %{
-        root: params.root,
-        quality: params.quality,
-        foreign_bass: params.foreign_bass_pitch_class
-      },
+      harmonic_identity: params.harmonic_identity,
       octave: params.octave,
       inversion: params.inversion,
       voicing: %Voicing{
@@ -137,7 +134,8 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
     }
   end
 
-  defp to_foreign_bass(%__MODULE__{foreign_bass_pitch_class: nil}), do: nil
+  defp to_foreign_bass(%__MODULE__{harmonic_identity: %HarmonicIdentity{foreign_bass: nil}}),
+    do: nil
 
   defp to_foreign_bass(%__MODULE__{} = params) do
     %ForeignBass{
@@ -188,37 +186,12 @@ defmodule Mensch.Harmony.ChordSpec.Parameters do
   defp parse_pitch_class(_value), do: {:error, "invalid root pitch class"}
 
   defp parse_quality(value) when is_binary(value) do
-    case String.to_existing_atom(value) do
-      atom
-      when atom in [
-             :maj,
-             :min,
-             :maj6,
-             :maj7,
-             :maj7_sharp5,
-             :min7,
-             :min_maj7,
-             :dom7,
-             :sus2,
-             :sus4,
-             :maj9,
-             :min9,
-             :dom9,
-             :maj11,
-             :min11,
-             :dom13,
-             :six_nine,
-             :min6,
-             :dim,
-             :half_dim,
-             :dim7,
-             :aug,
-             :min7_add11
-           ] ->
-        {:ok, atom}
+    atom = String.to_existing_atom(value)
 
-      _ ->
-        {:error, "invalid quality"}
+    if atom in ChordSpec.qualities() do
+      {:ok, atom}
+    else
+      {:error, "invalid quality"}
     end
   rescue
     ArgumentError -> {:error, "invalid quality"}
