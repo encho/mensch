@@ -17,6 +17,8 @@ defmodule Mensch.SampleDb do
   alias Mensch.SampleDb.Sample13Strum
   alias Mensch.SampleDb.Sample14StrumCMajorSixteenChords
   alias Mensch.SampleDb.Sample15StrumCMajorIViIiVProgression
+  alias Mensch.SampleDb.Sample16StrumBFlatIiVILandingPad
+  alias Mensch.SampleDb.Sample17DynamicVoicingBFlatIiVILandingPad
   alias Mensch.SampleDb.Sample7DynamicVoicing
   alias Mensch.SampleDb.Sample8DynamicVoicingOneBar
   alias Mensch.SampleDb.Sample9DynamicVoicingCMajor
@@ -52,6 +54,8 @@ defmodule Mensch.SampleDb do
     Sample13Strum.sample(@default_frame_mbeats),
     Sample14StrumCMajorSixteenChords.sample(@default_frame_mbeats),
     Sample15StrumCMajorIViIiVProgression.sample(@default_frame_mbeats),
+    Sample16StrumBFlatIiVILandingPad.sample(@default_frame_mbeats),
+    Sample17DynamicVoicingBFlatIiVILandingPad.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample15.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample16.sample(@default_frame_mbeats),
     GeneratedChordListGeneratedSample22.sample(@default_frame_mbeats),
