@@ -5,7 +5,6 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
-  alias Mensch.Harmony.Progression.Source.CreateWithDiatonicDegrees, as: DiatonicSource
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
 
   alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities,
@@ -13,12 +12,14 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
   alias Mensch.Harmony.Resolver
 
-  test "diatonic source generates chords for requested degrees" do
+  test "scale-generated source generates chords for requested degrees" do
     source =
-      DiatonicSource.source(
+      ScaleGeneratedSource.source(
         degrees: [2, 5, 1],
-        scale: %{tonic: :c, mode: :major},
-        chord_kind: :triad,
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
         render_defaults: %{octave: 3, inversion: 0}
       )
 
@@ -28,16 +29,18 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
     assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
   end
 
-  test "diatonic source enforces degree range 1..7" do
+  test "scale-generated source validates degrees against selected scale size" do
     source =
-      DiatonicSource.source(
+      ScaleGeneratedSource.source(
         degrees: [1, 8],
-        scale: %{tonic: :c, mode: :major},
-        chord_kind: :triad,
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:error, :invalid_degrees} = source.()
+    assert {:error, {:invalid_degrees_for_scale, 7}} = source.()
   end
 
   test "scale-generated source creates chords using scale-chord-lab identity path" do
@@ -138,10 +141,12 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
   test "progression.run composes middlewares" do
     source =
-      DiatonicSource.source(
+      ScaleGeneratedSource.source(
         degrees: [2, 5, 1],
-        scale: %{tonic: :c, mode: :major},
-        chord_kind: :triad,
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
         render_defaults: %{octave: 3, inversion: 0}
       )
 
@@ -154,10 +159,12 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
   test "progression.run_with_source runs source then transforms" do
     source =
-      DiatonicSource.source(
+      ScaleGeneratedSource.source(
         degrees: [2, 5, 1],
-        scale: %{tonic: :c, mode: :major},
-        chord_kind: :triad,
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
         render_defaults: %{octave: 3, inversion: 0}
       )
 

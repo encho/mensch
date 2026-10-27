@@ -38,7 +38,7 @@ defmodule MenschWeb.Layouts do
   attr :nav_active, :atom,
     default: nil,
     doc:
-      "active navbar destination (:samples, :chord_lab, :chord_lab_diatonic, :progression, :scale_lab, or :scale_chord_lab)"
+      "active navbar destination (:samples, :chord_lab, :progression, :scale_lab, or :scale_chord_lab)"
 
   attr :bpm, :integer,
     default: nil,
@@ -100,17 +100,6 @@ defmodule MenschWeb.Layouts do
               ]}
             >
               <.icon name="hero-beaker" class="size-4" />
-            </.link>
-            <.link
-              navigate={~p"/chord-lab-diatonic"}
-              title="Chord Lab Diatonic"
-              aria-label="Chord Lab Diatonic"
-              class={[
-                "ui-radius-btn relative flex size-9 items-center justify-center border text-white/70 transition-colors duration-150",
-                nav_button_class(@nav_active == :chord_lab_diatonic)
-              ]}
-            >
-              <.icon name="hero-adjustments-horizontal" class="size-4" />
             </.link>
             <.link
               navigate={~p"/progression"}

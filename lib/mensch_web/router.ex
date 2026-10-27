@@ -21,7 +21,6 @@ defmodule MenschWeb.Router do
     live "/samples", SamplesLive
     live "/samples/:sample_id", HomeLive
     live "/chord-lab", ChordLabLive
-    live "/chord-lab-diatonic", ChordLabDiatonicLive
     live "/progression", ProgressionLive
     live "/scale-lab", ScaleLabLive
     live "/scale-chord-lab", ScaleChordLabLive

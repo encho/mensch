@@ -2,11 +2,9 @@ defmodule MenschWeb.ProgressionLive do
   use MenschWeb, :live_view
 
   alias Mensch.Harmony.ChordSpec
-  alias Mensch.Harmony.DiatonicHarmonicIdentityResolver
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
-  alias Mensch.Harmony.Progression.Source.CreateWithDiatonicDegrees
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
   alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities
   alias Mensch.Harmony.Resolver
@@ -34,32 +32,14 @@ defmodule MenschWeb.ProgressionLive do
     :b_flat
   ]
 
-  @source_ids ["diatonic_degrees", "scale_generated_harmonic_identities", "fixed_chord"]
+  @source_ids ["scale_generated_harmonic_identities", "fixed_chord"]
   @transform_ids ["ensure_bass_ascending", "transpose_all"]
 
-  @modes DiatonicHarmonicIdentityResolver.scale_modes()
-  @chord_kinds DiatonicHarmonicIdentityResolver.chord_kinds()
-  @qualities [
-    :maj,
-    :min,
-    :dim,
-    :aug,
-    :maj7,
-    :min7,
-    :dom7,
-    :sus2,
-    :sus4
-  ]
+  @qualities ChordSpec.qualities() |> Enum.sort()
 
   @pitch_class_from_param Map.new(@pitch_classes, fn pitch_class ->
                             {Atom.to_string(pitch_class), pitch_class}
                           end)
-
-  @mode_from_param Map.new(@modes, fn mode -> {Atom.to_string(mode), mode} end)
-
-  @chord_kind_from_param Map.new(@chord_kinds, fn chord_kind ->
-                           {Atom.to_string(chord_kind), chord_kind}
-                         end)
 
   @quality_from_param Map.new(@qualities, fn quality ->
                         {Atom.to_string(quality), quality}
@@ -113,28 +93,6 @@ defmodule MenschWeb.ProgressionLive do
       update_source_opts(socket.assigns.source, fn opts ->
         if Map.has_key?(@pitch_class_from_param, tonic),
           do: Map.put(opts, "tonic", tonic),
-          else: opts
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_mode", %{"mode" => mode}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        if Map.has_key?(@mode_from_param, mode), do: Map.put(opts, "mode", mode), else: opts
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_chord_kind", %{"chord_kind" => chord_kind}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        if Map.has_key?(@chord_kind_from_param, chord_kind),
-          do: Map.put(opts, "chord_kind", chord_kind),
           else: opts
       end)
 
@@ -386,58 +344,6 @@ defmodule MenschWeb.ProgressionLive do
             </div>
 
             <p class="font-mono text-xs text-zinc-300">Current: {@source_label}</p>
-
-            <%= if @source.id == "diatonic_degrees" do %>
-              <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                <div class="max-w-xl">
-                  <MenschWeb.PitchClassKeyboard.mini
-                    id="progression-source-tonic"
-                    label="Tonic"
-                    event="set_source_tonic"
-                    selected_key={@selected_tonic_keyboard_key}
-                    selected_key_color="#9bf25a"
-                  />
-                </div>
-
-                <div class="space-y-1">
-                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                    Mode
-                  </label>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      :for={mode <- modes()}
-                      type="button"
-                      phx-click="set_source_mode"
-                      phx-value-mode={Atom.to_string(mode)}
-                      class={toggle_button_classes(@source.opts["mode"] == Atom.to_string(mode))}
-                    >
-                      {mode_label(mode)}
-                    </button>
-                  </div>
-                </div>
-
-                <div class="space-y-1">
-                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                    Chord Form
-                  </label>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      :for={chord_kind <- chord_kinds()}
-                      type="button"
-                      phx-click="set_source_chord_kind"
-                      phx-value-chord_kind={Atom.to_string(chord_kind)}
-                      class={
-                        toggle_button_classes(
-                          @source.opts["chord_kind"] == Atom.to_string(chord_kind)
-                        )
-                      }
-                    >
-                      {chord_kind_label(chord_kind)}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            <% end %>
 
             <%= if @source.id == "scale_generated_harmonic_identities" do %>
               <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
@@ -795,22 +701,6 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
-  defp source_to_fun(%{id: "diatonic_degrees", opts: opts}) do
-    with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
-         {:ok, mode} <- parse_mode(Map.get(opts, "mode")),
-         {:ok, chord_kind} <- parse_chord_kind(Map.get(opts, "chord_kind")) do
-      source =
-        CreateWithDiatonicDegrees.source(
-          degrees: Enum.to_list(1..7),
-          scale: %{tonic: tonic, mode: mode},
-          chord_kind: chord_kind,
-          render_defaults: %{octave: 3, inversion: 0}
-        )
-
-      {:ok, source}
-    end
-  end
-
   defp source_to_fun(%{id: "fixed_chord", opts: opts}) do
     with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
          {:ok, quality} <- parse_quality(Map.get(opts, "quality")),
@@ -882,12 +772,8 @@ defmodule MenschWeb.ProgressionLive do
 
   defp source_ids, do: @source_ids
   defp transform_ids, do: @transform_ids
-  defp modes, do: @modes
-  defp chord_kinds, do: @chord_kinds
   defp qualities, do: @qualities
   defp pitch_classes, do: @pitch_classes
-
-  defp source_label("diatonic_degrees"), do: "Create With Diatonic Degrees"
 
   defp source_label("scale_generated_harmonic_identities"),
     do: "Create With Scale-Generated Harmonic Identities"
@@ -899,14 +785,7 @@ defmodule MenschWeb.ProgressionLive do
   defp transform_label("transpose_all"), do: "Transpose All"
   defp transform_label(_), do: "Unknown Transform"
 
-  defp default_source_config(), do: default_source_config("diatonic_degrees")
-
-  defp default_source_config("diatonic_degrees") do
-    %{
-      id: "diatonic_degrees",
-      opts: %{"tonic" => "c", "mode" => "major", "chord_kind" => "triad"}
-    }
-  end
+  defp default_source_config(), do: default_source_config("scale_generated_harmonic_identities")
 
   defp default_source_config("fixed_chord") do
     %{
@@ -928,7 +807,7 @@ defmodule MenschWeb.ProgressionLive do
     }
   end
 
-  defp default_source_config(_), do: default_source_config("diatonic_degrees")
+  defp default_source_config(_), do: default_source_config("scale_generated_harmonic_identities")
 
   defp default_transform_config("ensure_bass_ascending") do
     %{id: "ensure_bass_ascending", opts: %{"include_foreign_bass" => false}}
@@ -992,15 +871,6 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp parse_tonic(_value), do: {:error, "invalid tonic"}
-
-  defp parse_mode(value) when is_binary(value) do
-    case Map.get(@mode_from_param, value) do
-      nil -> {:error, "invalid mode"}
-      mode -> {:ok, mode}
-    end
-  end
-
-  defp parse_mode(_value), do: {:error, "invalid mode"}
 
   defp parse_family(value, families) when is_binary(value) and is_list(families) do
     case Enum.find(families, &(Atom.to_string(&1.id) == value)) do
@@ -1174,15 +1044,6 @@ defmodule MenschWeb.ProgressionLive do
 
   defp parse_positive_integer(_value), do: {:error, :invalid_integer}
 
-  defp parse_chord_kind(value) when is_binary(value) do
-    case Map.get(@chord_kind_from_param, value) do
-      nil -> {:error, "invalid chord kind"}
-      chord_kind -> {:ok, chord_kind}
-    end
-  end
-
-  defp parse_chord_kind(_value), do: {:error, "invalid chord kind"}
-
   defp parse_quality(value) when is_binary(value) do
     case Map.get(@quality_from_param, value) do
       nil -> {:error, "invalid quality"}
@@ -1202,10 +1063,6 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp parse_integer(_value, field_name), do: {:error, "#{field_name} must be an integer"}
-
-  defp mode_label(:major), do: "Major"
-  defp mode_label(:natural_minor), do: "Natural Minor"
-  defp mode_label(:harmonic_minor), do: "Harmonic Minor"
 
   defp chord_kind_label(:triad), do: "Triad"
   defp chord_kind_label(:seventh), do: "Seventh"

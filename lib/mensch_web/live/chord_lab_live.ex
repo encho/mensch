@@ -20,7 +20,6 @@ defmodule MenschWeb.ChordLabLive do
   alias Mensch.Harmony.ChordSpec.Parameters
   alias Mensch.Harmony.ChordSpec.ForeignBass
   alias Mensch.Harmony.ChordSpec.Voicing
-  alias Mensch.Harmony.DiatonicHarmonicIdentityResolver
   alias Mensch.Harmony.Resolver
   alias Mensch.PerformanceAssembler
   alias Mensch.SampleBlueprint
@@ -71,9 +70,6 @@ defmodule MenschWeb.ChordLabLive do
     :maj7_sharp5
   ]
 
-  @diatonic_modes DiatonicHarmonicIdentityResolver.scale_modes()
-  @diatonic_chord_kinds DiatonicHarmonicIdentityResolver.chord_kinds()
-
   @quality_tiles [
     %{value: "maj", label: "Maj", position: "col-start-1 row-start-1"},
     %{value: "maj6", label: "6", position: "col-start-1 row-start-2"},
@@ -100,11 +96,6 @@ defmodule MenschWeb.ChordLabLive do
 
   @pitch_class_from_param Map.new(@pitch_classes, fn pc -> {Atom.to_string(pc), pc} end)
   @quality_from_param Map.new(@qualities, fn quality -> {Atom.to_string(quality), quality} end)
-  @diatonic_mode_from_param Map.new(@diatonic_modes, fn mode -> {Atom.to_string(mode), mode} end)
-
-  @diatonic_chord_kind_from_param Map.new(@diatonic_chord_kinds, fn chord_kind ->
-                                    {Atom.to_string(chord_kind), chord_kind}
-                                  end)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -200,78 +191,6 @@ defmodule MenschWeb.ChordLabLive do
         |> Map.put("quality", quality)
       else
         socket.assigns.values
-      end
-
-    {:noreply, assign_form_values_and_preview(socket, values)}
-  end
-
-  @impl true
-  def handle_event("set_identity_input_mode", %{"mode" => mode}, socket) do
-    values =
-      if mode in ["manual", "diatonic"] do
-        socket.assigns.values
-        |> Map.put("identity_input_mode", mode)
-        |> maybe_apply_diatonic_identity()
-      else
-        socket.assigns.values
-      end
-
-    {:noreply, assign_form_values_and_preview(socket, values)}
-  end
-
-  @impl true
-  def handle_event("set_diatonic_tonic_pitch_class", %{"pitch_class" => tonic}, socket) do
-    values =
-      if Map.has_key?(@pitch_class_from_param, tonic) do
-        socket.assigns.values
-        |> Map.put("diatonic_tonic", tonic)
-        |> maybe_apply_diatonic_identity()
-      else
-        socket.assigns.values
-      end
-
-    {:noreply, assign_form_values_and_preview(socket, values)}
-  end
-
-  @impl true
-  def handle_event("set_diatonic_mode", %{"mode" => mode}, socket) do
-    values =
-      if Map.has_key?(@diatonic_mode_from_param, mode) do
-        socket.assigns.values
-        |> Map.put("diatonic_mode", mode)
-        |> maybe_apply_diatonic_identity()
-      else
-        socket.assigns.values
-      end
-
-    {:noreply, assign_form_values_and_preview(socket, values)}
-  end
-
-  @impl true
-  def handle_event("set_diatonic_chord_kind", %{"chord_kind" => chord_kind}, socket) do
-    values =
-      if Map.has_key?(@diatonic_chord_kind_from_param, chord_kind) do
-        socket.assigns.values
-        |> Map.put("diatonic_chord_kind", chord_kind)
-        |> maybe_apply_diatonic_identity()
-      else
-        socket.assigns.values
-      end
-
-    {:noreply, assign_form_values_and_preview(socket, values)}
-  end
-
-  @impl true
-  def handle_event("set_diatonic_degree", %{"degree" => degree}, socket) do
-    values =
-      case Integer.parse(to_string(degree)) do
-        {parsed_degree, ""} when parsed_degree >= 1 and parsed_degree <= 7 ->
-          socket.assigns.values
-          |> Map.put("diatonic_degree", Integer.to_string(parsed_degree))
-          |> maybe_apply_diatonic_identity()
-
-        _ ->
-          socket.assigns.values
       end
 
     {:noreply, assign_form_values_and_preview(socket, values)}
@@ -652,10 +571,6 @@ defmodule MenschWeb.ChordLabLive do
       |> assign(:voice_count_slider_value, voice_count_slider_value(assigns.values))
       |> assign(:keyboard_degree_labels, keyboard_degree_labels(assigns.result))
       |> assign(:selected_root_keyboard_key, selected_root_keyboard_key(assigns.values))
-      |> assign(
-        :selected_diatonic_tonic_keyboard_key,
-        selected_diatonic_tonic_keyboard_key(assigns.values)
-      )
       |> assign(
         :selected_foreign_bass_keyboard_key,
         selected_foreign_bass_keyboard_key(assigns.values)
@@ -1059,47 +974,15 @@ defmodule MenschWeb.ChordLabLive do
         <div class="grid gap-4 lg:grid-cols-3">
           <div class="ui-radius-table space-y-3 border border-zinc-700/60 bg-black/30 p-4">
             <div class="space-y-2 rounded-md border border-zinc-700/70 bg-zinc-950/60 p-3">
-              <div class="flex items-center justify-between">
-                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  Harmonic Identity
-                </h3>
-                <div class="grid grid-cols-2 gap-1">
-                  <button
-                    type="button"
-                    phx-click="set_identity_input_mode"
-                    phx-value-mode="diatonic"
-                    class={[
-                      "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                      @values["identity_input_mode"] == "diatonic" &&
-                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                      @values["identity_input_mode"] != "diatonic" &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                  >
-                    Diatonic
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="set_identity_input_mode"
-                    phx-value-mode="manual"
-                    class={[
-                      "rounded-sm border px-2 py-1 font-mono text-[10px] font-semibold transition-colors duration-150",
-                      @values["identity_input_mode"] == "manual" &&
-                        "border-emerald-300 bg-emerald-400/25 text-emerald-100",
-                      @values["identity_input_mode"] != "manual" &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                  >
-                    Manual
-                  </button>
-                </div>
-              </div>
+              <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Harmonic Identity
+              </h3>
               <p class="font-mono text-[11px] text-zinc-300">
                 {identity_summary(@values)}
               </p>
             </div>
 
-            <div :if={@values["identity_input_mode"] == "manual"} class="space-y-3">
+            <div class="space-y-3">
               <MenschWeb.PitchClassKeyboard.mini
                 id="root-pitch-class-keyboard"
                 label="Root"
@@ -1138,85 +1021,6 @@ defmodule MenschWeb.ChordLabLive do
                       {tile.label}
                     </button>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div :if={@values["identity_input_mode"] == "diatonic"} class="space-y-3">
-              <MenschWeb.PitchClassKeyboard.mini
-                id="diatonic-tonic-pitch-class-keyboard"
-                label="Tonic"
-                event="set_diatonic_tonic_pitch_class"
-                selected_key={@selected_diatonic_tonic_keyboard_key}
-                selected_key_color="#9bf25a"
-              />
-
-              <div class="space-y-1">
-                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  Mode
-                </label>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    :for={mode <- diatonic_modes()}
-                    type="button"
-                    phx-click="set_diatonic_mode"
-                    phx-value-mode={Atom.to_string(mode)}
-                    class={[
-                      "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
-                      @values["diatonic_mode"] == Atom.to_string(mode) &&
-                        "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30",
-                      @values["diatonic_mode"] != Atom.to_string(mode) &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                  >
-                    {diatonic_mode_label(mode)}
-                  </button>
-                </div>
-              </div>
-
-              <div class="space-y-1">
-                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  Chord Form
-                </label>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    :for={chord_kind <- diatonic_chord_kinds()}
-                    type="button"
-                    phx-click="set_diatonic_chord_kind"
-                    phx-value-chord_kind={Atom.to_string(chord_kind)}
-                    class={[
-                      "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
-                      @values["diatonic_chord_kind"] == Atom.to_string(chord_kind) &&
-                        "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30",
-                      @values["diatonic_chord_kind"] != Atom.to_string(chord_kind) &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                  >
-                    {diatonic_chord_kind_label(chord_kind)}
-                  </button>
-                </div>
-              </div>
-
-              <div class="space-y-1">
-                <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  Degree
-                </label>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    :for={degree <- 1..7}
-                    type="button"
-                    phx-click="set_diatonic_degree"
-                    phx-value-degree={degree}
-                    class={[
-                      "rounded-sm border px-3 py-1.5 font-mono text-xs font-semibold transition-colors duration-150",
-                      @values["diatonic_degree"] == Integer.to_string(degree) &&
-                        "border-emerald-300 bg-emerald-400/20 text-emerald-100 hover:bg-emerald-400/30",
-                      @values["diatonic_degree"] != Integer.to_string(degree) &&
-                        "border-zinc-700 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500"
-                    ]}
-                  >
-                    {degree}
-                  </button>
                 </div>
               </div>
             </div>
@@ -1302,19 +1106,6 @@ defmodule MenschWeb.ChordLabLive do
             <.form for={@form} id="chord-lab-form" phx-change="validate" class="space-y-2">
               <input type="hidden" name={@form[:root].name} value={@values["root"]} />
               <input type="hidden" name={@form[:quality].name} value={@values["quality"]} />
-              <input
-                type="hidden"
-                name="chord[identity_input_mode]"
-                value={@values["identity_input_mode"]}
-              />
-              <input type="hidden" name="chord[diatonic_tonic]" value={@values["diatonic_tonic"]} />
-              <input type="hidden" name="chord[diatonic_mode]" value={@values["diatonic_mode"]} />
-              <input
-                type="hidden"
-                name="chord[diatonic_chord_kind]"
-                value={@values["diatonic_chord_kind"]}
-              />
-              <input type="hidden" name="chord[diatonic_degree]" value={@values["diatonic_degree"]} />
               <input
                 type="hidden"
                 name={@form[:foreign_bass_pitch_class].name}
@@ -2038,9 +1829,6 @@ defmodule MenschWeb.ChordLabLive do
 
   defp quality_tiles, do: @quality_tiles
 
-  defp diatonic_modes, do: @diatonic_modes
-  defp diatonic_chord_kinds, do: @diatonic_chord_kinds
-
   defp identity_summary(values) when is_map(values) do
     root =
       case parse_pitch_class(Map.get(values, "root")) do
@@ -2154,97 +1942,6 @@ defmodule MenschWeb.ChordLabLive do
   defp keyboard_root_from_semitone(10), do: "b_flat"
   defp keyboard_root_from_semitone(11), do: "b"
   defp keyboard_root_from_semitone(_), do: nil
-
-  defp selected_diatonic_tonic_keyboard_key(values) when is_map(values) do
-    case Map.get(values, "diatonic_tonic", "c") do
-      "c_sharp" -> "d_flat"
-      "d_sharp" -> "e_flat"
-      "f_sharp" -> "g_flat"
-      "g_sharp" -> "a_flat"
-      "a_sharp" -> "b_flat"
-      tonic -> tonic
-    end
-  end
-
-  defp maybe_apply_diatonic_identity(values) when is_map(values) do
-    if Map.get(values, "identity_input_mode") == "diatonic" do
-      apply_diatonic_identity(values)
-    else
-      values
-    end
-  end
-
-  defp apply_diatonic_identity(values) do
-    with {:ok, tonic} <- parse_diatonic_tonic(Map.get(values, "diatonic_tonic")),
-         {:ok, mode} <- parse_diatonic_mode(Map.get(values, "diatonic_mode")),
-         {:ok, degree} <- parse_diatonic_degree(Map.get(values, "diatonic_degree")),
-         {:ok, chord_kind} <- parse_diatonic_chord_kind(Map.get(values, "diatonic_chord_kind")),
-         {:ok, spec} <-
-           DiatonicHarmonicIdentityResolver.build(
-             %{tonic: tonic, mode: mode},
-             degree,
-             chord_kind: chord_kind,
-             octave: 3,
-             inversion: 0
-           ) do
-      values
-      |> Map.put("root", Atom.to_string(ChordSpec.root(spec)))
-      |> Map.put("quality", Atom.to_string(ChordSpec.quality(spec)))
-    else
-      _ -> values
-    end
-  end
-
-  defp parse_diatonic_tonic(value) when is_binary(value) do
-    case Map.get(@pitch_class_from_param, value) do
-      nil -> {:error, :invalid_tonic}
-      tonic -> {:ok, tonic}
-    end
-  end
-
-  defp parse_diatonic_tonic(_value), do: {:error, :invalid_tonic}
-
-  defp parse_diatonic_mode(value) when is_binary(value) do
-    case Map.get(@diatonic_mode_from_param, value) do
-      nil -> {:error, :invalid_mode}
-      mode -> {:ok, mode}
-    end
-  end
-
-  defp parse_diatonic_mode(_value), do: {:error, :invalid_mode}
-
-  defp parse_diatonic_chord_kind(value) when is_binary(value) do
-    case Map.get(@diatonic_chord_kind_from_param, value) do
-      nil -> {:error, :invalid_chord_kind}
-      chord_kind -> {:ok, chord_kind}
-    end
-  end
-
-  defp parse_diatonic_chord_kind(_value), do: {:error, :invalid_chord_kind}
-
-  defp parse_diatonic_degree(value) when is_integer(value) and value >= 1 and value <= 7,
-    do: {:ok, value}
-
-  defp parse_diatonic_degree(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {degree, ""} when degree >= 1 and degree <= 7 -> {:ok, degree}
-      _ -> {:error, :invalid_degree}
-    end
-  end
-
-  defp parse_diatonic_degree(_value), do: {:error, :invalid_degree}
-
-  defp diatonic_mode_label(:major), do: "Major"
-  defp diatonic_mode_label(:natural_minor), do: "Natural Minor"
-  defp diatonic_mode_label(:harmonic_minor), do: "Harmonic Minor"
-
-  defp diatonic_chord_kind_label(:triad), do: "Triad"
-  defp diatonic_chord_kind_label(:seventh), do: "Seventh"
-  defp diatonic_chord_kind_label(:add6), do: "Add 6"
-  defp diatonic_chord_kind_label(:six_nine), do: "6/9"
-  defp diatonic_chord_kind_label(:ninth), do: "9th"
-  defp diatonic_chord_kind_label(:eleventh), do: "11th"
-  defp diatonic_chord_kind_label(:thirteenth), do: "13th"
 
   defp parse_spec(values) do
     with {:ok, root} <- parse_pitch_class(values["root"]),
@@ -2405,13 +2102,8 @@ defmodule MenschWeb.ChordLabLive do
 
   defp default_values do
     %{
-      "identity_input_mode" => "diatonic",
       "root" => "c",
       "quality" => "maj",
-      "diatonic_tonic" => "c",
-      "diatonic_mode" => "major",
-      "diatonic_chord_kind" => "triad",
-      "diatonic_degree" => "1",
       "octave" => "3",
       "inversion" => "0",
       "voicing_type" => "close",
