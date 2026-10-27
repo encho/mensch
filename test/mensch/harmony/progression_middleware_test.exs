@@ -7,6 +7,10 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateWithDiatonicDegrees, as: DiatonicSource
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
+
+  alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities,
+    as: ScaleGeneratedSource
+
   alias Mensch.Harmony.Resolver
 
   test "diatonic source generates chords for requested degrees" do
@@ -34,6 +38,63 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
       )
 
     assert {:error, :invalid_degrees} = source.()
+  end
+
+  test "scale-generated source creates chords using scale-chord-lab identity path" do
+    source =
+      ScaleGeneratedSource.source(
+        degrees: [2, 5, 1],
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:ok, chords} = source.()
+    assert length(chords) == 3
+    assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
+  end
+
+  test "scale-generated source validates scale map shape" do
+    source =
+      ScaleGeneratedSource.source(
+        degrees: [1],
+        scale: %{tonic: :c, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:error, :missing_scale} = source.()
+  end
+
+  test "scale-generated source infers degree count from scale size when degrees are omitted" do
+    source =
+      ScaleGeneratedSource.source(
+        scale: %{tonic: :c, family: :major_pentatonic, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:ok, chords} = source.()
+    assert length(chords) == 5
+  end
+
+  test "scale-generated source rejects degrees outside selected scale size" do
+    source =
+      ScaleGeneratedSource.source(
+        degrees: [1, 6],
+        scale: %{tonic: :c, family: :major_pentatonic, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:error, {:invalid_degrees_for_scale, 5}} = source.()
   end
 
   test "ensure_bass_ascending enforces non-decreasing voiced bass" do

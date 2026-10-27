@@ -56,10 +56,13 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
       pcs ->
         scale_spec = Keyword.get(opts, :scale_spec)
         spelling_mode = Keyword.get(opts, :spelling_mode, :practical)
-        explicit_bass = Keyword.get(opts, :bass_pitch_class)
+        explicit_foreign_bass = Keyword.get(opts, :bass_pitch_class)
         spelling_map = spelling_map(scale_spec, spelling_mode)
-        bass_pitch_class = resolve_bass_pitch_class(note_numbers_or_pitch_classes, explicit_bass)
-        bass_pitch_class_pc = pitch_class_to_semitone_or_nil(bass_pitch_class)
+
+        foreign_bass =
+          resolve_foreign_bass_option(note_numbers_or_pitch_classes, explicit_foreign_bass)
+
+        foreign_bass_pc = pitch_class_to_semitone_or_nil(foreign_bass)
 
         preferred_root_pitch_class =
           normalize_preferred_root(Keyword.get(opts, :preferred_root_pitch_class))
@@ -87,7 +90,7 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
               root,
               root_pc,
               quality,
-              bass_pitch_class_pc,
+              foreign_bass_pc,
               spelling_map,
               scale_spec,
               priors
@@ -167,7 +170,7 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
          root,
          root_pc,
          quality,
-         bass_pitch_class_pc,
+         foreign_bass_pc,
          spelling_map,
          scale_spec,
          priors
@@ -186,7 +189,7 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
     root_present_bonus = if MapSet.member?(observed_set, root_pc), do: 10, else: 0
 
     effective_foreign_bass =
-      resolve_foreign_bass_for_candidate(bass_pitch_class_pc, expected_set, spelling_map)
+      resolve_foreign_bass_for_candidate(foreign_bass_pc, expected_set, spelling_map)
 
     slash_adjustment = slash_adjustment(effective_foreign_bass, root)
 
@@ -240,11 +243,11 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
     |> Enum.sort()
   end
 
-  defp resolve_bass_pitch_class(_note_numbers_or_pitch_classes, explicit_bass)
-       when is_atom(explicit_bass),
-       do: explicit_bass
+  defp resolve_foreign_bass_option(_note_numbers_or_pitch_classes, explicit_foreign_bass)
+       when is_atom(explicit_foreign_bass),
+       do: explicit_foreign_bass
 
-  defp resolve_bass_pitch_class(note_numbers_or_pitch_classes, _explicit_bass) do
+  defp resolve_foreign_bass_option(note_numbers_or_pitch_classes, _explicit_foreign_bass) do
     note_numbers_or_pitch_classes
     |> Enum.filter(&is_integer/1)
     |> Enum.sort()
@@ -300,12 +303,12 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
 
   defp resolve_foreign_bass_for_candidate(nil, _expected_set, _spelling_map), do: nil
 
-  defp resolve_foreign_bass_for_candidate(bass_pitch_class_pc, expected_set, spelling_map)
-       when is_integer(bass_pitch_class_pc) do
-    if MapSet.member?(expected_set, bass_pitch_class_pc) do
+  defp resolve_foreign_bass_for_candidate(foreign_bass_pc, expected_set, spelling_map)
+       when is_integer(foreign_bass_pc) do
+    if MapSet.member?(expected_set, foreign_bass_pc) do
       nil
     else
-      spell_pitch_class(bass_pitch_class_pc, spelling_map)
+      spell_pitch_class(foreign_bass_pc, spelling_map)
     end
   end
 
@@ -372,10 +375,10 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
 
   defp slash_adjustment(nil, _root), do: 0
 
-  defp slash_adjustment(bass_pitch_class, root) when bass_pitch_class == root,
+  defp slash_adjustment(foreign_bass, root) when foreign_bass == root,
     do: @slash_unison_penalty
 
-  defp slash_adjustment(_bass_pitch_class, _root), do: @slash_difference_bonus
+  defp slash_adjustment(_foreign_bass, _root), do: @slash_difference_bonus
 
   defp prior_adjustment(priors, root_pc, quality) do
     root_prior_adjustment(priors.preferred_root_pitch_class, root_pc) +

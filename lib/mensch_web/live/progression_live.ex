@@ -8,7 +8,10 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateWithDiatonicDegrees
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
+  alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities
   alias Mensch.Harmony.Resolver
+  alias Mensch.Scale
+  alias Mensch.Scale.ScaleRegistry
   alias MenschWeb.FullPianoKeyboard
 
   @pitch_classes [
@@ -31,7 +34,7 @@ defmodule MenschWeb.ProgressionLive do
     :b_flat
   ]
 
-  @source_ids ["diatonic_degrees", "fixed_chord"]
+  @source_ids ["diatonic_degrees", "scale_generated_harmonic_identities", "fixed_chord"]
   @transform_ids ["ensure_bass_ascending", "transpose_all"]
 
   @modes DiatonicHarmonicIdentityResolver.scale_modes()
@@ -62,6 +65,8 @@ defmodule MenschWeb.ProgressionLive do
                         {Atom.to_string(quality), quality}
                       end)
 
+  @shape_order [:triad, :seventh, :ninth, :eleventh, :thirteenth, :add6, :six_nine]
+
   @impl true
   def mount(_params, _session, socket) do
     source = default_source_config()
@@ -69,6 +74,8 @@ defmodule MenschWeb.ProgressionLive do
     socket =
       socket
       |> assign(:midi_status, Mensch.Midi.Connection.status())
+      |> assign(:scale_families, ScaleRegistry.all())
+      |> assign(:chord_strategies, Scale.chord_strategy_options())
       |> assign(:source, source)
       |> assign(:transforms, [])
       |> assign(:next_transform_id, hd(@transform_ids))
@@ -129,6 +136,68 @@ defmodule MenschWeb.ProgressionLive do
         if Map.has_key?(@chord_kind_from_param, chord_kind),
           do: Map.put(opts, "chord_kind", chord_kind),
           else: opts
+      end)
+
+    {:noreply, assign(socket, :source, source)}
+  end
+
+  @impl true
+  def handle_event("set_source_family", %{"family" => family}, socket) do
+    source =
+      update_source_opts(socket.assigns.source, fn opts ->
+        case parse_family(family, socket.assigns.scale_families) do
+          {:ok, family_id} ->
+            mode = default_mode_for_family(socket.assigns.scale_families, family_id)
+            opts |> Map.put("family", family) |> Map.put("scale_mode", mode)
+
+          {:error, _reason} ->
+            opts
+        end
+      end)
+
+    {:noreply, assign(socket, :source, source)}
+  end
+
+  @impl true
+  def handle_event("set_source_scale_mode", %{"scale_mode" => scale_mode}, socket) do
+    source =
+      update_source_opts(socket.assigns.source, fn opts ->
+        case parse_positive_integer(scale_mode) do
+          {:ok, _mode} -> Map.put(opts, "scale_mode", scale_mode)
+          {:error, _reason} -> opts
+        end
+      end)
+
+    {:noreply, assign(socket, :source, source)}
+  end
+
+  @impl true
+  def handle_event("set_source_strategy", %{"strategy" => strategy}, socket) do
+    source =
+      update_source_opts(socket.assigns.source, fn opts ->
+        case parse_strategy(strategy, socket.assigns.chord_strategies) do
+          {:ok, _strategy} ->
+            shape = default_shape_for_strategy(strategy, socket.assigns.chord_strategies)
+            opts |> Map.put("strategy", strategy) |> Map.put("shape", shape)
+
+          {:error, _reason} ->
+            opts
+        end
+      end)
+
+    {:noreply, assign(socket, :source, source)}
+  end
+
+  @impl true
+  def handle_event("set_source_shape", %{"shape" => shape}, socket) do
+    source =
+      update_source_opts(socket.assigns.source, fn opts ->
+        strategy = Map.get(opts, "strategy")
+
+        case parse_shape_for_strategy(shape, strategy, socket.assigns.chord_strategies) do
+          {:ok, _shape} -> Map.put(opts, "shape", shape)
+          {:error, _reason} -> opts
+        end
       end)
 
     {:noreply, assign(socket, :source, source)}
@@ -273,6 +342,19 @@ defmodule MenschWeb.ProgressionLive do
       assigns
       |> assign(:source_label, source_label(assigns.source.id))
       |> assign(:selected_tonic_keyboard_key, selected_tonic_keyboard_key(assigns.source))
+      |> assign(
+        :scale_family_options,
+        source_scale_family_options(assigns.scale_families, assigns.source)
+      )
+      |> assign(
+        :scale_mode_options,
+        source_scale_mode_options(assigns.scale_families, assigns.source)
+      )
+      |> assign(
+        :strategy_options,
+        source_strategy_options(assigns.chord_strategies, assigns.source)
+      )
+      |> assign(:shape_options, source_shape_options(assigns.chord_strategies, assigns.source))
       |> assign(:chord_cards, build_chord_cards(assigns.chords))
 
     ~H"""
@@ -353,6 +435,120 @@ defmodule MenschWeb.ProgressionLive do
                       {chord_kind_label(chord_kind)}
                     </button>
                   </div>
+                </div>
+              </div>
+            <% end %>
+
+            <%= if @source.id == "scale_generated_harmonic_identities" do %>
+              <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  1) Define Scale
+                </h3>
+
+                <div class="max-w-xl">
+                  <MenschWeb.PitchClassKeyboard.mini
+                    id="progression-scale-source-tonic"
+                    label="Tonic"
+                    event="set_source_tonic"
+                    selected_key={@selected_tonic_keyboard_key}
+                    selected_key_color="#f6d365"
+                  />
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2">
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                      Scale Family
+                    </span>
+                    <form id="progression-scale-source-family-form" phx-change="set_source_family">
+                      <select
+                        name="family"
+                        class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                      >
+                        <option
+                          :for={item <- @scale_family_options}
+                          value={item.value}
+                          selected={item.selected}
+                        >
+                          {item.label}
+                        </option>
+                      </select>
+                    </form>
+                  </label>
+
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                      Mode
+                    </span>
+                    <%= if @scale_mode_options == [] do %>
+                      <div class="rounded-sm border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 font-mono text-xs text-zinc-500">
+                        No mode (standalone scale)
+                      </div>
+                    <% else %>
+                      <form id="progression-scale-source-mode-form" phx-change="set_source_scale_mode">
+                        <select
+                          name="scale_mode"
+                          class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                        >
+                          <option
+                            :for={item <- @scale_mode_options}
+                            value={item.value}
+                            selected={item.selected}
+                          >
+                            {item.label}
+                          </option>
+                        </select>
+                      </form>
+                    <% end %>
+                  </label>
+                </div>
+              </div>
+
+              <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  2) Chord Strategy
+                </h3>
+
+                <div class="grid gap-3 md:grid-cols-2">
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                      Strategy
+                    </span>
+                    <form id="progression-scale-source-strategy-form" phx-change="set_source_strategy">
+                      <select
+                        name="strategy"
+                        class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                      >
+                        <option
+                          :for={item <- @strategy_options}
+                          value={item.value}
+                          selected={item.selected}
+                        >
+                          {item.label}
+                        </option>
+                      </select>
+                    </form>
+                  </label>
+
+                  <label class="space-y-1">
+                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                      Chord Shape
+                    </span>
+                    <form id="progression-scale-source-shape-form" phx-change="set_source_shape">
+                      <select
+                        name="shape"
+                        class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                      >
+                        <option
+                          :for={item <- @shape_options}
+                          value={item.value}
+                          selected={item.selected}
+                        >
+                          {item.label}
+                        </option>
+                      </select>
+                    </form>
+                  </label>
                 </div>
               </div>
             <% end %>
@@ -634,6 +830,31 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
+  defp source_to_fun(%{id: "scale_generated_harmonic_identities", opts: opts}) do
+    with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
+         {:ok, family} <- parse_family(Map.get(opts, "family"), ScaleRegistry.all()),
+         {:ok, mode} <- parse_scale_mode(Map.get(opts, "scale_mode")),
+         {:ok, strategy} <-
+           parse_strategy(Map.get(opts, "strategy"), Scale.chord_strategy_options()),
+         {:ok, shape} <-
+           parse_shape_for_strategy(
+             Map.get(opts, "shape"),
+             Map.get(opts, "strategy"),
+             Scale.chord_strategy_options()
+           ) do
+      source =
+        CreateWithScaleGeneratedHarmonicIdentities.source(
+          scale: %{tonic: tonic, family: family, mode: mode},
+          strategy: strategy,
+          shape: shape,
+          spelling_mode: :practical,
+          render_defaults: %{octave: 3, inversion: 0}
+        )
+
+      {:ok, source}
+    end
+  end
+
   defp source_to_fun(_), do: {:error, :invalid_source}
 
   defp transforms_to_funs(transforms) when is_list(transforms) do
@@ -667,6 +888,10 @@ defmodule MenschWeb.ProgressionLive do
   defp pitch_classes, do: @pitch_classes
 
   defp source_label("diatonic_degrees"), do: "Create With Diatonic Degrees"
+
+  defp source_label("scale_generated_harmonic_identities"),
+    do: "Create With Scale-Generated Harmonic Identities"
+
   defp source_label("fixed_chord"), do: "Create With Fixed Chord (Test)"
   defp source_label(_), do: "Unknown Source"
 
@@ -687,6 +912,19 @@ defmodule MenschWeb.ProgressionLive do
     %{
       id: "fixed_chord",
       opts: %{"tonic" => "c", "quality" => "maj", "count" => 7, "octave" => 3, "inversion" => 0}
+    }
+  end
+
+  defp default_source_config("scale_generated_harmonic_identities") do
+    %{
+      id: "scale_generated_harmonic_identities",
+      opts: %{
+        "tonic" => "c",
+        "family" => "major",
+        "scale_mode" => "1",
+        "strategy" => "tertian",
+        "shape" => "triad"
+      }
     }
   end
 
@@ -763,6 +1001,178 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp parse_mode(_value), do: {:error, "invalid mode"}
+
+  defp parse_family(value, families) when is_binary(value) and is_list(families) do
+    case Enum.find(families, &(Atom.to_string(&1.id) == value)) do
+      %{id: id} -> {:ok, id}
+      nil -> {:error, "invalid family"}
+    end
+  end
+
+  defp parse_family(_value, _families), do: {:error, "invalid family"}
+
+  defp parse_scale_mode(value) when is_integer(value) and value > 0, do: {:ok, value}
+
+  defp parse_scale_mode(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {mode, ""} when mode > 0 -> {:ok, mode}
+      _ -> {:error, "invalid scale mode"}
+    end
+  end
+
+  defp parse_scale_mode(_value), do: {:error, "invalid scale mode"}
+
+  defp parse_strategy(value, strategies) when is_binary(value) and is_list(strategies) do
+    case Enum.find(strategies, &(Atom.to_string(&1.id) == value)) do
+      %{id: id} -> {:ok, id}
+      nil -> {:error, "invalid strategy"}
+    end
+  end
+
+  defp parse_strategy(_value, _strategies), do: {:error, "invalid strategy"}
+
+  defp parse_shape_for_strategy(shape_value, selected_strategy, strategies) do
+    with {:ok, shape} <- parse_shape(shape_value),
+         {:ok, allowed_shapes} <- strategy_shapes(selected_strategy, strategies) do
+      if shape in allowed_shapes do
+        {:ok, shape}
+      else
+        {:error, "invalid shape for strategy"}
+      end
+    end
+  end
+
+  defp parse_shape(value) when is_binary(value) do
+    case Enum.find(@shape_order, &(Atom.to_string(&1) == value)) do
+      nil -> {:error, "invalid shape"}
+      shape -> {:ok, shape}
+    end
+  end
+
+  defp parse_shape(_value), do: {:error, "invalid shape"}
+
+  defp source_scale_family_options(families, source) do
+    selected_family = Map.get(source.opts, "family", "major")
+
+    Enum.map(families, fn family ->
+      %{
+        value: Atom.to_string(family.id),
+        label: family.name,
+        selected: Atom.to_string(family.id) == selected_family
+      }
+    end)
+  end
+
+  defp source_scale_mode_options(families, source) do
+    selected_family = Map.get(source.opts, "family", "major")
+    selected_mode = Map.get(source.opts, "scale_mode", "1")
+
+    case Enum.find(families, &(Atom.to_string(&1.id) == selected_family)) do
+      %{mode_names: mode_names} when is_map(mode_names) and map_size(mode_names) > 0 ->
+        mode_names
+        |> Enum.sort_by(fn {mode_idx, _name} -> mode_idx end)
+        |> Enum.map(fn {mode_idx, mode_name} ->
+          mode_value = Integer.to_string(mode_idx)
+
+          %{
+            value: mode_value,
+            label: "#{mode_idx} — #{mode_name}",
+            selected: mode_value == selected_mode
+          }
+        end)
+
+      _ ->
+        []
+    end
+  end
+
+  defp source_strategy_options(strategies, source) do
+    selected_strategy = Map.get(source.opts, "strategy", "tertian")
+
+    Enum.map(strategies, fn strategy ->
+      %{
+        value: Atom.to_string(strategy.id),
+        label: strategy.label,
+        selected: Atom.to_string(strategy.id) == selected_strategy
+      }
+    end)
+  end
+
+  defp source_shape_options(strategies, source) do
+    selected_strategy = Map.get(source.opts, "strategy", "tertian")
+    selected_shape = Map.get(source.opts, "shape", "triad")
+
+    case Enum.find(strategies, &(Atom.to_string(&1.id) == selected_strategy)) do
+      nil ->
+        []
+
+      strategy ->
+        strategy.shapes
+        |> order_shapes()
+        |> Enum.map(fn shape ->
+          %{
+            value: Atom.to_string(shape),
+            label: chord_kind_label(shape),
+            selected: Atom.to_string(shape) == selected_shape
+          }
+        end)
+    end
+  end
+
+  defp strategy_shapes(selected_strategy, strategies) when is_binary(selected_strategy) do
+    case Enum.find(strategies, &(Atom.to_string(&1.id) == selected_strategy)) do
+      nil -> {:error, "invalid strategy"}
+      strategy -> {:ok, Map.get(strategy, :shapes, [])}
+    end
+  end
+
+  defp strategy_shapes(_selected_strategy, _strategies), do: {:error, "invalid strategy"}
+
+  defp default_mode_for_family(families, family_id) do
+    case Enum.find(families, &(&1.id == family_id)) do
+      %{mode_names: mode_names} when is_map(mode_names) and map_size(mode_names) > 0 ->
+        mode_names
+        |> Map.keys()
+        |> Enum.sort()
+        |> List.first()
+        |> Integer.to_string()
+
+      _ ->
+        "1"
+    end
+  end
+
+  defp default_shape_for_strategy(selected_strategy, strategies) do
+    case Enum.find(strategies, &(Atom.to_string(&1.id) == selected_strategy)) do
+      %{shapes: shapes} ->
+        shape =
+          shapes
+          |> order_shapes()
+          |> List.first()
+
+        Atom.to_string(shape)
+
+      _ ->
+        "triad"
+    end
+  end
+
+  defp order_shapes(shapes) when is_list(shapes) do
+    Enum.sort_by(shapes, fn shape ->
+      Enum.find_index(@shape_order, &(&1 == shape)) || 999
+    end)
+  end
+
+  defp parse_positive_integer(value) when is_integer(value) and value > 0, do: {:ok, value}
+
+  defp parse_positive_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {num, ""} when num > 0 -> {:ok, num}
+      _ -> {:error, :invalid_integer}
+    end
+  end
+
+  defp parse_positive_integer(_value), do: {:error, :invalid_integer}
 
   defp parse_chord_kind(value) when is_binary(value) do
     case Map.get(@chord_kind_from_param, value) do
