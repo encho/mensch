@@ -51,6 +51,7 @@ defmodule Mensch.Harmony.ChordSpec do
           | :sus4
           | :maj9
           | :min9
+          | :min7_flat9
           | :dom9
           | :maj7_add_sharp9
           | :dim7_flat9
@@ -60,6 +61,9 @@ defmodule Mensch.Harmony.ChordSpec do
           | :dom7_flat9
           | :maj11
           | :min11
+          | :maj13
+          | :min13
+          | :dom11
           | :dom13
           | :six_nine
           | :min6
@@ -192,6 +196,7 @@ defmodule Mensch.Harmony.ChordSpec do
     sus4: ["1", "4", "5"],
     maj9: ["1", "3", "5", "7", "9"],
     min9: ["1", "b3", "5", "b7", "9"],
+    min7_flat9: ["1", "b3", "5", "b7", "b9"],
     dom9: ["1", "3", "5", "b7", "9"],
     maj7_add_sharp9: ["1", "3", "5", "7", "#9"],
     dim7_flat9: ["1", "b3", "b5", "bb7", "b9"],
@@ -201,6 +206,9 @@ defmodule Mensch.Harmony.ChordSpec do
     dom7_flat9: ["1", "3", "5", "b7", "b9"],
     maj11: ["1", "3", "5", "7", "9", "11"],
     min11: ["1", "b3", "5", "b7", "9", "11"],
+    maj13: ["1", "3", "5", "7", "9", "11", "13"],
+    min13: ["1", "b3", "5", "b7", "9", "11", "13"],
+    dom11: ["1", "3", "5", "b7", "9", "11"],
     dom13: ["1", "3", "5", "b7", "9", "13"],
     six_nine: ["1", "3", "5", "6", "9"],
     min6: ["1", "b3", "5", "6"],
@@ -448,6 +456,7 @@ defmodule Mensch.Harmony.ChordSpec do
       set == MapSet.new(["1", "b3", "b5", "bb7"]) -> "dim7"
       set == MapSet.new(["1", "3", "5", "7", "9"]) -> "maj9"
       set == MapSet.new(["1", "b3", "5", "b7", "9"]) -> "m9"
+      set == MapSet.new(["1", "b3", "5", "b7", "b9"]) -> "m7(♭9)"
       set == MapSet.new(["1", "3", "5", "b7", "9"]) -> "9"
       set == MapSet.new(["1", "3", "5", "7", "#9"]) -> "maj7(add#9)"
       set == MapSet.new(["1", "b3", "b5", "bb7", "b9"]) -> "dim7(♭9)"
@@ -457,6 +466,9 @@ defmodule Mensch.Harmony.ChordSpec do
       set == MapSet.new(["1", "3", "5", "b7", "b9"]) -> "7(♭9)"
       set == MapSet.new(["1", "b3", "5", "b7", "9", "11"]) -> "m11"
       set == MapSet.new(["1", "3", "5", "7", "9", "11"]) -> "maj11"
+      set == MapSet.new(["1", "3", "5", "7", "9", "11", "13"]) -> "maj13"
+      set == MapSet.new(["1", "b3", "5", "b7", "9", "11", "13"]) -> "m13"
+      set == MapSet.new(["1", "3", "5", "b7", "9", "11"]) -> "11"
       set == MapSet.new(["1", "3", "5", "b7", "9", "13"]) -> "13"
       set == MapSet.new(["1", "3", "5", "6"]) -> "6"
       set == MapSet.new(["1", "3", "5", "6", "9"]) -> "6/9"

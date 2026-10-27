@@ -97,7 +97,7 @@ defmodule Mensch.Harmony.DirectHarmonicIdentityResolver do
   end
 
   defp resolve_best_fit_quality(root_pc, chord_pcs, shape)
-       when shape in [:eleventh, :add6, :six_nine] do
+       when shape in [:eleventh, :thirteenth, :add6, :six_nine] do
     target = normalized_relative_intervals(root_pc, chord_pcs)
     observed_size = length(target)
 
@@ -139,7 +139,9 @@ defmodule Mensch.Harmony.DirectHarmonicIdentityResolver do
 
   defp resolve_best_fit_quality(_root_pc, _chord_pcs, _shape), do: :unknown
 
-  defp shape_candidate_qualities(:eleventh), do: [:maj11, :min11, :dom13, :min7_add11]
+  defp shape_candidate_qualities(:eleventh), do: [:maj11, :min11, :dom11, :dom13, :min7_add11]
+
+  defp shape_candidate_qualities(:thirteenth), do: [:maj13, :min13, :dom13]
 
   defp shape_candidate_qualities(:add6),
     do: [:maj6, :min6, :maj7_sharp5, :min_maj7, :dom7, :half_dim]
@@ -147,6 +149,7 @@ defmodule Mensch.Harmony.DirectHarmonicIdentityResolver do
   defp shape_candidate_qualities(:six_nine), do: [:six_nine]
 
   defp min_intersection_for_shape(:eleventh), do: 4
+  defp min_intersection_for_shape(:thirteenth), do: 5
   defp min_intersection_for_shape(:add6), do: 3
   defp min_intersection_for_shape(:six_nine), do: 3
 
@@ -168,6 +171,7 @@ defmodule Mensch.Harmony.DirectHarmonicIdentityResolver do
       quality in [
         :maj9,
         :min9,
+        :min7_flat9,
         :dom9,
         :maj7_add_sharp9,
         :dim7_flat9,
@@ -177,8 +181,10 @@ defmodule Mensch.Harmony.DirectHarmonicIdentityResolver do
         :dom7_flat9
       ]
 
-  defp quality_matches_shape?(quality, :eleventh), do: quality in [:maj11, :min11, :min7_add11]
-  defp quality_matches_shape?(quality, :thirteenth), do: quality in [:dom13]
+  defp quality_matches_shape?(quality, :eleventh),
+    do: quality in [:maj11, :min11, :dom11, :min7_add11]
+
+  defp quality_matches_shape?(quality, :thirteenth), do: quality in [:maj13, :min13, :dom13]
   defp quality_matches_shape?(quality, :add6), do: quality in [:maj6, :min6]
   defp quality_matches_shape?(quality, :six_nine), do: quality in [:six_nine]
   defp quality_matches_shape?(_quality, _shape), do: false

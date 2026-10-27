@@ -419,6 +419,7 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
       quality in [
         :maj9,
         :min9,
+        :min7_flat9,
         :dom9,
         :maj7_add_sharp9,
         :dim7_flat9,
@@ -428,8 +429,8 @@ defmodule Mensch.Harmony.HarmonicIdentityInference do
         :dom7_flat9
       ]
 
-  defp quality_matches_shape?(quality, :eleventh), do: quality in [:maj11, :min11]
-  defp quality_matches_shape?(quality, :thirteenth), do: quality in [:dom13]
+  defp quality_matches_shape?(quality, :eleventh), do: quality in [:maj11, :min11, :dom11]
+  defp quality_matches_shape?(quality, :thirteenth), do: quality in [:maj13, :min13, :dom13]
   defp quality_matches_shape?(quality, :add6), do: quality in [:maj6, :min6]
   defp quality_matches_shape?(quality, :six_nine), do: quality in [:six_nine]
 

@@ -165,4 +165,64 @@ defmodule Mensch.Harmony.HarmonicIdentityInferenceTest do
     assert top.source == :direct
     assert top.harmonic_identity.root == :g
   end
+
+  test "c ionian degree-3 ninth resolves direct-first as e min7_flat9" do
+    {:ok, scale_spec} = Scale.build_scale(:c, :major, 1)
+    {:ok, chord} = Scale.generate_chord(scale_spec, 3, strategy: :tertian, shape: :ninth)
+
+    [top | _rest] =
+      HarmonicIdentityInference.infer(chord.pitch_classes,
+        scale_spec: scale_spec,
+        spelling_mode: :practical,
+        bass_pitch_class: :e,
+        preferred_root_pitch_class: chord.root_pitch_class,
+        preferred_strategy: :tertian,
+        preferred_shape: :ninth,
+        preferred_degree: 3
+      )
+
+    assert top.source == :direct
+    assert top.harmonic_identity.root == :e
+    assert top.harmonic_identity.quality == :min7_flat9
+  end
+
+  test "c ionian degree-5 eleventh resolves direct-first as g dom11" do
+    {:ok, scale_spec} = Scale.build_scale(:c, :major, 1)
+    {:ok, chord} = Scale.generate_chord(scale_spec, 5, strategy: :tertian, shape: :eleventh)
+
+    [top | _rest] =
+      HarmonicIdentityInference.infer(chord.pitch_classes,
+        scale_spec: scale_spec,
+        spelling_mode: :practical,
+        bass_pitch_class: :g,
+        preferred_root_pitch_class: chord.root_pitch_class,
+        preferred_strategy: :tertian,
+        preferred_shape: :eleventh,
+        preferred_degree: 5
+      )
+
+    assert top.source == :direct
+    assert top.harmonic_identity.root == :g
+    assert top.harmonic_identity.quality == :dom11
+  end
+
+  test "c ionian degree-1 thirteenth resolves direct-first as c maj13" do
+    {:ok, scale_spec} = Scale.build_scale(:c, :major, 1)
+    {:ok, chord} = Scale.generate_chord(scale_spec, 1, strategy: :tertian, shape: :thirteenth)
+
+    [top | _rest] =
+      HarmonicIdentityInference.infer(chord.pitch_classes,
+        scale_spec: scale_spec,
+        spelling_mode: :practical,
+        bass_pitch_class: :c,
+        preferred_root_pitch_class: chord.root_pitch_class,
+        preferred_strategy: :tertian,
+        preferred_shape: :thirteenth,
+        preferred_degree: 1
+      )
+
+    assert top.source == :direct
+    assert top.harmonic_identity.root == :c
+    assert top.harmonic_identity.quality == :maj13
+  end
 end

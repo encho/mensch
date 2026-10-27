@@ -98,4 +98,55 @@ defmodule Mensch.Harmony.DirectHarmonicIdentityResolverTest do
     assert identity.foreign_bass == nil
     assert identity.quality == :six_nine
   end
+
+  test "resolves c ionian degree-3 ninth deterministically as e min7_flat9" do
+    {:ok, scale_spec} = Scale.build_scale(:c, :major, 1)
+    {:ok, chord} = Scale.generate_chord(scale_spec, 3, strategy: :tertian, shape: :ninth)
+
+    assert {:ok, identity} =
+             DirectHarmonicIdentityResolver.resolve(scale_spec, chord,
+               strategy: :tertian,
+               shape: :ninth,
+               degree: 3,
+               spelling_mode: :practical
+             )
+
+    assert identity.root == :e
+    assert identity.quality == :min7_flat9
+    assert identity.foreign_bass == nil
+  end
+
+  test "resolves c ionian degree-5 eleventh deterministically as g dom11" do
+    {:ok, scale_spec} = Scale.build_scale(:c, :major, 1)
+    {:ok, chord} = Scale.generate_chord(scale_spec, 5, strategy: :tertian, shape: :eleventh)
+
+    assert {:ok, identity} =
+             DirectHarmonicIdentityResolver.resolve(scale_spec, chord,
+               strategy: :tertian,
+               shape: :eleventh,
+               degree: 5,
+               spelling_mode: :practical
+             )
+
+    assert identity.root == :g
+    assert identity.quality == :dom11
+    assert identity.foreign_bass == nil
+  end
+
+  test "resolves c ionian degree-1 thirteenth deterministically as c maj13" do
+    {:ok, scale_spec} = Scale.build_scale(:c, :major, 1)
+    {:ok, chord} = Scale.generate_chord(scale_spec, 1, strategy: :tertian, shape: :thirteenth)
+
+    assert {:ok, identity} =
+             DirectHarmonicIdentityResolver.resolve(scale_spec, chord,
+               strategy: :tertian,
+               shape: :thirteenth,
+               degree: 1,
+               spelling_mode: :practical
+             )
+
+    assert identity.root == :c
+    assert identity.quality == :maj13
+    assert identity.foreign_bass == nil
+  end
 end
