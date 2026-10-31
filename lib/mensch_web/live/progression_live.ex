@@ -5,6 +5,7 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.AppendChord
+  alias Mensch.Harmony.Progression.Middleware.AppendScaleGeneratedChords
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
@@ -36,7 +37,12 @@ defmodule MenschWeb.ProgressionLive do
   ]
 
   @source_ids ["scale_generated_harmonic_identities", "fixed_chord", "empty_progression"]
-  @transform_ids ["ensure_bass_ascending", "transpose_all", "append_chord"]
+  @transform_ids [
+    "ensure_bass_ascending",
+    "transpose_all",
+    "append_chord",
+    "append_scale_generated_chords"
+  ]
 
   @qualities ChordSpec.qualities() |> Enum.sort()
 
@@ -261,6 +267,17 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
+  def handle_event("toggle_append_scale_generated_ui", %{"index" => index}, socket) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        expanded = Map.get(opts, "expanded", true)
+        Map.put(opts, "expanded", !expanded)
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
   def handle_event(
         "set_transform_bool",
         %{"index" => index, "field" => field, "value" => value},
@@ -370,6 +387,72 @@ defmodule MenschWeb.ProgressionLive do
 
           _ ->
             opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event("set_transform_scale_family", %{"index" => index, "family" => family}, socket) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        case parse_family(family, socket.assigns.scale_families) do
+          {:ok, family_id} ->
+            mode = default_mode_for_family(socket.assigns.scale_families, family_id)
+            opts |> Map.put("family", family) |> Map.put("scale_mode", mode)
+
+          {:error, _reason} ->
+            opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "set_transform_scale_mode",
+        %{"index" => index, "scale_mode" => scale_mode},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        case parse_positive_integer(scale_mode) do
+          {:ok, _mode} -> Map.put(opts, "scale_mode", scale_mode)
+          {:error, _reason} -> opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event("set_transform_strategy", %{"index" => index, "strategy" => strategy}, socket) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        case parse_strategy(strategy, socket.assigns.chord_strategies) do
+          {:ok, _strategy} ->
+            shape = default_shape_for_strategy(strategy, socket.assigns.chord_strategies)
+            opts |> Map.put("strategy", strategy) |> Map.put("shape", shape)
+
+          {:error, _reason} ->
+            opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event("set_transform_shape", %{"index" => index, "shape" => shape}, socket) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        strategy = Map.get(opts, "strategy")
+
+        case parse_shape_for_strategy(shape, strategy, socket.assigns.chord_strategies) do
+          {:ok, _shape} -> Map.put(opts, "shape", shape)
+          {:error, _reason} -> opts
         end
       end)
 
@@ -1093,6 +1176,166 @@ defmodule MenschWeb.ProgressionLive do
                     </div>
                   </div>
                 <% end %>
+
+                <%= if transform.id == "append_scale_generated_chords" do %>
+                  <% expanded = append_scale_generated_transform_expanded?(transform) %>
+                  <% transform_source = %{opts: transform.opts} %>
+                  <% transform_scale_family_options =
+                    source_scale_family_options(@scale_families, transform_source) %>
+                  <% transform_scale_mode_options =
+                    source_scale_mode_options(@scale_families, transform_source) %>
+                  <% transform_strategy_options =
+                    source_strategy_options(@chord_strategies, transform_source) %>
+                  <% transform_shape_options =
+                    source_shape_options(@chord_strategies, transform_source) %>
+
+                  <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3">
+                    <div class="flex items-center justify-between gap-2">
+                      <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                        Append Scale-Generated Chords
+                      </h4>
+                      <button
+                        type="button"
+                        phx-click="toggle_append_scale_generated_ui"
+                        phx-value-index={index}
+                        class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-2 py-1 font-mono text-[11px] text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                      >
+                        {if expanded, do: "Minimize", else: "Expand"}
+                      </button>
+                    </div>
+
+                    <%= if expanded do %>
+                      <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                        <h5 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                          1) Define Scale
+                        </h5>
+
+                        <div class="max-w-xl">
+                          <MenschWeb.PitchClassKeyboard.mini
+                            id={"progression-transform-scale-tonic-#{index}"}
+                            label="Tonic"
+                            event="set_transform_pitch_class"
+                            selected_key={
+                              selected_tonic_keyboard_key(%{
+                                opts: %{"tonic" => transform.opts["tonic"]}
+                              })
+                            }
+                            selected_key_color="#f6d365"
+                            value_index={index}
+                            value_field="tonic"
+                          />
+                        </div>
+
+                        <div class="grid gap-3 md:grid-cols-2">
+                          <label class="space-y-1">
+                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                              Scale Family
+                            </span>
+                            <form phx-change="set_transform_scale_family">
+                              <input type="hidden" name="index" value={index} />
+                              <select
+                                name="family"
+                                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                              >
+                                <option
+                                  :for={item <- transform_scale_family_options}
+                                  value={item.value}
+                                  selected={item.selected}
+                                >
+                                  {item.label}
+                                </option>
+                              </select>
+                            </form>
+                          </label>
+
+                          <label class="space-y-1">
+                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                              Mode
+                            </span>
+                            <%= if transform_scale_mode_options == [] do %>
+                              <div class="rounded-sm border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 font-mono text-xs text-zinc-500">
+                                No mode (standalone scale)
+                              </div>
+                            <% else %>
+                              <form phx-change="set_transform_scale_mode">
+                                <input type="hidden" name="index" value={index} />
+                                <select
+                                  name="scale_mode"
+                                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                                >
+                                  <option
+                                    :for={item <- transform_scale_mode_options}
+                                    value={item.value}
+                                    selected={item.selected}
+                                  >
+                                    {item.label}
+                                  </option>
+                                </select>
+                              </form>
+                            <% end %>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                        <h5 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                          2) Chord Strategy
+                        </h5>
+
+                        <div class="grid gap-3 md:grid-cols-2">
+                          <label class="space-y-1">
+                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                              Strategy
+                            </span>
+                            <form phx-change="set_transform_strategy">
+                              <input type="hidden" name="index" value={index} />
+                              <select
+                                name="strategy"
+                                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                              >
+                                <option
+                                  :for={item <- transform_strategy_options}
+                                  value={item.value}
+                                  selected={item.selected}
+                                >
+                                  {item.label}
+                                </option>
+                              </select>
+                            </form>
+                          </label>
+
+                          <label class="space-y-1">
+                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                              Chord Shape
+                            </span>
+                            <form phx-change="set_transform_shape">
+                              <input type="hidden" name="index" value={index} />
+                              <select
+                                name="shape"
+                                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                              >
+                                <option
+                                  :for={item <- transform_shape_options}
+                                  value={item.value}
+                                  selected={item.selected}
+                                >
+                                  {item.label}
+                                </option>
+                              </select>
+                            </form>
+                          </label>
+                        </div>
+                      </div>
+                    <% else %>
+                      <p class="font-mono text-xs text-zinc-300">
+                        {String.upcase(transform.opts["tonic"] || "c")} · {transform.opts["family"] ||
+                          "major"} · mode {transform.opts["scale_mode"] || "1"} · {transform.opts[
+                          "strategy"
+                        ] || "tertian"}/{transform.opts["shape"] || "triad"}
+                      </p>
+                    <% end %>
+                  </div>
+                <% end %>
               </div>
             </div>
           </div>
@@ -1315,6 +1558,29 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
+  defp transform_to_fun(%{id: "append_scale_generated_chords", opts: opts}) do
+    with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
+         {:ok, family} <- parse_family(Map.get(opts, "family"), ScaleRegistry.all()),
+         {:ok, mode} <- parse_scale_mode(Map.get(opts, "scale_mode")),
+         {:ok, strategy} <-
+           parse_strategy(Map.get(opts, "strategy"), Scale.chord_strategy_options()),
+         {:ok, shape} <-
+           parse_shape_for_strategy(
+             Map.get(opts, "shape"),
+             Map.get(opts, "strategy"),
+             Scale.chord_strategy_options()
+           ) do
+      {:ok,
+       AppendScaleGeneratedChords.middleware(
+         scale: %{tonic: tonic, family: family, mode: mode},
+         strategy: strategy,
+         shape: shape,
+         spelling_mode: :practical,
+         render_defaults: %{octave: 3, inversion: 0}
+       )}
+    end
+  end
+
   defp transform_to_fun(_), do: {:error, :invalid_transform}
 
   defp source_ids, do: @source_ids
@@ -1332,6 +1598,7 @@ defmodule MenschWeb.ProgressionLive do
   defp transform_label("ensure_bass_ascending"), do: "Ensure Bass Ascending"
   defp transform_label("transpose_all"), do: "Transpose All"
   defp transform_label("append_chord"), do: "Append Chord"
+  defp transform_label("append_scale_generated_chords"), do: "Append Scale-Generated Chords"
   defp transform_label(_), do: "Unknown Transform"
 
   defp default_source_config(), do: default_source_config("scale_generated_harmonic_identities")
@@ -1385,6 +1652,20 @@ defmodule MenschWeb.ProgressionLive do
         "voice_count" => nil,
         "doubling" => "auto",
         "inversion_resolution_mode" => "per_step_centered",
+        "expanded" => true
+      }
+    }
+  end
+
+  defp default_transform_config("append_scale_generated_chords") do
+    %{
+      id: "append_scale_generated_chords",
+      opts: %{
+        "tonic" => "c",
+        "family" => "major",
+        "scale_mode" => "1",
+        "strategy" => "tertian",
+        "shape" => "triad",
         "expanded" => true
       }
     }
@@ -1713,6 +1994,12 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp append_transform_expanded?(_transform), do: true
+
+  defp append_scale_generated_transform_expanded?(%{opts: opts}) when is_map(opts) do
+    Map.get(opts, "expanded", true) != false
+  end
+
+  defp append_scale_generated_transform_expanded?(_transform), do: true
 
   defp chord_kind_label(:triad), do: "Triad"
   defp chord_kind_label(:seventh), do: "Seventh"

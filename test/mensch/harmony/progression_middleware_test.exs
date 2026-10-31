@@ -5,6 +5,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.AppendChord
+  alias Mensch.Harmony.Progression.Middleware.AppendScaleGeneratedChords
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
@@ -335,5 +336,77 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     assert Enum.zip(original_appended_notes, shifted_appended_notes)
            |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 12 end)
+  end
+
+  test "append_scale_generated_chords appends generated chords to existing progression" do
+    base =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :a, quality: :min},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [base]}
+
+    transform =
+      AppendScaleGeneratedChords.middleware(
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:ok, %ChordProgression{chords: chords}} = transform.(progression)
+    assert length(chords) == 8
+    assert ChordSpec.root(Enum.at(chords, 0)) == :a
+    assert ChordSpec.quality(Enum.at(chords, 0)) == :min
+  end
+
+  test "append_scale_generated_chords then transpose_all transposes appended chords too" do
+    base =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [base]}
+
+    append_scale =
+      AppendScaleGeneratedChords.middleware(
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    assert {:ok, %ChordProgression{chords: [shifted_base | shifted_generated]}} =
+             Progression.run(progression, [append_scale, TransposeAll.middleware(semitones: 12)])
+
+    assert shifted_generated != []
+
+    original_base_notes = Resolver.resolve(base)
+    shifted_base_notes = Resolver.resolve(shifted_base)
+
+    assert Enum.zip(original_base_notes, shifted_base_notes)
+           |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 12 end)
+
+    generated_original_notes =
+      append_scale
+      |> then(fn transform ->
+        {:ok, appended} = transform.(%ChordProgression{name: "x", description: "x", chords: []})
+        appended.chords
+      end)
+      |> Enum.map(&Resolver.resolve/1)
+
+    generated_shifted_notes = Enum.map(shifted_generated, &Resolver.resolve/1)
+
+    assert Enum.zip(generated_original_notes, generated_shifted_notes)
+           |> Enum.all?(fn {old_notes, new_notes} ->
+             Enum.zip(old_notes, new_notes)
+             |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 12 end)
+           end)
   end
 end
