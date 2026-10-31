@@ -92,12 +92,14 @@ defmodule MenschWeb.ChordProgressionsLive do
   end
 
   @impl true
-  def handle_event("merge_selected_progressions", _params, socket) do
+  def handle_event("merge_selected_progressions", %{"merge" => params}, socket) do
     selected_ids = socket.assigns.selected_ids
+    name = Map.get(params, "name", socket.assigns.merge_name)
+    description = Map.get(params, "description", socket.assigns.merge_description)
 
     case ChordProgressions.merge_progressions(
-           socket.assigns.merge_name,
-           socket.assigns.merge_description,
+           name,
+           description,
            selected_ids
          ) do
       {:ok, record} ->
@@ -121,6 +123,10 @@ defmodule MenschWeb.ChordProgressionsLive do
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Merge failed: #{inspect(reason)}")}
     end
+  end
+
+  def handle_event("merge_selected_progressions", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Invalid merge submission")}
   end
 
   @impl true
