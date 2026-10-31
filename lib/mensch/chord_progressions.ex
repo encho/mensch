@@ -105,6 +105,35 @@ defmodule Mensch.ChordProgressions do
 
   def create_progression(_name, _description, _chords), do: {:error, :invalid_params}
 
+  @spec merge_progressions(String.t(), String.t(), [String.t()]) ::
+          {:ok, progression_record()} | {:error, term()}
+  def merge_progressions(name, description, source_ids)
+      when is_binary(name) and is_binary(description) and is_list(source_ids) do
+    cleaned_ids =
+      source_ids
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    cond do
+      cleaned_ids == [] ->
+        {:error, :no_sources_selected}
+
+      true ->
+        with {:ok, source_records} <- fetch_progression_records(cleaned_ids),
+             merged_chords <- Enum.flat_map(source_records, & &1.progression.chords),
+             false <- merged_chords == [],
+             {:ok, record} <- create_progression(name, description, merged_chords) do
+          {:ok, record}
+        else
+          true -> {:error, :no_chords_to_merge}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  def merge_progressions(_name, _description, _source_ids), do: {:error, :invalid_params}
+
   defp normalize_loaded_record(id, %{} = record) do
     with progression_value when not is_nil(progression_value) <- Map.get(record, :progression),
          {:ok, progression} <- normalize_progression(progression_value) do
@@ -196,5 +225,18 @@ defmodule Mensch.ChordProgressions do
 
   defp now_iso8601 do
     DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+  end
+
+  defp fetch_progression_records(ids) do
+    Enum.reduce_while(ids, {:ok, []}, fn id, {:ok, acc} ->
+      case fetch_progression(id) do
+        {:ok, record} -> {:cont, {:ok, [record | acc]}}
+        {:error, reason} -> {:halt, {:error, {:source_load_failed, id, reason}}}
+      end
+    end)
+    |> case do
+      {:ok, records} -> {:ok, Enum.reverse(records)}
+      {:error, reason} -> {:error, reason}
+    end
   end
 end
