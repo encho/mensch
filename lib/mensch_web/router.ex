@@ -21,7 +21,9 @@ defmodule MenschWeb.Router do
     live "/samples", SamplesLive
     live "/samples/:sample_id", HomeLive
     live "/chord-lab", ChordLabLive
-    live "/chord-progression-lab", ProgressionLive
+    live "/chord-progressions", ChordProgressionsLive
+    live "/chord-progressions/new", ProgressionLive
+    live "/chord-progressions/:id", ChordProgressionShowLive
     live "/scale-lab", ScaleLabLive
     live "/scale-chord-lab", ScaleChordLabLive
     get "/exports/sample/:index/bitwig-mpe.mid", ExportController, :bitwig_mpe_midi

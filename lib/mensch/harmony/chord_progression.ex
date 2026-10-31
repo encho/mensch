@@ -16,7 +16,13 @@ defmodule Mensch.Harmony.ChordProgression do
 
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
-    progression = struct(__MODULE__, attrs)
+    attrs_map =
+      case attrs do
+        %__MODULE__{} = progression -> Map.from_struct(progression)
+        _ -> attrs
+      end
+
+    progression = struct(__MODULE__, attrs_map)
 
     cond do
       not is_binary(progression.name) ->

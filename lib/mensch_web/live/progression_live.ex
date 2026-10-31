@@ -1,6 +1,7 @@
 defmodule MenschWeb.ProgressionLive do
   use MenschWeb, :live_view
 
+  alias Mensch.ChordProgressions
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
@@ -59,7 +60,11 @@ defmodule MenschWeb.ProgressionLive do
       |> assign(:source, source)
       |> assign(:transforms, [])
       |> assign(:next_transform_id, hd(@transform_ids))
+      |> assign(:progression, nil)
       |> assign(:chords, [])
+      |> assign(:save_modal_open, false)
+      |> assign(:save_name, "")
+      |> assign(:save_description, "")
       |> assign(:preview_note_channels, [])
       |> assign(:preview_stop_ref, nil)
       |> assign(:error_message, nil)
@@ -263,6 +268,54 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
+  def handle_event("open_save_modal", _params, socket) do
+    case socket.assigns.progression do
+      %{chords: chords, name: name, description: description}
+      when is_list(chords) and chords != [] ->
+        {:noreply,
+         socket
+         |> assign(:save_modal_open, true)
+         |> assign(:save_name, name)
+         |> assign(:save_description, description)}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Run the pipeline before saving")}
+    end
+  end
+
+  @impl true
+  def handle_event("close_save_modal", _params, socket) do
+    {:noreply, assign(socket, :save_modal_open, false)}
+  end
+
+  @impl true
+  def handle_event("save_progression", %{"progression" => params}, socket) do
+    name = Map.get(params, "name", "")
+    description = Map.get(params, "description", "")
+
+    case socket.assigns.progression do
+      %{chords: chords} when is_list(chords) and chords != [] ->
+        case ChordProgressions.create_progression(name, description, chords) do
+          {:ok, record} ->
+            {:noreply,
+             socket
+             |> assign(:save_modal_open, false)
+             |> put_flash(:info, "Progression saved")
+             |> push_navigate(to: ~p"/chord-progressions/#{record.id}")}
+
+          {:error, :name_required} ->
+            {:noreply, put_flash(socket, :error, "Name is required")}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Save failed: #{inspect(reason)}")}
+        end
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "No progression to save")}
+    end
+  end
+
+  @impl true
   def handle_event("play_chord", %{"index" => index}, socket) do
     chord =
       case Integer.parse(to_string(index)) do
@@ -322,6 +375,15 @@ defmodule MenschWeb.ProgressionLive do
           title="Chord Progression Lab"
           subtitle="Build a progression pipeline with one source and append-only transforms."
         />
+
+        <div class="flex items-center justify-end">
+          <.link
+            navigate={~p"/chord-progressions"}
+            class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+          >
+            View Saved Progressions
+          </.link>
+        </div>
 
         <div class="ui-radius-table space-y-4 border border-zinc-700/60 bg-black/30 p-4">
           <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3 space-y-3">
@@ -638,6 +700,14 @@ defmodule MenschWeb.ProgressionLive do
             >
               Run Pipeline
             </button>
+
+            <button
+              type="button"
+              phx-click="open_save_modal"
+              class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-4 py-2 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+            >
+              Save Progression
+            </button>
           </div>
 
           <div :if={@error_message} class="rounded-sm border border-rose-500/40 bg-rose-950/30 p-3">
@@ -681,6 +751,66 @@ defmodule MenschWeb.ProgressionLive do
             </div>
           </div>
         </div>
+
+        <div
+          :if={@save_modal_open}
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+        >
+          <div class="w-full max-w-lg rounded-sm border border-zinc-700 bg-zinc-950 p-4">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="font-mono text-sm text-zinc-100">Save Chord Progression</h3>
+              <button
+                type="button"
+                phx-click="close_save_modal"
+                class="rounded-sm border border-zinc-700 px-2 py-1 font-mono text-[11px] text-zinc-300 hover:border-zinc-500"
+              >
+                Close
+              </button>
+            </div>
+
+            <form phx-submit="save_progression" class="space-y-3">
+              <label class="space-y-1 block">
+                <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Name
+                </span>
+                <input
+                  type="text"
+                  name="progression[name]"
+                  value={@save_name}
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                  required
+                />
+              </label>
+
+              <label class="space-y-1 block">
+                <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Description
+                </span>
+                <textarea
+                  name="progression[description]"
+                  rows="3"
+                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                >{@save_description}</textarea>
+              </label>
+
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  phx-click="close_save_modal"
+                  class="rounded-sm border border-zinc-700 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-200 hover:border-zinc-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 hover:bg-emerald-400/30"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </section>
     </Layouts.app>
     """
@@ -691,11 +821,13 @@ defmodule MenschWeb.ProgressionLive do
          {:ok, transforms} <- transforms_to_funs(socket.assigns.transforms),
          {:ok, progression} <- Progression.run_with_source(source_fn, transforms) do
       socket
+      |> assign(:progression, progression)
       |> assign(:chords, progression.chords)
       |> assign(:error_message, nil)
     else
       {:error, reason} ->
         socket
+        |> assign(:progression, nil)
         |> assign(:chords, [])
         |> assign(:error_message, format_error(reason))
     end

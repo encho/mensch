@@ -102,7 +102,7 @@ defmodule MenschWeb.Layouts do
               <.icon name="hero-musical-note" class="size-4" />
             </.link>
             <.link
-              navigate={~p"/chord-progression-lab"}
+              navigate={~p"/chord-progressions"}
               title="Chord Progression Lab"
               aria-label="Chord Progression Lab"
               class={[
