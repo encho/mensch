@@ -7,6 +7,7 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.Harmony.Progression.Middleware.AppendChord
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
+  alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
   alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities
   alias Mensch.Harmony.Resolver
@@ -34,7 +35,7 @@ defmodule MenschWeb.ProgressionLive do
     :b_flat
   ]
 
-  @source_ids ["scale_generated_harmonic_identities", "fixed_chord"]
+  @source_ids ["scale_generated_harmonic_identities", "fixed_chord", "empty_progression"]
   @transform_ids ["ensure_bass_ascending", "transpose_all", "append_chord"]
 
   @qualities ChordSpec.qualities() |> Enum.sort()
@@ -733,6 +734,14 @@ defmodule MenschWeb.ProgressionLive do
                 </div>
               </div>
             <% end %>
+
+            <%= if @source.id == "empty_progression" do %>
+              <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
+                <p class="font-mono text-xs text-zinc-300">
+                  This source starts with an empty chord list. Add chords via transforms such as Append Chord.
+                </p>
+              </div>
+            <% end %>
           </div>
 
           <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3 space-y-3">
@@ -1273,6 +1282,10 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
+  defp source_to_fun(%{id: "empty_progression"}) do
+    {:ok, CreateEmptyProgression.source()}
+  end
+
   defp source_to_fun(_), do: {:error, :invalid_source}
 
   defp transforms_to_funs(transforms) when is_list(transforms) do
@@ -1313,6 +1326,7 @@ defmodule MenschWeb.ProgressionLive do
     do: "Create With Scale-Generated Harmonic Identities"
 
   defp source_label("fixed_chord"), do: "Create With Fixed Chord (Test)"
+  defp source_label("empty_progression"), do: "Create Empty Progression"
   defp source_label(_), do: "Unknown Source"
 
   defp transform_label("ensure_bass_ascending"), do: "Ensure Bass Ascending"
@@ -1340,6 +1354,10 @@ defmodule MenschWeb.ProgressionLive do
         "shape" => "triad"
       }
     }
+  end
+
+  defp default_source_config("empty_progression") do
+    %{id: "empty_progression", opts: %{}}
   end
 
   defp default_source_config(_), do: default_source_config("scale_generated_harmonic_identities")

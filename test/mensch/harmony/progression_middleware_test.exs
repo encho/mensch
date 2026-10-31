@@ -8,6 +8,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
+  alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
 
   alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities,
     as: ScaleGeneratedSource
@@ -195,6 +196,13 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
     chords = progression.chords
     assert length(chords) == 4
     assert Enum.all?(chords, &(ChordSpec.root(&1) == :d and ChordSpec.quality(&1) == :min))
+  end
+
+  test "create_empty_progression source returns progression with no chords" do
+    source = CreateEmptyProgression.source()
+
+    assert {:ok, %ChordProgression{} = progression} = source.()
+    assert progression.chords == []
   end
 
   test "transpose_all shifts resolved notes by octave when semitones is 12" do
