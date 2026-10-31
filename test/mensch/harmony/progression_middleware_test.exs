@@ -4,6 +4,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.Progression
+  alias Mensch.Harmony.Progression.Middleware.AppendChord
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
@@ -251,5 +252,80 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     assert {:error, {:transform_failed, 0, :bad_transform}} =
              Progression.run_with_source(source, [bad_transform])
+  end
+
+  test "append_chord adds one chord with advanced voicing settings" do
+    first =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    appended =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min7},
+        octave: 4,
+        inversion: 1,
+        voicing: %ChordSpec.Voicing{
+          type: :open,
+          center_note: 64,
+          range_min: 45,
+          range_max: 84,
+          voice_count: 4,
+          doubling: :auto,
+          inversion_resolution_mode: :anchor_then_wander
+        }
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [first]}
+    middleware = AppendChord.middleware(chord_spec: appended)
+
+    assert {:ok, %ChordProgression{chords: [a, b]}} = middleware.(progression)
+
+    assert ChordSpec.root(a) == :c
+    assert ChordSpec.root(b) == :d
+    assert ChordSpec.quality(b) == :min7
+    assert b.voicing.type == :open
+    assert b.voicing.center_note == 64
+    assert b.voicing.range_min == 45
+    assert b.voicing.range_max == 84
+    assert b.voicing.voice_count == 4
+    assert b.voicing.inversion_resolution_mode == :anchor_then_wander
+  end
+
+  test "append_chord before transpose_all also transposes appended chord" do
+    first =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    appended =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [first]}
+
+    assert {:ok, %ChordProgression{chords: [shifted_first, shifted_appended]}} =
+             Progression.run(progression, [
+               AppendChord.middleware(chord_spec: appended),
+               TransposeAll.middleware(semitones: 12)
+             ])
+
+    original_first_notes = Resolver.resolve(first)
+    original_appended_notes = Resolver.resolve(appended)
+    shifted_first_notes = Resolver.resolve(shifted_first)
+    shifted_appended_notes = Resolver.resolve(shifted_appended)
+
+    assert Enum.zip(original_first_notes, shifted_first_notes)
+           |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 12 end)
+
+    assert Enum.zip(original_appended_notes, shifted_appended_notes)
+           |> Enum.all?(fn {old_note, new_note} -> new_note - old_note == 12 end)
   end
 end

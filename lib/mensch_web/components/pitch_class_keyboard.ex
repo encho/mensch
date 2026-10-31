@@ -30,6 +30,8 @@ defmodule MenschWeb.PitchClassKeyboard do
   attr :header_action_label, :string, default: nil
   attr :header_action_value, :string, default: ""
   attr :selected_key_color, :string, default: "#9bf25a"
+  attr :value_index, :any, default: nil
+  attr :value_field, :string, default: nil
 
   def mini(assigns) do
     assigns = assign(assigns, :keyboard_keys, @keyboard_keys)
@@ -43,6 +45,8 @@ defmodule MenschWeb.PitchClassKeyboard do
           type="button"
           phx-click={@event}
           phx-value-pitch_class={@header_action_value}
+          phx-value-index={@value_index}
+          phx-value-field={@value_field}
           class="rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-[10px] text-zinc-300 hover:border-zinc-500"
         >
           {@header_action_label || @clear_label}
@@ -54,6 +58,8 @@ defmodule MenschWeb.PitchClassKeyboard do
           type="button"
           phx-click={@event}
           phx-value-pitch_class={key.root}
+          phx-value-index={@value_index}
+          phx-value-field={@value_field}
           title={key.label}
           class={[
             "absolute border transition-colors duration-150",
@@ -86,6 +92,8 @@ defmodule MenschWeb.PitchClassKeyboard do
           type="button"
           phx-click={@event}
           phx-value-pitch_class=""
+          phx-value-index={@value_index}
+          phx-value-field={@value_field}
           class="rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-[10px] text-zinc-300 hover:border-zinc-500"
         >
           {@clear_label}

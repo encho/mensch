@@ -4,6 +4,7 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.ChordProgressions
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Progression
+  alias Mensch.Harmony.Progression.Middleware.AppendChord
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
@@ -34,7 +35,7 @@ defmodule MenschWeb.ProgressionLive do
   ]
 
   @source_ids ["scale_generated_harmonic_identities", "fixed_chord"]
-  @transform_ids ["ensure_bass_ascending", "transpose_all"]
+  @transform_ids ["ensure_bass_ascending", "transpose_all", "append_chord"]
 
   @qualities ChordSpec.qualities() |> Enum.sort()
 
@@ -47,6 +48,26 @@ defmodule MenschWeb.ProgressionLive do
                       end)
 
   @shape_order [:triad, :seventh, :ninth, :eleventh, :thirteenth, :add6, :six_nine]
+
+  @voicing_type_options [
+    %{value: "close", label: "Close"},
+    %{value: "open", label: "Open"}
+  ]
+
+  @doubling_options [
+    %{value: "auto", label: "Auto"},
+    %{value: "root", label: "Root"},
+    %{value: "top", label: "Top"},
+    %{value: "third", label: "Third"},
+    %{value: "fifth", label: "Fifth"},
+    %{value: "guide_tones", label: "Guide Tones"},
+    %{value: "bass", label: "Bass"}
+  ]
+
+  @inversion_resolution_mode_options [
+    %{value: "per_step_centered", label: "Per Step Centered"},
+    %{value: "anchor_then_wander", label: "Anchor Then Wander"}
+  ]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -228,6 +249,17 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
+  def handle_event("toggle_append_transform_ui", %{"index" => index}, socket) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        expanded = Map.get(opts, "expanded", true)
+        Map.put(opts, "expanded", !expanded)
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
   def handle_event(
         "set_transform_bool",
         %{"index" => index, "field" => field, "value" => value},
@@ -256,6 +288,87 @@ defmodule MenschWeb.ProgressionLive do
         case parse_integer(value, "transform field") do
           {:ok, parsed} -> Map.put(opts, field, parsed)
           {:error, _reason} -> opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "set_transform_optional_integer",
+        %{"index" => index, "field" => field, "value" => value},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        case parse_optional_integer(value, field) do
+          {:ok, parsed} -> Map.put(opts, field, parsed)
+          {:error, _reason} -> opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "set_transform_pitch_class",
+        %{"index" => index, "field" => field, "pitch_class" => pitch_class},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        if Map.has_key?(@pitch_class_from_param, pitch_class),
+          do: Map.put(opts, field, pitch_class),
+          else: opts
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "set_transform_quality",
+        %{"index" => index, "quality" => quality},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        if Map.has_key?(@quality_from_param, quality),
+          do: Map.put(opts, "quality", quality),
+          else: opts
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "set_transform_text",
+        %{"index" => index, "field" => field, "value" => value},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        case field do
+          "voicing_type" ->
+            if value in Enum.map(@voicing_type_options, & &1.value),
+              do: Map.put(opts, field, value),
+              else: opts
+
+          "doubling" ->
+            if value in Enum.map(@doubling_options, & &1.value),
+              do: Map.put(opts, field, value),
+              else: opts
+
+          "inversion_resolution_mode" ->
+            if value in Enum.map(@inversion_resolution_mode_options, & &1.value),
+              do: Map.put(opts, field, value),
+              else: opts
+
+          _ ->
+            opts
         end
       end)
 
@@ -330,6 +443,23 @@ defmodule MenschWeb.ProgressionLive do
 
       _ ->
         {:noreply, put_flash(socket, :error, "Invalid chord selection")}
+    end
+  end
+
+  @impl true
+  def handle_event("play_append_transform_chord", %{"index" => index}, socket) do
+    transform =
+      case Integer.parse(to_string(index)) do
+        {parsed, ""} -> Enum.at(socket.assigns.transforms, parsed)
+        _ -> nil
+      end
+
+    with %{id: "append_chord", opts: opts} <- transform,
+         {:ok, chord_spec} <- append_chord_spec_from_opts(opts) do
+      notes = Resolver.resolve(chord_spec)
+      play_notes_for_3s(socket, notes)
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Invalid append chord settings")}
     end
   end
 
@@ -688,6 +818,272 @@ defmodule MenschWeb.ProgressionLive do
                     />
                   </label>
                 <% end %>
+
+                <%= if transform.id == "append_chord" do %>
+                  <% preview = append_chord_preview(transform.opts) %>
+                  <% expanded = append_transform_expanded?(transform) %>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                      <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                        Chord Spec
+                      </h4>
+                      <button
+                        type="button"
+                        phx-click="toggle_append_transform_ui"
+                        phx-value-index={index}
+                        class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-2 py-1 font-mono text-[11px] text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                      >
+                        {if expanded, do: "Minimize", else: "Expand"}
+                      </button>
+                    </div>
+
+                    <%= if expanded do %>
+                      <div class="max-w-xl">
+                        <MenschWeb.PitchClassKeyboard.mini
+                          id={"progression-append-root-#{index}"}
+                          label="Root"
+                          event="set_transform_pitch_class"
+                          selected_key={
+                            selected_tonic_keyboard_key(%{
+                              opts: %{"tonic" => transform.opts["tonic"]}
+                            })
+                          }
+                          selected_key_color="#f6d365"
+                          value_index={index}
+                          value_field="tonic"
+                        />
+                      </div>
+
+                      <div class="space-y-1">
+                        <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                          Quality
+                        </label>
+                        <div class="flex flex-wrap gap-2">
+                          <button
+                            :for={quality <- qualities()}
+                            type="button"
+                            phx-click="set_transform_quality"
+                            phx-value-index={index}
+                            phx-value-quality={Atom.to_string(quality)}
+                            class={
+                              toggle_button_classes(
+                                transform.opts["quality"] == Atom.to_string(quality)
+                              )
+                            }
+                          >
+                            {Atom.to_string(quality)}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Octave
+                          </span>
+                          <input
+                            type="number"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            value={transform.opts["octave"]}
+                            phx-blur="set_transform_integer"
+                            phx-value-index={index}
+                            phx-value-field="octave"
+                          />
+                        </label>
+
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Inversion
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            value={transform.opts["inversion"]}
+                            phx-blur="set_transform_integer"
+                            phx-value-index={index}
+                            phx-value-field="inversion"
+                          />
+                        </label>
+
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Voicing Type
+                          </span>
+                          <form phx-change="set_transform_text">
+                            <input type="hidden" name="index" value={index} />
+                            <input type="hidden" name="field" value="voicing_type" />
+                            <select
+                              name="value"
+                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            >
+                              <option
+                                :for={item <- voicing_type_options()}
+                                value={item.value}
+                                selected={transform.opts["voicing_type"] == item.value}
+                              >
+                                {item.label}
+                              </option>
+                            </select>
+                          </form>
+                        </label>
+
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Center Note
+                          </span>
+                          <input
+                            type="number"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            value={transform.opts["center_note"]}
+                            phx-blur="set_transform_integer"
+                            phx-value-index={index}
+                            phx-value-field="center_note"
+                          />
+                        </label>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Range Min (optional)
+                          </span>
+                          <input
+                            type="number"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            value={transform.opts["range_min"]}
+                            phx-blur="set_transform_optional_integer"
+                            phx-value-index={index}
+                            phx-value-field="range_min"
+                          />
+                        </label>
+
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Range Max (optional)
+                          </span>
+                          <input
+                            type="number"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            value={transform.opts["range_max"]}
+                            phx-blur="set_transform_optional_integer"
+                            phx-value-index={index}
+                            phx-value-field="range_max"
+                          />
+                        </label>
+
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Voice Count (optional)
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            value={transform.opts["voice_count"]}
+                            phx-blur="set_transform_optional_integer"
+                            phx-value-index={index}
+                            phx-value-field="voice_count"
+                          />
+                        </label>
+
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Doubling
+                          </span>
+                          <form phx-change="set_transform_text">
+                            <input type="hidden" name="index" value={index} />
+                            <input type="hidden" name="field" value="doubling" />
+                            <select
+                              name="value"
+                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            >
+                              <option
+                                :for={item <- doubling_options()}
+                                value={item.value}
+                                selected={transform.opts["doubling"] == item.value}
+                              >
+                                {item.label}
+                              </option>
+                            </select>
+                          </form>
+                        </label>
+                      </div>
+
+                      <label class="space-y-1 block max-w-sm">
+                        <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                          Inversion Resolution Mode
+                        </span>
+                        <form phx-change="set_transform_text">
+                          <input type="hidden" name="index" value={index} />
+                          <input type="hidden" name="field" value="inversion_resolution_mode" />
+                          <select
+                            name="value"
+                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                          >
+                            <option
+                              :for={item <- inversion_resolution_mode_options()}
+                              value={item.value}
+                              selected={transform.opts["inversion_resolution_mode"] == item.value}
+                            >
+                              {item.label}
+                            </option>
+                          </select>
+                        </form>
+                      </label>
+                    <% else %>
+                      <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3">
+                        <p class="truncate font-mono text-xs text-zinc-100">
+                          {if preview, do: preview.symbol, else: "Preview unavailable"}
+                        </p>
+                        <p :if={preview} class="mt-1 font-mono text-[11px] text-zinc-400">
+                          {preview.named_notes}
+                        </p>
+                        <p :if={!preview} class="mt-1 font-mono text-[11px] text-rose-300">
+                          Invalid append chord settings
+                        </p>
+                      </div>
+                    <% end %>
+
+                    <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3 space-y-2">
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="truncate font-mono text-xs text-zinc-100">
+                            {if preview, do: preview.symbol, else: "Preview unavailable"}
+                          </p>
+                          <p :if={preview} class="font-mono text-[11px] text-zinc-400">
+                            {preview.named_notes}
+                          </p>
+                          <p :if={!preview} class="font-mono text-[11px] text-rose-300">
+                            Invalid append chord settings
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          phx-click="play_append_transform_chord"
+                          phx-value-index={index}
+                          disabled={!preview}
+                          class="rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 enabled:hover:bg-emerald-400/30 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Play
+                        </button>
+                      </div>
+
+                      <%= if preview && expanded do %>
+                        <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
+                          <FullPianoKeyboard.keyboard
+                            id={"append-chord-preview-keyboard-#{index}"}
+                            keys={preview.keyboard_keys}
+                            height_class="h-20"
+                            show_bottom_lane={false}
+                            color_mode={:dark}
+                          />
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
               </div>
             </div>
           </div>
@@ -900,6 +1296,12 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
+  defp transform_to_fun(%{id: "append_chord", opts: opts}) do
+    with {:ok, chord_spec} <- append_chord_spec_from_opts(opts) do
+      {:ok, AppendChord.middleware(chord_spec: chord_spec)}
+    end
+  end
+
   defp transform_to_fun(_), do: {:error, :invalid_transform}
 
   defp source_ids, do: @source_ids
@@ -915,6 +1317,7 @@ defmodule MenschWeb.ProgressionLive do
 
   defp transform_label("ensure_bass_ascending"), do: "Ensure Bass Ascending"
   defp transform_label("transpose_all"), do: "Transpose All"
+  defp transform_label("append_chord"), do: "Append Chord"
   defp transform_label(_), do: "Unknown Transform"
 
   defp default_source_config(), do: default_source_config("scale_generated_harmonic_identities")
@@ -947,6 +1350,26 @@ defmodule MenschWeb.ProgressionLive do
 
   defp default_transform_config("transpose_all") do
     %{id: "transpose_all", opts: %{"semitones" => 12}}
+  end
+
+  defp default_transform_config("append_chord") do
+    %{
+      id: "append_chord",
+      opts: %{
+        "tonic" => "c",
+        "quality" => "maj",
+        "octave" => 3,
+        "inversion" => 0,
+        "voicing_type" => "close",
+        "center_note" => 60,
+        "range_min" => nil,
+        "range_max" => nil,
+        "voice_count" => nil,
+        "doubling" => "auto",
+        "inversion_resolution_mode" => "per_step_centered",
+        "expanded" => true
+      }
+    }
   end
 
   defp default_transform_config(_), do: default_transform_config("ensure_bass_ascending")
@@ -1196,6 +1619,83 @@ defmodule MenschWeb.ProgressionLive do
 
   defp parse_integer(_value, field_name), do: {:error, "#{field_name} must be an integer"}
 
+  defp parse_optional_integer(value, _field_name) when value in [nil, ""], do: {:ok, nil}
+  defp parse_optional_integer(value, field_name), do: parse_integer(value, field_name)
+
+  defp parse_voicing_type("close"), do: {:ok, :close}
+  defp parse_voicing_type("open"), do: {:ok, :open}
+  defp parse_voicing_type(_), do: {:error, "invalid voicing_type"}
+
+  defp parse_doubling("auto"), do: {:ok, :auto}
+  defp parse_doubling("root"), do: {:ok, :root}
+  defp parse_doubling("top"), do: {:ok, :top}
+  defp parse_doubling("third"), do: {:ok, :third}
+  defp parse_doubling("fifth"), do: {:ok, :fifth}
+  defp parse_doubling("guide_tones"), do: {:ok, :guide_tones}
+  defp parse_doubling("bass"), do: {:ok, :bass}
+  defp parse_doubling(_), do: {:error, "invalid doubling"}
+
+  defp parse_inversion_resolution_mode("per_step_centered"), do: {:ok, :per_step_centered}
+
+  defp parse_inversion_resolution_mode("anchor_then_wander"),
+    do: {:ok, :anchor_then_wander}
+
+  defp parse_inversion_resolution_mode(_), do: {:error, "invalid inversion_resolution_mode"}
+
+  defp append_chord_spec_from_opts(opts) when is_map(opts) do
+    with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
+         {:ok, quality} <- parse_quality(Map.get(opts, "quality")),
+         {:ok, octave} <- parse_integer(Map.get(opts, "octave"), "octave"),
+         {:ok, inversion} <- parse_integer(Map.get(opts, "inversion"), "inversion"),
+         {:ok, voicing_type} <- parse_voicing_type(Map.get(opts, "voicing_type")),
+         {:ok, center_note} <- parse_integer(Map.get(opts, "center_note"), "center_note"),
+         {:ok, range_min} <- parse_optional_integer(Map.get(opts, "range_min"), "range_min"),
+         {:ok, range_max} <- parse_optional_integer(Map.get(opts, "range_max"), "range_max"),
+         {:ok, voice_count} <- parse_optional_integer(Map.get(opts, "voice_count"), "voice_count"),
+         {:ok, doubling} <- parse_doubling(Map.get(opts, "doubling")),
+         {:ok, inversion_resolution_mode} <-
+           parse_inversion_resolution_mode(Map.get(opts, "inversion_resolution_mode")),
+         {:ok, chord_spec} <-
+           ChordSpec.new(%{
+             harmonic_identity: %ChordSpec.HarmonicIdentity{root: tonic, quality: quality},
+             octave: octave,
+             inversion: inversion,
+             voicing: %ChordSpec.Voicing{
+               type: voicing_type,
+               center_note: center_note,
+               range_min: range_min,
+               range_max: range_max,
+               voice_count: voice_count,
+               doubling: doubling,
+               inversion_resolution_mode: inversion_resolution_mode
+             }
+           }) do
+      {:ok, chord_spec}
+    end
+  end
+
+  defp append_chord_spec_from_opts(_), do: {:error, :invalid_append_opts}
+
+  defp append_chord_preview(opts) do
+    with {:ok, chord_spec} <- append_chord_spec_from_opts(opts) do
+      notes = Resolver.resolve(chord_spec)
+
+      %{
+        symbol: ChordSpec.symbol_label(chord_spec),
+        named_notes: join_named_notes(notes),
+        keyboard_keys: piano_keys(notes)
+      }
+    else
+      _ -> nil
+    end
+  end
+
+  defp append_transform_expanded?(%{opts: opts}) when is_map(opts) do
+    Map.get(opts, "expanded", true) != false
+  end
+
+  defp append_transform_expanded?(_transform), do: true
+
   defp chord_kind_label(:triad), do: "Triad"
   defp chord_kind_label(:seventh), do: "Seventh"
   defp chord_kind_label(:add6), do: "Add 6"
@@ -1268,6 +1768,10 @@ defmodule MenschWeb.ProgressionLive do
   defp toggle_button_classes(false) do
     "rounded-sm border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 font-mono text-xs text-zinc-200 transition-colors duration-150 hover:border-zinc-500"
   end
+
+  defp voicing_type_options, do: @voicing_type_options
+  defp doubling_options, do: @doubling_options
+  defp inversion_resolution_mode_options, do: @inversion_resolution_mode_options
 
   defp format_error({:source_failed, reason}), do: "Source failed: #{inspect(reason)}"
 
