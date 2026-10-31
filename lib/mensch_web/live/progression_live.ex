@@ -689,9 +689,9 @@ defmodule MenschWeb.ProgressionLive do
   defp run_pipeline(socket) do
     with {:ok, source_fn} <- source_to_fun(socket.assigns.source),
          {:ok, transforms} <- transforms_to_funs(socket.assigns.transforms),
-         {:ok, chords} <- Progression.run_with_source(source_fn, transforms) do
+         {:ok, progression} <- Progression.run_with_source(source_fn, transforms) do
       socket
-      |> assign(:chords, chords)
+      |> assign(:chords, progression.chords)
       |> assign(:error_message, nil)
     else
       {:error, reason} ->

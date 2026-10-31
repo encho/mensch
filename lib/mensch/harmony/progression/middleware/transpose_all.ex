@@ -6,6 +6,7 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
   updates harmonic identity and voicing anchors together.
   """
 
+  alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.ChordSpec.ForeignBass
   alias Mensch.Harmony.ChordSpec.HarmonicIdentity
@@ -13,17 +14,24 @@ defmodule Mensch.Harmony.Progression.Middleware.TransposeAll do
 
   @type opts :: [semitones: integer()]
 
-  @spec middleware(opts()) :: (list(ChordSpec.t()) ->
-                                 {:ok, list(ChordSpec.t())} | {:error, term()})
+  @spec middleware(opts()) :: (ChordProgression.t() ->
+                                 {:ok, ChordProgression.t()} | {:error, term()})
   def middleware(opts \\ []) when is_list(opts) do
     semitones = Keyword.get(opts, :semitones, 12)
 
-    fn chord_list ->
+    fn progression ->
       with :ok <- validate_semitones(semitones) do
-        {:ok,
-         Enum.map(chord_list, fn chord_spec ->
-           transpose_chord_spec(chord_spec, semitones)
-         end)}
+        case progression do
+          %ChordProgression{} ->
+            {:ok,
+             %{
+               progression
+               | chords: Enum.map(progression.chords, &transpose_chord_spec(&1, semitones))
+             }}
+
+          _ ->
+            {:error, :invalid_progression}
+        end
       end
     end
   end

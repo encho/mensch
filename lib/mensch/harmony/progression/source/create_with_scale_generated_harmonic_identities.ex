@@ -7,6 +7,7 @@ defmodule Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIden
   which is direct-first with inference fallback.
   """
 
+  alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.HarmonicIdentityInference
   alias Mensch.Scale
@@ -20,7 +21,7 @@ defmodule Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIden
           render_defaults: keyword() | map()
         ]
 
-  @spec source(opts()) :: (-> {:ok, [ChordSpec.t()]} | {:error, term()})
+  @spec source(opts()) :: (-> {:ok, ChordProgression.t()} | {:error, term()})
   def source(opts) when is_list(opts) do
     fn ->
       with {:ok, explicit_degrees} <- fetch_degrees(opts),
@@ -34,7 +35,13 @@ defmodule Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIden
            render_defaults <- normalize_defaults(Keyword.get(opts, :render_defaults, %{})),
            {:ok, chords} <-
              build_chords(scale_spec, degrees, strategy, shape, spelling_mode, render_defaults) do
-        {:ok, chords}
+        {:ok,
+         %ChordProgression{
+           name: "Scale-Generated Harmonic Identity Progression",
+           description:
+             "Generates chords from a scale and resolves harmonic identities via direct-first inference.",
+           chords: chords
+         }}
       end
     end
   end

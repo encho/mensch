@@ -3,6 +3,7 @@ defmodule Mensch.Harmony.Progression.Source.CreateWithFixedChord do
   Test source that creates a progression by repeating one fixed chord.
   """
 
+  alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.ChordSpec
 
   @type opts :: [
@@ -13,7 +14,7 @@ defmodule Mensch.Harmony.Progression.Source.CreateWithFixedChord do
           inversion: integer()
         ]
 
-  @spec source(opts()) :: (-> {:ok, [ChordSpec.t()]} | {:error, term()})
+  @spec source(opts()) :: (-> {:ok, ChordProgression.t()} | {:error, term()})
   def source(opts \\ []) when is_list(opts) do
     fn ->
       root = Keyword.get(opts, :root, :c)
@@ -30,7 +31,12 @@ defmodule Mensch.Harmony.Progression.Source.CreateWithFixedChord do
             inversion: inversion
           })
 
-        {:ok, List.duplicate(chord, count)}
+        {:ok,
+         %ChordProgression{
+           name: "Fixed Chord Progression",
+           description: "Repeats a single fixed chord #{count} times.",
+           chords: List.duplicate(chord, count)
+         }}
       end
     end
   end

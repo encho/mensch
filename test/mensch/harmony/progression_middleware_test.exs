@@ -2,6 +2,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   use ExUnit.Case, async: true
 
   alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
@@ -23,7 +24,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:ok, chords} = source.()
+    assert {:ok, progression} = source.()
+    chords = progression.chords
     assert length(chords) == 3
 
     assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
@@ -54,7 +56,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:ok, chords} = source.()
+    assert {:ok, progression} = source.()
+    chords = progression.chords
     assert length(chords) == 3
     assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
   end
@@ -82,7 +85,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:ok, chords} = source.()
+    assert {:ok, progression} = source.()
+    chords = progression.chords
     assert length(chords) == 5
   end
 
@@ -127,7 +131,13 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     middleware = EnsureBassAscending.middleware(include_foreign_bass: false)
 
-    assert {:ok, [a, b, c]} = middleware.([first, second, third])
+    progression = %ChordProgression{
+      name: "test",
+      description: "test",
+      chords: [first, second, third]
+    }
+
+    assert {:ok, %ChordProgression{chords: [a, b, c]}} = middleware.(progression)
 
     basses =
       [a, b, c]
@@ -153,7 +163,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
     ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
 
     assert {:ok, initial} = source.()
-    assert {:ok, chords} = Progression.run(initial, [ensure])
+    assert {:ok, %ChordProgression{chords: chords}} = Progression.run(initial, [ensure])
     assert length(chords) == 3
   end
 
@@ -170,7 +180,9 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
 
-    assert {:ok, chords} = Progression.run_with_source(source, [ensure])
+    assert {:ok, %ChordProgression{chords: chords}} =
+             Progression.run_with_source(source, [ensure])
+
     assert length(chords) == 3
   end
 
@@ -178,7 +190,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
     source =
       CreateWithFixedChord.source(root: :d, quality: :min, count: 4, octave: 3, inversion: 0)
 
-    assert {:ok, chords} = source.()
+    assert {:ok, progression} = source.()
+    chords = progression.chords
     assert length(chords) == 4
     assert Enum.all?(chords, &(ChordSpec.root(&1) == :d and ChordSpec.quality(&1) == :min))
   end
@@ -193,7 +206,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     middleware = TransposeAll.middleware(semitones: 12)
 
-    assert {:ok, [shifted]} = middleware.([chord])
+    progression = %ChordProgression{name: "test", description: "test", chords: [chord]}
+    assert {:ok, %ChordProgression{chords: [shifted]}} = middleware.(progression)
 
     original_notes = Resolver.resolve(chord)
     shifted_notes = Resolver.resolve(shifted)
@@ -214,7 +228,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     middleware = TransposeAll.middleware(semitones: 5)
 
-    assert {:ok, [shifted]} = middleware.([chord])
+    progression = %ChordProgression{name: "test", description: "test", chords: [chord]}
+    assert {:ok, %ChordProgression{chords: [shifted]}} = middleware.(progression)
 
     original_notes = Resolver.resolve(chord)
     shifted_notes = Resolver.resolve(shifted)
@@ -227,7 +242,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
   test "run_with_source wraps source and transform failures" do
     bad_source = fn -> {:error, :bad_source} end
-    bad_transform = fn _chords -> {:error, :bad_transform} end
+    bad_transform = fn _progression -> {:error, :bad_transform} end
 
     assert {:error, {:source_failed, :bad_source}} = Progression.run_with_source(bad_source, [])
 

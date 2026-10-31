@@ -6,29 +6,36 @@ defmodule Mensch.Harmony.Progression.Middleware.EnsureBassAscending do
   nearest candidate whose bass note is >= previous bass.
   """
 
-  alias Mensch.Harmony.ChordSpec
+  alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.Resolver
 
   @type opts :: [include_foreign_bass: boolean()]
 
-  @spec middleware(opts()) :: (list(ChordSpec.t()) ->
-                                 {:ok, list(ChordSpec.t())} | {:error, term()})
+  @spec middleware(opts()) :: (ChordProgression.t() ->
+                                 {:ok, ChordProgression.t()} | {:error, term()})
   def middleware(opts \\ []) when is_list(opts) do
     include_foreign_bass = Keyword.get(opts, :include_foreign_bass, false)
 
-    fn chord_list ->
-      ensure_bass_ascending(chord_list, include_foreign_bass)
+    fn progression ->
+      ensure_bass_ascending(progression, include_foreign_bass)
     end
   end
 
-  defp ensure_bass_ascending([], _include_foreign_bass), do: {:ok, []}
+  defp ensure_bass_ascending(%ChordProgression{chords: []} = progression, _include_foreign_bass),
+    do: {:ok, progression}
 
-  defp ensure_bass_ascending([first | rest], include_foreign_bass) do
+  defp ensure_bass_ascending(
+         %ChordProgression{chords: [first | rest]} = progression,
+         include_foreign_bass
+       ) do
     with {:ok, first_bass} <- resolve_bass(first, include_foreign_bass),
          {:ok, result} <- step(rest, [first], first_bass, include_foreign_bass) do
-      {:ok, result}
+      {:ok, %{progression | chords: result}}
     end
   end
+
+  defp ensure_bass_ascending(_progression, _include_foreign_bass),
+    do: {:error, :invalid_progression}
 
   defp step([], acc, _previous_bass, _include_foreign_bass), do: {:ok, acc}
 
