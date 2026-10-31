@@ -8,17 +8,13 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.Progression.Middleware.AppendScaleGeneratedChords
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
-  alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
   alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
-
-  alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities,
-    as: ScaleGeneratedSource
 
   alias Mensch.Harmony.Resolver
 
-  test "scale-generated source generates chords for requested degrees" do
-    source =
-      ScaleGeneratedSource.source(
+  test "append_scale_generated_chords generates chords for requested degrees" do
+    transform =
+      AppendScaleGeneratedChords.middleware(
         degrees: [2, 5, 1],
         scale: %{tonic: :c, family: :major, mode: 1},
         strategy: :tertian,
@@ -27,16 +23,18 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:ok, progression} = source.()
+    assert {:ok, progression} =
+             transform.(%ChordProgression{name: "test", description: "test", chords: []})
+
     chords = progression.chords
     assert length(chords) == 3
 
     assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
   end
 
-  test "scale-generated source validates degrees against selected scale size" do
-    source =
-      ScaleGeneratedSource.source(
+  test "append_scale_generated_chords validates degrees against selected scale size" do
+    transform =
+      AppendScaleGeneratedChords.middleware(
         degrees: [1, 8],
         scale: %{tonic: :c, family: :major, mode: 1},
         strategy: :tertian,
@@ -45,12 +43,13 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:error, {:invalid_degrees_for_scale, 7}} = source.()
+    assert {:error, {:scale_generation_failed, {:invalid_degrees_for_scale, 7}}} =
+             transform.(%ChordProgression{name: "test", description: "test", chords: []})
   end
 
-  test "scale-generated source creates chords using scale-chord-lab identity path" do
-    source =
-      ScaleGeneratedSource.source(
+  test "append_scale_generated_chords creates chords using scale-chord-lab identity path" do
+    transform =
+      AppendScaleGeneratedChords.middleware(
         degrees: [2, 5, 1],
         scale: %{tonic: :c, family: :major, mode: 1},
         strategy: :tertian,
@@ -59,15 +58,17 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:ok, progression} = source.()
+    assert {:ok, progression} =
+             transform.(%ChordProgression{name: "test", description: "test", chords: []})
+
     chords = progression.chords
     assert length(chords) == 3
     assert Enum.map(chords, &ChordSpec.quality/1) == [:min, :maj, :maj]
   end
 
-  test "scale-generated source validates scale map shape" do
-    source =
-      ScaleGeneratedSource.source(
+  test "append_scale_generated_chords validates scale map shape" do
+    transform =
+      AppendScaleGeneratedChords.middleware(
         degrees: [1],
         scale: %{tonic: :c, mode: 1},
         strategy: :tertian,
@@ -75,12 +76,13 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:error, :missing_scale} = source.()
+    assert {:error, {:scale_generation_failed, :missing_scale}} =
+             transform.(%ChordProgression{name: "test", description: "test", chords: []})
   end
 
-  test "scale-generated source infers degree count from scale size when degrees are omitted" do
-    source =
-      ScaleGeneratedSource.source(
+  test "append_scale_generated_chords infers degree count from scale size when degrees are omitted" do
+    transform =
+      AppendScaleGeneratedChords.middleware(
         scale: %{tonic: :c, family: :major_pentatonic, mode: 1},
         strategy: :tertian,
         shape: :triad,
@@ -88,14 +90,16 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:ok, progression} = source.()
+    assert {:ok, progression} =
+             transform.(%ChordProgression{name: "test", description: "test", chords: []})
+
     chords = progression.chords
     assert length(chords) == 5
   end
 
-  test "scale-generated source rejects degrees outside selected scale size" do
-    source =
-      ScaleGeneratedSource.source(
+  test "append_scale_generated_chords rejects degrees outside selected scale size" do
+    transform =
+      AppendScaleGeneratedChords.middleware(
         degrees: [1, 6],
         scale: %{tonic: :c, family: :major_pentatonic, mode: 1},
         strategy: :tertian,
@@ -104,7 +108,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
         render_defaults: %{octave: 3, inversion: 0}
       )
 
-    assert {:error, {:invalid_degrees_for_scale, 5}} = source.()
+    assert {:error, {:scale_generation_failed, {:invalid_degrees_for_scale, 5}}} =
+             transform.(%ChordProgression{name: "test", description: "test", chords: []})
   end
 
   test "ensure_bass_ascending enforces non-decreasing voiced bass" do
@@ -153,26 +158,8 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   end
 
   test "progression.run composes middlewares" do
-    source =
-      ScaleGeneratedSource.source(
-        degrees: [2, 5, 1],
-        scale: %{tonic: :c, family: :major, mode: 1},
-        strategy: :tertian,
-        shape: :triad,
-        spelling_mode: :practical,
-        render_defaults: %{octave: 3, inversion: 0}
-      )
-
-    ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
-
-    assert {:ok, initial} = source.()
-    assert {:ok, %ChordProgression{chords: chords}} = Progression.run(initial, [ensure])
-    assert length(chords) == 3
-  end
-
-  test "progression.run_with_source runs source then transforms" do
-    source =
-      ScaleGeneratedSource.source(
+    append_scale =
+      AppendScaleGeneratedChords.middleware(
         degrees: [2, 5, 1],
         scale: %{tonic: :c, family: :major, mode: 1},
         strategy: :tertian,
@@ -184,19 +171,50 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
     ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
 
     assert {:ok, %ChordProgression{chords: chords}} =
-             Progression.run_with_source(source, [ensure])
+             Progression.run(%ChordProgression{name: "test", description: "test", chords: []}, [
+               append_scale,
+               ensure
+             ])
 
     assert length(chords) == 3
   end
 
-  test "create_with_fixed_chord source generates repeated chords" do
-    source =
-      CreateWithFixedChord.source(root: :d, quality: :min, count: 4, octave: 3, inversion: 0)
+  test "progression.run_with_source runs source then transforms" do
+    source = CreateEmptyProgression.source()
 
-    assert {:ok, progression} = source.()
-    chords = progression.chords
-    assert length(chords) == 4
-    assert Enum.all?(chords, &(ChordSpec.root(&1) == :d and ChordSpec.quality(&1) == :min))
+    append_scale =
+      AppendScaleGeneratedChords.middleware(
+        degrees: [2, 5, 1],
+        scale: %{tonic: :c, family: :major, mode: 1},
+        strategy: :tertian,
+        shape: :triad,
+        spelling_mode: :practical,
+        render_defaults: %{octave: 3, inversion: 0}
+      )
+
+    ensure = EnsureBassAscending.middleware(include_foreign_bass: false)
+
+    assert {:ok, %ChordProgression{chords: chords}} =
+             Progression.run_with_source(source, [append_scale, ensure])
+
+    assert length(chords) == 3
+  end
+
+  test "append_chord adds one chord onto empty source" do
+    source = CreateEmptyProgression.source()
+
+    appended =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :min},
+        octave: 3,
+        inversion: 0
+      })
+
+    assert {:ok, %ChordProgression{chords: [chord]}} =
+             Progression.run_with_source(source, [AppendChord.middleware(chord_spec: appended)])
+
+    assert ChordSpec.root(chord) == :d
+    assert ChordSpec.quality(chord) == :min
   end
 
   test "create_empty_progression source returns progression with no chords" do
@@ -256,8 +274,7 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     assert {:error, {:source_failed, :bad_source}} = Progression.run_with_source(bad_source, [])
 
-    source =
-      CreateWithFixedChord.source(root: :c, quality: :maj, count: 1, octave: 3, inversion: 0)
+    source = CreateEmptyProgression.source()
 
     assert {:error, {:transform_failed, 0, :bad_transform}} =
              Progression.run_with_source(source, [bad_transform])

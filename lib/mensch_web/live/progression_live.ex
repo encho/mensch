@@ -9,8 +9,6 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
-  alias Mensch.Harmony.Progression.Source.CreateWithFixedChord
-  alias Mensch.Harmony.Progression.Source.CreateWithScaleGeneratedHarmonicIdentities
   alias Mensch.Harmony.Resolver
   alias Mensch.Scale
   alias Mensch.Scale.ScaleRegistry
@@ -36,7 +34,6 @@ defmodule MenschWeb.ProgressionLive do
     :b_flat
   ]
 
-  @source_ids ["scale_generated_harmonic_identities", "fixed_chord", "empty_progression"]
   @transform_ids [
     "ensure_bass_ascending",
     "transpose_all",
@@ -78,16 +75,12 @@ defmodule MenschWeb.ProgressionLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    source = default_source_config()
-
     socket =
       socket
       |> assign(:midi_status, Mensch.Midi.Connection.status())
       |> assign(:scale_families, ScaleRegistry.all())
       |> assign(:chord_strategies, Scale.chord_strategy_options())
-      |> assign(:source, source)
       |> assign(:transforms, [])
-      |> assign(:next_transform_id, hd(@transform_ids))
       |> assign(:progression, nil)
       |> assign(:chords, [])
       |> assign(:save_modal_open, false)
@@ -101,147 +94,9 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
-  def handle_event("set_source_id", params, socket) do
-    source_id =
-      params["source_id"] ||
-        get_in(params, ["source", "source_id"]) ||
-        params["value"]
-
-    source =
-      if source_id in @source_ids do
-        default_source_config(source_id)
-      else
-        socket.assigns.source
-      end
-
-    {:noreply,
-     socket
-     |> assign(:source, source)
-     |> assign(:error_message, nil)}
-  end
-
-  @impl true
-  def handle_event("set_source_tonic", %{"pitch_class" => tonic}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        if Map.has_key?(@pitch_class_from_param, tonic),
-          do: Map.put(opts, "tonic", tonic),
-          else: opts
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_family", %{"family" => family}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        case parse_family(family, socket.assigns.scale_families) do
-          {:ok, family_id} ->
-            mode = default_mode_for_family(socket.assigns.scale_families, family_id)
-            opts |> Map.put("family", family) |> Map.put("scale_mode", mode)
-
-          {:error, _reason} ->
-            opts
-        end
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_scale_mode", %{"scale_mode" => scale_mode}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        case parse_positive_integer(scale_mode) do
-          {:ok, _mode} -> Map.put(opts, "scale_mode", scale_mode)
-          {:error, _reason} -> opts
-        end
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_strategy", %{"strategy" => strategy}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        case parse_strategy(strategy, socket.assigns.chord_strategies) do
-          {:ok, _strategy} ->
-            shape = default_shape_for_strategy(strategy, socket.assigns.chord_strategies)
-            opts |> Map.put("strategy", strategy) |> Map.put("shape", shape)
-
-          {:error, _reason} ->
-            opts
-        end
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_shape", %{"shape" => shape}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        strategy = Map.get(opts, "strategy")
-
-        case parse_shape_for_strategy(shape, strategy, socket.assigns.chord_strategies) do
-          {:ok, _shape} -> Map.put(opts, "shape", shape)
-          {:error, _reason} -> opts
-        end
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_quality", %{"quality" => quality}, socket) do
-    source =
-      update_source_opts(socket.assigns.source, fn opts ->
-        if Map.has_key?(@quality_from_param, quality),
-          do: Map.put(opts, "quality", quality),
-          else: opts
-      end)
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_source_field", %{"field" => field, "value" => value}, socket) do
-    source =
-      case field do
-        "count" ->
-          update_source_integer(socket.assigns.source, "count", value)
-
-        "octave" ->
-          update_source_integer(socket.assigns.source, "octave", value)
-
-        "inversion" ->
-          update_source_integer(socket.assigns.source, "inversion", value)
-
-        _ ->
-          socket.assigns.source
-      end
-
-    {:noreply, assign(socket, :source, source)}
-  end
-
-  @impl true
-  def handle_event("set_next_transform", params, socket) do
-    transform_id =
-      params["transform_id"] ||
-        get_in(params, ["transform", "transform_id"]) ||
-        params["value"]
-
-    value =
-      if transform_id in @transform_ids, do: transform_id, else: socket.assigns.next_transform_id
-
-    {:noreply, assign(socket, :next_transform_id, value)}
-  end
-
-  @impl true
-  def handle_event("add_transform", _params, socket) do
-    transform = default_transform_config(socket.assigns.next_transform_id)
+  def handle_event("add_transform", params, socket) do
+    transform_id = Map.get(params, "transform_id", hd(@transform_ids))
+    transform = default_transform_config(valid_transform_id(transform_id))
 
     {:noreply,
      socket
@@ -565,21 +420,6 @@ defmodule MenschWeb.ProgressionLive do
   def render(assigns) do
     assigns =
       assigns
-      |> assign(:source_label, source_label(assigns.source.id))
-      |> assign(:selected_tonic_keyboard_key, selected_tonic_keyboard_key(assigns.source))
-      |> assign(
-        :scale_family_options,
-        source_scale_family_options(assigns.scale_families, assigns.source)
-      )
-      |> assign(
-        :scale_mode_options,
-        source_scale_mode_options(assigns.scale_families, assigns.source)
-      )
-      |> assign(
-        :strategy_options,
-        source_strategy_options(assigns.chord_strategies, assigns.source)
-      )
-      |> assign(:shape_options, source_shape_options(assigns.chord_strategies, assigns.source))
       |> assign(:chord_cards, build_chord_cards(assigns.chords))
 
     ~H"""
@@ -601,264 +441,7 @@ defmodule MenschWeb.ProgressionLive do
 
         <div class="ui-radius-table space-y-4 border border-zinc-700/60 bg-black/30 p-4">
           <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3 space-y-3">
-            <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">Source</h3>
-
-            <div class="space-y-1">
-              <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                Source Type
-              </label>
-              <form phx-change="set_source_id">
-                <select
-                  class="w-full max-w-sm rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                  name="source_id"
-                >
-                  <option :for={id <- source_ids()} value={id} selected={@source.id == id}>
-                    {source_label(id)}
-                  </option>
-                </select>
-              </form>
-            </div>
-
-            <p class="font-mono text-xs text-zinc-300">Current: {@source_label}</p>
-
-            <%= if @source.id == "scale_generated_harmonic_identities" do %>
-              <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  1) Define Scale
-                </h3>
-
-                <div class="max-w-xl">
-                  <MenschWeb.PitchClassKeyboard.mini
-                    id="progression-scale-source-tonic"
-                    label="Tonic"
-                    event="set_source_tonic"
-                    selected_key={@selected_tonic_keyboard_key}
-                    selected_key_color="#f6d365"
-                  />
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-2">
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Scale Family
-                    </span>
-                    <form id="progression-scale-source-family-form" phx-change="set_source_family">
-                      <select
-                        name="family"
-                        class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      >
-                        <option
-                          :for={item <- @scale_family_options}
-                          value={item.value}
-                          selected={item.selected}
-                        >
-                          {item.label}
-                        </option>
-                      </select>
-                    </form>
-                  </label>
-
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Mode
-                    </span>
-                    <%= if @scale_mode_options == [] do %>
-                      <div class="rounded-sm border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 font-mono text-xs text-zinc-500">
-                        No mode (standalone scale)
-                      </div>
-                    <% else %>
-                      <form id="progression-scale-source-mode-form" phx-change="set_source_scale_mode">
-                        <select
-                          name="scale_mode"
-                          class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                        >
-                          <option
-                            :for={item <- @scale_mode_options}
-                            value={item.value}
-                            selected={item.selected}
-                          >
-                            {item.label}
-                          </option>
-                        </select>
-                      </form>
-                    <% end %>
-                  </label>
-                </div>
-              </div>
-
-              <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  2) Chord Strategy
-                </h3>
-
-                <div class="grid gap-3 md:grid-cols-2">
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Strategy
-                    </span>
-                    <form id="progression-scale-source-strategy-form" phx-change="set_source_strategy">
-                      <select
-                        name="strategy"
-                        class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      >
-                        <option
-                          :for={item <- @strategy_options}
-                          value={item.value}
-                          selected={item.selected}
-                        >
-                          {item.label}
-                        </option>
-                      </select>
-                    </form>
-                  </label>
-
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Chord Shape
-                    </span>
-                    <form id="progression-scale-source-shape-form" phx-change="set_source_shape">
-                      <select
-                        name="shape"
-                        class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      >
-                        <option
-                          :for={item <- @shape_options}
-                          value={item.value}
-                          selected={item.selected}
-                        >
-                          {item.label}
-                        </option>
-                      </select>
-                    </form>
-                  </label>
-                </div>
-              </div>
-            <% end %>
-
-            <%= if @source.id == "fixed_chord" do %>
-              <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                <div class="space-y-1">
-                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                    Root
-                  </label>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      :for={root <- pitch_classes()}
-                      type="button"
-                      phx-click="set_source_tonic"
-                      phx-value-pitch_class={Atom.to_string(root)}
-                      class={toggle_button_classes(@source.opts["tonic"] == Atom.to_string(root))}
-                    >
-                      {ChordSpec.root_label(root)}
-                    </button>
-                  </div>
-                </div>
-
-                <div class="space-y-1">
-                  <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                    Quality
-                  </label>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      :for={quality <- qualities()}
-                      type="button"
-                      phx-click="set_source_quality"
-                      phx-value-quality={Atom.to_string(quality)}
-                      class={
-                        toggle_button_classes(@source.opts["quality"] == Atom.to_string(quality))
-                      }
-                    >
-                      {Atom.to_string(quality)}
-                    </button>
-                  </div>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-3">
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Count
-                    </span>
-                    <input
-                      type="number"
-                      min="1"
-                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      value={@source.opts["count"]}
-                      phx-blur="set_source_field"
-                      phx-value-field="count"
-                    />
-                  </label>
-
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Octave
-                    </span>
-                    <input
-                      type="number"
-                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      value={@source.opts["octave"]}
-                      phx-blur="set_source_field"
-                      phx-value-field="octave"
-                    />
-                  </label>
-
-                  <label class="space-y-1">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Inversion
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      value={@source.opts["inversion"]}
-                      phx-blur="set_source_field"
-                      phx-value-field="inversion"
-                    />
-                  </label>
-                </div>
-              </div>
-            <% end %>
-
-            <%= if @source.id == "empty_progression" do %>
-              <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                <p class="font-mono text-xs text-zinc-300">
-                  This source starts with an empty chord list. Add chords via transforms such as Append Chord.
-                </p>
-              </div>
-            <% end %>
-          </div>
-
-          <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3 space-y-3">
             <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">Transforms</h3>
-
-            <div class="flex flex-wrap items-end gap-2">
-              <label class="space-y-1">
-                <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  Add Transform
-                </span>
-                <form phx-change="set_next_transform">
-                  <select
-                    class="w-64 rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                    name="transform_id"
-                  >
-                    <option
-                      :for={id <- transform_ids()}
-                      value={id}
-                      selected={@next_transform_id == id}
-                    >
-                      {transform_label(id)}
-                    </option>
-                  </select>
-                </form>
-              </label>
-
-              <button
-                type="button"
-                phx-click="add_transform"
-                class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
-              >
-                Add
-              </button>
-            </div>
 
             <div class="space-y-3">
               <div
@@ -1338,6 +921,23 @@ defmodule MenschWeb.ProgressionLive do
                 <% end %>
               </div>
             </div>
+
+            <div class="space-y-1">
+              <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                Add Transform
+              </span>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  :for={id <- transform_ids()}
+                  type="button"
+                  phx-click="add_transform"
+                  phx-value-transform_id={id}
+                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                >
+                  {transform_label(id)}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">
@@ -1465,7 +1065,7 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp run_pipeline(socket) do
-    with {:ok, source_fn} <- source_to_fun(socket.assigns.source),
+    with {:ok, source_fn} <- {:ok, CreateEmptyProgression.source()},
          {:ok, transforms} <- transforms_to_funs(socket.assigns.transforms),
          {:ok, progression} <- Progression.run_with_source(source_fn, transforms) do
       socket
@@ -1480,56 +1080,6 @@ defmodule MenschWeb.ProgressionLive do
         |> assign(:error_message, format_error(reason))
     end
   end
-
-  defp source_to_fun(%{id: "fixed_chord", opts: opts}) do
-    with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
-         {:ok, quality} <- parse_quality(Map.get(opts, "quality")),
-         {:ok, count} <- parse_integer(Map.get(opts, "count"), "count"),
-         {:ok, octave} <- parse_integer(Map.get(opts, "octave"), "octave"),
-         {:ok, inversion} <- parse_integer(Map.get(opts, "inversion"), "inversion") do
-      source =
-        CreateWithFixedChord.source(
-          root: tonic,
-          quality: quality,
-          count: count,
-          octave: octave,
-          inversion: inversion
-        )
-
-      {:ok, source}
-    end
-  end
-
-  defp source_to_fun(%{id: "scale_generated_harmonic_identities", opts: opts}) do
-    with {:ok, tonic} <- parse_tonic(Map.get(opts, "tonic")),
-         {:ok, family} <- parse_family(Map.get(opts, "family"), ScaleRegistry.all()),
-         {:ok, mode} <- parse_scale_mode(Map.get(opts, "scale_mode")),
-         {:ok, strategy} <-
-           parse_strategy(Map.get(opts, "strategy"), Scale.chord_strategy_options()),
-         {:ok, shape} <-
-           parse_shape_for_strategy(
-             Map.get(opts, "shape"),
-             Map.get(opts, "strategy"),
-             Scale.chord_strategy_options()
-           ) do
-      source =
-        CreateWithScaleGeneratedHarmonicIdentities.source(
-          scale: %{tonic: tonic, family: family, mode: mode},
-          strategy: strategy,
-          shape: shape,
-          spelling_mode: :practical,
-          render_defaults: %{octave: 3, inversion: 0}
-        )
-
-      {:ok, source}
-    end
-  end
-
-  defp source_to_fun(%{id: "empty_progression"}) do
-    {:ok, CreateEmptyProgression.source()}
-  end
-
-  defp source_to_fun(_), do: {:error, :invalid_source}
 
   defp transforms_to_funs(transforms) when is_list(transforms) do
     transforms
@@ -1583,51 +1133,17 @@ defmodule MenschWeb.ProgressionLive do
 
   defp transform_to_fun(_), do: {:error, :invalid_transform}
 
-  defp source_ids, do: @source_ids
   defp transform_ids, do: @transform_ids
   defp qualities, do: @qualities
-  defp pitch_classes, do: @pitch_classes
 
-  defp source_label("scale_generated_harmonic_identities"),
-    do: "Create With Scale-Generated Harmonic Identities"
-
-  defp source_label("fixed_chord"), do: "Create With Fixed Chord (Test)"
-  defp source_label("empty_progression"), do: "Create Empty Progression"
-  defp source_label(_), do: "Unknown Source"
+  defp valid_transform_id(transform_id) when transform_id in @transform_ids, do: transform_id
+  defp valid_transform_id(_), do: hd(@transform_ids)
 
   defp transform_label("ensure_bass_ascending"), do: "Ensure Bass Ascending"
   defp transform_label("transpose_all"), do: "Transpose All"
   defp transform_label("append_chord"), do: "Append Chord"
   defp transform_label("append_scale_generated_chords"), do: "Append Scale-Generated Chords"
   defp transform_label(_), do: "Unknown Transform"
-
-  defp default_source_config(), do: default_source_config("scale_generated_harmonic_identities")
-
-  defp default_source_config("fixed_chord") do
-    %{
-      id: "fixed_chord",
-      opts: %{"tonic" => "c", "quality" => "maj", "count" => 7, "octave" => 3, "inversion" => 0}
-    }
-  end
-
-  defp default_source_config("scale_generated_harmonic_identities") do
-    %{
-      id: "scale_generated_harmonic_identities",
-      opts: %{
-        "tonic" => "c",
-        "family" => "major",
-        "scale_mode" => "1",
-        "strategy" => "tertian",
-        "shape" => "triad"
-      }
-    }
-  end
-
-  defp default_source_config("empty_progression") do
-    %{id: "empty_progression", opts: %{}}
-  end
-
-  defp default_source_config(_), do: default_source_config("scale_generated_harmonic_identities")
 
   defp default_transform_config("ensure_bass_ascending") do
     %{id: "ensure_bass_ascending", opts: %{"include_foreign_bass" => false}}
@@ -1672,19 +1188,6 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp default_transform_config(_), do: default_transform_config("ensure_bass_ascending")
-
-  defp update_source_opts(source, updater) do
-    %{source | opts: updater.(source.opts)}
-  end
-
-  defp update_source_integer(source, field, value) do
-    update_source_opts(source, fn opts ->
-      case parse_integer(value, field) do
-        {:ok, parsed} -> Map.put(opts, field, parsed)
-        {:error, _reason} -> opts
-      end
-    end)
-  end
 
   defp remove_transform_by_index(transforms, index_param) do
     case Integer.parse(to_string(index_param)) do
