@@ -92,6 +92,7 @@ defmodule MenschWeb.ProgressionLive do
       |> assign(:preview_stop_ref, nil)
       |> assign(:error_message, nil)
       |> assign_blueprint_from_params(params)
+      |> run_pipeline()
 
     {:ok, socket}
   end
@@ -102,15 +103,13 @@ defmodule MenschWeb.ProgressionLive do
     transform = default_transform_config(valid_transform_id(transform_id))
 
     {:noreply,
-     socket
-     |> assign(:transforms, socket.assigns.transforms ++ [transform])
-     |> assign(:error_message, nil)}
+     assign_transforms_and_run_pipeline(socket, socket.assigns.transforms ++ [transform])}
   end
 
   @impl true
   def handle_event("remove_transform", %{"index" => index}, socket) do
     transforms = remove_transform_by_index(socket.assigns.transforms, index)
-    {:noreply, socket |> assign(:transforms, transforms) |> assign(:error_message, nil)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -150,7 +149,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -167,7 +166,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -184,7 +183,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -200,7 +199,7 @@ defmodule MenschWeb.ProgressionLive do
           else: opts
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -216,7 +215,7 @@ defmodule MenschWeb.ProgressionLive do
           else: opts
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -248,7 +247,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -265,7 +264,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -282,7 +281,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -299,7 +298,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -314,12 +313,7 @@ defmodule MenschWeb.ProgressionLive do
         end
       end)
 
-    {:noreply, assign(socket, :transforms, transforms)}
-  end
-
-  @impl true
-  def handle_event("run_pipeline", _params, socket) do
-    {:noreply, run_pipeline(socket)}
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -336,7 +330,7 @@ defmodule MenschWeb.ProgressionLive do
          |> assign(:save_description, default_description)}
 
       _ ->
-        {:noreply, put_flash(socket, :error, "Run the pipeline before saving")}
+        {:noreply, put_flash(socket, :error, "No chords to save")}
     end
   end
 
@@ -483,19 +477,40 @@ defmodule MenschWeb.ProgressionLive do
                 <% end %>
 
                 <%= if transform.id == "transpose_all" do %>
-                  <label class="space-y-1">
+                  <label class="space-y-2">
                     <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
                       Semitones
                     </span>
-                    <input
-                      type="number"
-                      step="1"
-                      class="w-full max-w-xs rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                      value={transform.opts["semitones"]}
-                      phx-blur="set_transform_integer"
-                      phx-value-index={index}
-                      phx-value-field="semitones"
-                    />
+
+                    <div class="w-full max-w-xl space-y-2">
+                      <form phx-input="set_transform_integer" phx-change="set_transform_integer">
+                        <input type="hidden" name="index" value={index} />
+                        <input type="hidden" name="field" value="semitones" />
+                        <input
+                          type="range"
+                          min="-24"
+                          max="24"
+                          step="1"
+                          name="value"
+                          class="w-full accent-emerald-300"
+                          value={transform.opts["semitones"]}
+                        />
+                      </form>
+
+                      <form phx-input="set_transform_integer" phx-change="set_transform_integer">
+                        <input type="hidden" name="index" value={index} />
+                        <input type="hidden" name="field" value="semitones" />
+                        <input
+                          type="number"
+                          min="-24"
+                          max="24"
+                          step="1"
+                          name="value"
+                          class="w-28 rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                          value={transform.opts["semitones"]}
+                        />
+                      </form>
+                    </div>
                   </label>
                 <% end %>
 
@@ -948,14 +963,6 @@ defmodule MenschWeb.ProgressionLive do
           <div class="flex items-center gap-2">
             <button
               type="button"
-              phx-click="run_pipeline"
-              class="rounded-sm border border-emerald-300 bg-emerald-400/20 px-4 py-2 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
-            >
-              Run Pipeline
-            </button>
-
-            <button
-              type="button"
               phx-click="open_save_modal"
               class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-4 py-2 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
             >
@@ -1084,6 +1091,12 @@ defmodule MenschWeb.ProgressionLive do
         |> assign(:chords, [])
         |> assign(:error_message, format_error(reason))
     end
+  end
+
+  defp assign_transforms_and_run_pipeline(socket, transforms) do
+    socket
+    |> assign(:transforms, transforms)
+    |> run_pipeline()
   end
 
   defp transforms_to_funs(transforms) when is_list(transforms) do

@@ -42,10 +42,6 @@ defmodule MenschWeb.ProgressionLiveTest do
     {:ok, view, _html} = live(conn, ~p"/chord-progressions/new?blueprint_id=#{source.id}")
 
     view
-    |> element("button[phx-click='run_pipeline']")
-    |> render_click()
-
-    view
     |> element("button[phx-click='open_save_modal']")
     |> render_click()
 
