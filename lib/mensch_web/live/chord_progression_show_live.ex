@@ -229,6 +229,13 @@ defmodule MenschWeb.ChordProgressionShowLive do
           class="ui-radius-table rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3"
         >
           <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
+            <.link
+              navigate={~p"/chord-progressions/new?blueprint_id=#{@record.id}"}
+              class="rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
+            >
+              Use as Blueprint
+            </.link>
+
             <button
               type="button"
               phx-click="open_save_selected_modal"

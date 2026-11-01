@@ -2,6 +2,7 @@ defmodule MenschWeb.ProgressionLive do
   use MenschWeb, :live_view
 
   alias Mensch.ChordProgressions
+  alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.AppendChord
@@ -74,12 +75,13 @@ defmodule MenschWeb.ProgressionLive do
   ]
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     socket =
       socket
       |> assign(:midi_status, Mensch.Midi.Connection.status())
       |> assign(:scale_families, ScaleRegistry.all())
       |> assign(:chord_strategies, Scale.chord_strategy_options())
+      |> assign(:blueprint_progression, nil)
       |> assign(:transforms, [])
       |> assign(:progression, nil)
       |> assign(:chords, [])
@@ -89,6 +91,7 @@ defmodule MenschWeb.ProgressionLive do
       |> assign(:preview_note_channels, [])
       |> assign(:preview_stop_ref, nil)
       |> assign(:error_message, nil)
+      |> assign_blueprint_from_params(params)
 
     {:ok, socket}
   end
@@ -322,13 +325,15 @@ defmodule MenschWeb.ProgressionLive do
   @impl true
   def handle_event("open_save_modal", _params, socket) do
     case socket.assigns.progression do
-      %{chords: chords, name: name, description: description}
-      when is_list(chords) and chords != [] ->
+      %{chords: chords} when is_list(chords) and chords != [] ->
+        {default_name, default_description} =
+          default_save_metadata(socket.assigns.progression, socket.assigns.blueprint_progression)
+
         {:noreply,
          socket
          |> assign(:save_modal_open, true)
-         |> assign(:save_name, name)
-         |> assign(:save_description, description)}
+         |> assign(:save_name, default_name)
+         |> assign(:save_description, default_description)}
 
       _ ->
         {:noreply, put_flash(socket, :error, "Run the pipeline before saving")}
@@ -1065,7 +1070,7 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp run_pipeline(socket) do
-    with {:ok, source_fn} <- {:ok, CreateEmptyProgression.source()},
+    with {:ok, source_fn} <- {:ok, source_from_blueprint(socket.assigns.blueprint_progression)},
          {:ok, transforms} <- transforms_to_funs(socket.assigns.transforms),
          {:ok, progression} <- Progression.run_with_source(source_fn, transforms) do
       socket
@@ -1132,6 +1137,66 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   defp transform_to_fun(_), do: {:error, :invalid_transform}
+
+  defp assign_blueprint_from_params(socket, %{"blueprint_id" => blueprint_id})
+       when is_binary(blueprint_id) and blueprint_id != "" do
+    case ChordProgressions.fetch_progression(blueprint_id) do
+      {:ok, %{progression: %ChordProgression{} = progression}} ->
+        assign(socket, :blueprint_progression, progression)
+
+      {:ok, _record} ->
+        socket
+        |> assign(:blueprint_progression, nil)
+        |> put_flash(:error, "Invalid blueprint progression")
+
+      {:error, :not_found} ->
+        socket
+        |> assign(:blueprint_progression, nil)
+        |> put_flash(:error, "Blueprint progression not found")
+
+      {:error, reason} ->
+        socket
+        |> assign(:blueprint_progression, nil)
+        |> put_flash(:error, "Failed to load blueprint: #{inspect(reason)}")
+    end
+  end
+
+  defp assign_blueprint_from_params(socket, _params),
+    do: assign(socket, :blueprint_progression, nil)
+
+  defp source_from_blueprint(%ChordProgression{} = blueprint_progression) do
+    fn -> {:ok, blueprint_progression} end
+  end
+
+  defp source_from_blueprint(_), do: CreateEmptyProgression.source()
+
+  defp default_save_metadata(%{name: name, description: description}, nil),
+    do: {name, description}
+
+  defp default_save_metadata(_progression, %ChordProgression{} = blueprint_progression) do
+    blueprint_name =
+      blueprint_progression
+      |> Map.get(:name, "Chord Progression")
+      |> to_string()
+      |> String.trim()
+
+    base_name = if blueprint_name == "", do: "Chord Progression", else: blueprint_name
+
+    blueprint_description =
+      blueprint_progression
+      |> Map.get(:description, "")
+      |> to_string()
+      |> String.trim()
+
+    derived_description =
+      if blueprint_description == "" do
+        "Variation of #{base_name}"
+      else
+        "Variation of #{base_name}. #{blueprint_description}"
+      end
+
+    {"#{base_name} (variation)", derived_description}
+  end
 
   defp transform_ids, do: @transform_ids
   defp qualities, do: @qualities

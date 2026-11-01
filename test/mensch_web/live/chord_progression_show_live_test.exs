@@ -78,6 +78,23 @@ defmodule MenschWeb.ChordProgressionShowLiveTest do
     assert roots == [:e, :c]
   end
 
+  test "shows use as blueprint link to progression builder", %{conn: conn} do
+    assert {:ok, source} =
+             ChordProgressions.create_progression(
+               "Source",
+               "",
+               [chord(:c), chord(:d)]
+             )
+
+    {:ok, view, _html} = live(conn, ~p"/chord-progressions/#{source.id}")
+
+    assert has_element?(
+             view,
+             "a[href='/chord-progressions/new?blueprint_id=#{source.id}']",
+             "Use as Blueprint"
+           )
+  end
+
   defp chord(root) do
     ChordSpec.new!(%{
       harmonic_identity: %ChordSpec.HarmonicIdentity{root: root, quality: :maj},
