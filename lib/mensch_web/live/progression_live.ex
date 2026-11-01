@@ -4,7 +4,6 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.ChordProgressions
   alias Mensch.Harmony.ChordProgression
   alias Mensch.Harmony.ChordSpec
-  alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.AppendChord
   alias Mensch.Harmony.Progression.Middleware.AppendScaleGeneratedChords
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
@@ -76,16 +75,21 @@ defmodule MenschWeb.ProgressionLive do
 
   @impl true
   def mount(params, _session, socket) do
+    scratch_timestamp = NaiveDateTime.local_now() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+
     socket =
       socket
       |> assign(:midi_status, Mensch.Midi.Connection.status())
       |> assign(:scale_families, ScaleRegistry.all())
       |> assign(:chord_strategies, Scale.chord_strategy_options())
       |> assign(:blueprint_progression, nil)
+      |> assign(:scratch_timestamp, scratch_timestamp)
       |> assign(:transforms, [])
+      |> assign(:stage_progressions, [])
       |> assign(:progression, nil)
       |> assign(:chords, [])
       |> assign(:save_modal_open, false)
+      |> assign(:save_stage_index, nil)
       |> assign(:save_name, "")
       |> assign(:save_description, "")
       |> assign(:preview_note_channels, [])
@@ -101,9 +105,11 @@ defmodule MenschWeb.ProgressionLive do
   def handle_event("add_transform", params, socket) do
     transform_id = Map.get(params, "transform_id", hd(@transform_ids))
     transform = default_transform_config(valid_transform_id(transform_id))
+    stage_index = Map.get(params, "stage_index", length(socket.assigns.transforms) - 1)
 
-    {:noreply,
-     assign_transforms_and_run_pipeline(socket, socket.assigns.transforms ++ [transform])}
+    transforms = insert_transform_after_stage(socket.assigns.transforms, stage_index, transform)
+
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
   end
 
   @impl true
@@ -317,15 +323,25 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
-  def handle_event("open_save_modal", _params, socket) do
-    case socket.assigns.progression do
+  def handle_event("open_save_modal", params, socket) do
+    stage_index =
+      params
+      |> Map.get("stage_index", max(length(socket.assigns.stage_progressions) - 1, 0))
+      |> parse_stage_index(socket.assigns.stage_progressions)
+
+    case Enum.at(socket.assigns.stage_progressions, stage_index) do
       %{chords: chords} when is_list(chords) and chords != [] ->
         {default_name, default_description} =
-          default_save_metadata(socket.assigns.progression, socket.assigns.blueprint_progression)
+          default_save_metadata(
+            socket.assigns.blueprint_progression,
+            stage_index,
+            socket.assigns.scratch_timestamp
+          )
 
         {:noreply,
          socket
          |> assign(:save_modal_open, true)
+         |> assign(:save_stage_index, stage_index)
          |> assign(:save_name, default_name)
          |> assign(:save_description, default_description)}
 
@@ -336,7 +352,7 @@ defmodule MenschWeb.ProgressionLive do
 
   @impl true
   def handle_event("close_save_modal", _params, socket) do
-    {:noreply, assign(socket, :save_modal_open, false)}
+    {:noreply, socket |> assign(:save_modal_open, false) |> assign(:save_stage_index, nil)}
   end
 
   @impl true
@@ -344,13 +360,17 @@ defmodule MenschWeb.ProgressionLive do
     name = Map.get(params, "name", "")
     description = Map.get(params, "description", "")
 
-    case socket.assigns.progression do
+    stage_index =
+      socket.assigns.save_stage_index || max(length(socket.assigns.stage_progressions) - 1, 0)
+
+    case Enum.at(socket.assigns.stage_progressions, stage_index) do
       %{chords: chords} when is_list(chords) and chords != [] ->
         case ChordProgressions.create_progression(name, description, chords) do
           {:ok, record} ->
             {:noreply,
              socket
              |> assign(:save_modal_open, false)
+             |> assign(:save_stage_index, nil)
              |> put_flash(:info, "Progression saved")
              |> push_navigate(to: ~p"/chord-progressions/#{record.id}")}
 
@@ -367,11 +387,22 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
-  def handle_event("play_chord", %{"index" => index}, socket) do
+  def handle_event("play_chord", %{"index" => index} = params, socket) do
+    parsed_stage_index =
+      params
+      |> Map.get("stage_index", max(length(socket.assigns.stage_progressions) - 1, 0))
+      |> parse_stage_index(socket.assigns.stage_progressions)
+
     chord =
       case Integer.parse(to_string(index)) do
-        {parsed, ""} -> Enum.at(socket.assigns.chords, parsed)
-        _ -> nil
+        {parsed, ""} ->
+          socket.assigns.stage_progressions
+          |> Enum.at(parsed_stage_index)
+          |> then(fn progression -> if progression, do: progression.chords, else: [] end)
+          |> Enum.at(parsed)
+
+        _ ->
+          nil
       end
 
     case chord do
@@ -419,7 +450,7 @@ defmodule MenschWeb.ProgressionLive do
   def render(assigns) do
     assigns =
       assigns
-      |> assign(:chord_cards, build_chord_cards(assigns.chords))
+      |> assign(:stage_cards, build_stage_cards(assigns.stage_progressions))
 
     ~H"""
     <Layouts.app flash={@flash} midi_status={@midi_status} nav_active={:progression}>
@@ -438,53 +469,140 @@ defmodule MenschWeb.ProgressionLive do
           </.link>
         </div>
 
-        <div class="ui-radius-table space-y-4 border border-zinc-700/60 bg-black/30 p-4">
-          <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3 space-y-3">
-            <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">Transforms</h3>
+        <div class="space-y-4">
+          <div :if={@error_message} class="rounded-sm border border-rose-500/40 bg-rose-950/30 p-3">
+            <p class="font-mono text-xs text-rose-200">{@error_message}</p>
+          </div>
 
-            <div class="space-y-3">
+          <div class="space-y-4">
+            <div
+              :for={stage <- @stage_cards}
+              class="rounded-sm border border-zinc-600/70 bg-zinc-950/40 p-3 space-y-3"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                  {if stage.index == 0,
+                    do: "Stage 0 · Initial Progression",
+                    else: "Stage #{stage.index} · Result"}
+                </h3>
+
+                <button
+                  id={"save-stage-#{stage.index}"}
+                  type="button"
+                  phx-click="open_save_modal"
+                  phx-value-stage_index={stage.index}
+                  disabled={stage.chord_cards == []}
+                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Save This Stage
+                </button>
+              </div>
+
               <div
-                :for={{transform, index} <- Enum.with_index(@transforms)}
-                class="rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3"
+                :if={stage.chord_cards == []}
+                class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
               >
-                <div class="mb-2 flex items-center justify-between">
-                  <p class="font-mono text-xs text-zinc-200">
-                    Step {index + 1}: {transform_label(transform.id)}
-                  </p>
+                <p class="font-mono text-xs text-zinc-400">No chords in this stage yet.</p>
+              </div>
+
+              <div :if={stage.chord_cards != []} class="space-y-4">
+                <div
+                  :for={card <- stage.chord_cards}
+                  class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
+                >
+                  <div class="flex flex-col gap-3 md:flex-row md:items-start">
+                    <button
+                      type="button"
+                      phx-click="play_chord"
+                      phx-value-stage_index={stage.index}
+                      phx-value-index={card.index}
+                      class="w-56 shrink-0 rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-2 text-center font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
+                    >
+                      {card.degree} · {card.symbol}
+                    </button>
+
+                    <div class="min-w-0 flex-1 md:max-w-4xl">
+                      <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
+                        <FullPianoKeyboard.keyboard
+                          id={"progression-keyboard-#{stage.index}-#{card.index}"}
+                          keys={card.keyboard_keys}
+                          height_class="h-28"
+                          show_bottom_lane={false}
+                          color_mode={:dark}
+                        />
+                      </div>
+
+                      <p class="mt-2 font-mono text-[11px] text-zinc-400">{card.named_notes}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2 rounded-sm border border-dashed border-zinc-600/70 bg-zinc-950/20 p-3">
+                <% has_transform_after_stage = stage.index < length(@transforms) %>
+                <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                  Insert Transform After Stage {stage.index}
+                </span>
+                <div class="flex flex-wrap items-center gap-2">
                   <button
+                    :for={id <- transform_ids()}
                     type="button"
-                    phx-click="remove_transform"
-                    phx-value-index={index}
-                    class="rounded-sm border border-rose-500/50 bg-rose-900/20 px-2 py-1 font-mono text-[11px] text-rose-200 transition-colors duration-150 hover:bg-rose-900/40"
+                    phx-click="add_transform"
+                    phx-value-stage_index={stage.index}
+                    phx-value-transform_id={id}
+                    disabled={has_transform_after_stage}
+                    class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Remove
+                    {transform_label(id)}
                   </button>
                 </div>
+              </div>
 
-                <%= if transform.id == "ensure_bass_ascending" do %>
-                  <label class="inline-flex items-center gap-2 font-mono text-xs text-zinc-200">
-                    <input
-                      type="checkbox"
-                      checked={transform.opts["include_foreign_bass"]}
-                      phx-click="set_transform_bool"
-                      phx-value-index={index}
-                      phx-value-field="include_foreign_bass"
-                      phx-value-value={
-                        if(transform.opts["include_foreign_bass"], do: "false", else: "true")
-                      }
-                    /> Include foreign bass
-                  </label>
-                <% end %>
+              <%= if stage.index < length(@transforms) do %>
+                <% transform = Enum.at(@transforms, stage.index) %>
+                <% preview =
+                  if transform && transform.id == "append_chord",
+                    do: append_chord_preview(transform.opts),
+                    else: nil %>
 
-                <%= if transform.id == "transpose_all" do %>
-                  <label class="space-y-2">
-                    <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                      Semitones
-                    </span>
+                <div class="space-y-3 rounded-sm border border-amber-500/30 bg-zinc-900/70 p-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="font-mono text-xs text-zinc-200">
+                      Transform {stage.index + 1}: {transform_label(transform.id)}
+                    </p>
+                    <button
+                      type="button"
+                      phx-click="remove_transform"
+                      phx-value-index={stage.index}
+                      class="rounded-sm border border-rose-500/50 bg-rose-900/20 px-2 py-1 font-mono text-[11px] text-rose-200 transition-colors duration-150 hover:bg-rose-900/40"
+                    >
+                      Remove
+                    </button>
+                  </div>
 
-                    <div class="w-full max-w-xl space-y-2">
+                  <%= if transform.id == "ensure_bass_ascending" do %>
+                    <label class="inline-flex items-center gap-2 font-mono text-xs text-zinc-200">
+                      <input
+                        type="checkbox"
+                        checked={transform.opts["include_foreign_bass"]}
+                        phx-click="set_transform_bool"
+                        phx-value-index={stage.index}
+                        phx-value-field="include_foreign_bass"
+                        phx-value-value={
+                          if(transform.opts["include_foreign_bass"], do: "false", else: "true")
+                        }
+                      /> Include foreign bass
+                    </label>
+                  <% end %>
+
+                  <%= if transform.id == "transpose_all" do %>
+                    <div class="space-y-2 max-w-xl">
+                      <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                        Semitones
+                      </span>
+
                       <form phx-input="set_transform_integer" phx-change="set_transform_integer">
-                        <input type="hidden" name="index" value={index} />
+                        <input type="hidden" name="index" value={stage.index} />
                         <input type="hidden" name="field" value="semitones" />
                         <input
                           type="range"
@@ -498,7 +616,7 @@ defmodule MenschWeb.ProgressionLive do
                       </form>
 
                       <form phx-input="set_transform_integer" phx-change="set_transform_integer">
-                        <input type="hidden" name="index" value={index} />
+                        <input type="hidden" name="index" value={stage.index} />
                         <input type="hidden" name="field" value="semitones" />
                         <input
                           type="number"
@@ -511,31 +629,13 @@ defmodule MenschWeb.ProgressionLive do
                         />
                       </form>
                     </div>
-                  </label>
-                <% end %>
+                  <% end %>
 
-                <%= if transform.id == "append_chord" do %>
-                  <% preview = append_chord_preview(transform.opts) %>
-                  <% expanded = append_transform_expanded?(transform) %>
-                  <div class="space-y-3">
-                    <div class="flex items-center justify-between gap-2">
-                      <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                        Chord Spec
-                      </h4>
-                      <button
-                        type="button"
-                        phx-click="toggle_append_transform_ui"
-                        phx-value-index={index}
-                        class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-2 py-1 font-mono text-[11px] text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
-                      >
-                        {if expanded, do: "Minimize", else: "Expand"}
-                      </button>
-                    </div>
-
-                    <%= if expanded do %>
+                  <%= if transform.id == "append_chord" do %>
+                    <div class="space-y-3">
                       <div class="max-w-xl">
                         <MenschWeb.PitchClassKeyboard.mini
-                          id={"progression-append-root-#{index}"}
+                          id={"progression-append-root-#{stage.index}"}
                           label="Root"
                           event="set_transform_pitch_class"
                           selected_key={
@@ -544,7 +644,7 @@ defmodule MenschWeb.ProgressionLive do
                             })
                           }
                           selected_key_color="#f6d365"
-                          value_index={index}
+                          value_index={stage.index}
                           value_field="tonic"
                         />
                       </div>
@@ -558,7 +658,7 @@ defmodule MenschWeb.ProgressionLive do
                             :for={quality <- qualities()}
                             type="button"
                             phx-click="set_transform_quality"
-                            phx-value-index={index}
+                            phx-value-index={stage.index}
                             phx-value-quality={Atom.to_string(quality)}
                             class={
                               toggle_button_classes(
@@ -571,7 +671,7 @@ defmodule MenschWeb.ProgressionLive do
                         </div>
                       </div>
 
-                      <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <div class="grid gap-3 md:grid-cols-2">
                         <label class="space-y-1">
                           <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
                             Octave
@@ -581,7 +681,7 @@ defmodule MenschWeb.ProgressionLive do
                             class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
                             value={transform.opts["octave"]}
                             phx-blur="set_transform_integer"
-                            phx-value-index={index}
+                            phx-value-index={stage.index}
                             phx-value-field="octave"
                           />
                         </label>
@@ -596,418 +696,159 @@ defmodule MenschWeb.ProgressionLive do
                             class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
                             value={transform.opts["inversion"]}
                             phx-blur="set_transform_integer"
-                            phx-value-index={index}
+                            phx-value-index={stage.index}
                             phx-value-field="inversion"
                           />
                         </label>
-
-                        <label class="space-y-1">
-                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                            Voicing Type
-                          </span>
-                          <form phx-change="set_transform_text">
-                            <input type="hidden" name="index" value={index} />
-                            <input type="hidden" name="field" value="voicing_type" />
-                            <select
-                              name="value"
-                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                            >
-                              <option
-                                :for={item <- voicing_type_options()}
-                                value={item.value}
-                                selected={transform.opts["voicing_type"] == item.value}
-                              >
-                                {item.label}
-                              </option>
-                            </select>
-                          </form>
-                        </label>
-
-                        <label class="space-y-1">
-                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                            Center Note
-                          </span>
-                          <input
-                            type="number"
-                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                            value={transform.opts["center_note"]}
-                            phx-blur="set_transform_integer"
-                            phx-value-index={index}
-                            phx-value-field="center_note"
-                          />
-                        </label>
                       </div>
 
-                      <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                        <label class="space-y-1">
-                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                            Range Min (optional)
-                          </span>
-                          <input
-                            type="number"
-                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                            value={transform.opts["range_min"]}
-                            phx-blur="set_transform_optional_integer"
-                            phx-value-index={index}
-                            phx-value-field="range_min"
-                          />
-                        </label>
+                      <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="min-w-0">
+                            <p class="truncate font-mono text-xs text-zinc-100">
+                              {if preview, do: preview.symbol, else: "Preview unavailable"}
+                            </p>
+                            <p :if={preview} class="font-mono text-[11px] text-zinc-400">
+                              {preview.named_notes}
+                            </p>
+                            <p :if={!preview} class="font-mono text-[11px] text-rose-300">
+                              Invalid append chord settings
+                            </p>
+                          </div>
 
-                        <label class="space-y-1">
-                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                            Range Max (optional)
-                          </span>
-                          <input
-                            type="number"
-                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                            value={transform.opts["range_max"]}
-                            phx-blur="set_transform_optional_integer"
-                            phx-value-index={index}
-                            phx-value-field="range_max"
-                          />
-                        </label>
-
-                        <label class="space-y-1">
-                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                            Voice Count (optional)
-                          </span>
-                          <input
-                            type="number"
-                            min="1"
-                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                            value={transform.opts["voice_count"]}
-                            phx-blur="set_transform_optional_integer"
-                            phx-value-index={index}
-                            phx-value-field="voice_count"
-                          />
-                        </label>
-
-                        <label class="space-y-1">
-                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                            Doubling
-                          </span>
-                          <form phx-change="set_transform_text">
-                            <input type="hidden" name="index" value={index} />
-                            <input type="hidden" name="field" value="doubling" />
-                            <select
-                              name="value"
-                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                            >
-                              <option
-                                :for={item <- doubling_options()}
-                                value={item.value}
-                                selected={transform.opts["doubling"] == item.value}
-                              >
-                                {item.label}
-                              </option>
-                            </select>
-                          </form>
-                        </label>
-                      </div>
-
-                      <label class="space-y-1 block max-w-sm">
-                        <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                          Inversion Resolution Mode
-                        </span>
-                        <form phx-change="set_transform_text">
-                          <input type="hidden" name="index" value={index} />
-                          <input type="hidden" name="field" value="inversion_resolution_mode" />
-                          <select
-                            name="value"
-                            class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                          <button
+                            type="button"
+                            phx-click="play_append_transform_chord"
+                            phx-value-index={stage.index}
+                            disabled={!preview}
+                            class="rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 enabled:hover:bg-emerald-400/30 disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            <option
-                              :for={item <- inversion_resolution_mode_options()}
-                              value={item.value}
-                              selected={transform.opts["inversion_resolution_mode"] == item.value}
+                            Play
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
+
+                  <%= if transform.id == "append_scale_generated_chords" do %>
+                    <% transform_source = %{opts: transform.opts} %>
+                    <% transform_scale_family_options =
+                      source_scale_family_options(@scale_families, transform_source) %>
+                    <% transform_scale_mode_options =
+                      source_scale_mode_options(@scale_families, transform_source) %>
+                    <% transform_strategy_options =
+                      source_strategy_options(@chord_strategies, transform_source) %>
+                    <% transform_shape_options =
+                      source_shape_options(@chord_strategies, transform_source) %>
+
+                    <div class="space-y-3">
+                      <div class="max-w-xl">
+                        <MenschWeb.PitchClassKeyboard.mini
+                          id={"progression-transform-scale-tonic-#{stage.index}"}
+                          label="Tonic"
+                          event="set_transform_pitch_class"
+                          selected_key={
+                            selected_tonic_keyboard_key(%{
+                              opts: %{"tonic" => transform.opts["tonic"]}
+                            })
+                          }
+                          selected_key_color="#f6d365"
+                          value_index={stage.index}
+                          value_field="tonic"
+                        />
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Scale Family
+                          </span>
+                          <form phx-change="set_transform_scale_family">
+                            <input type="hidden" name="index" value={stage.index} />
+                            <select
+                              name="family"
+                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
                             >
-                              {item.label}
-                            </option>
-                          </select>
-                        </form>
-                      </label>
-                    <% else %>
-                      <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3">
-                        <p class="truncate font-mono text-xs text-zinc-100">
-                          {if preview, do: preview.symbol, else: "Preview unavailable"}
-                        </p>
-                        <p :if={preview} class="mt-1 font-mono text-[11px] text-zinc-400">
-                          {preview.named_notes}
-                        </p>
-                        <p :if={!preview} class="mt-1 font-mono text-[11px] text-rose-300">
-                          Invalid append chord settings
-                        </p>
-                      </div>
-                    <% end %>
-
-                    <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3 space-y-2">
-                      <div class="flex items-center justify-between gap-2">
-                        <div class="min-w-0">
-                          <p class="truncate font-mono text-xs text-zinc-100">
-                            {if preview, do: preview.symbol, else: "Preview unavailable"}
-                          </p>
-                          <p :if={preview} class="font-mono text-[11px] text-zinc-400">
-                            {preview.named_notes}
-                          </p>
-                          <p :if={!preview} class="font-mono text-[11px] text-rose-300">
-                            Invalid append chord settings
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          phx-click="play_append_transform_chord"
-                          phx-value-index={index}
-                          disabled={!preview}
-                          class="rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-1.5 font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 enabled:hover:bg-emerald-400/30 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Play
-                        </button>
-                      </div>
-
-                      <%= if preview && expanded do %>
-                        <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
-                          <FullPianoKeyboard.keyboard
-                            id={"append-chord-preview-keyboard-#{index}"}
-                            keys={preview.keyboard_keys}
-                            height_class="h-20"
-                            show_bottom_lane={false}
-                            color_mode={:dark}
-                          />
-                        </div>
-                      <% end %>
-                    </div>
-                  </div>
-                <% end %>
-
-                <%= if transform.id == "append_scale_generated_chords" do %>
-                  <% expanded = append_scale_generated_transform_expanded?(transform) %>
-                  <% transform_source = %{opts: transform.opts} %>
-                  <% transform_scale_family_options =
-                    source_scale_family_options(@scale_families, transform_source) %>
-                  <% transform_scale_mode_options =
-                    source_scale_mode_options(@scale_families, transform_source) %>
-                  <% transform_strategy_options =
-                    source_strategy_options(@chord_strategies, transform_source) %>
-                  <% transform_shape_options =
-                    source_shape_options(@chord_strategies, transform_source) %>
-
-                  <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3">
-                    <div class="flex items-center justify-between gap-2">
-                      <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                        Append Scale-Generated Chords
-                      </h4>
-                      <button
-                        type="button"
-                        phx-click="toggle_append_scale_generated_ui"
-                        phx-value-index={index}
-                        class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-2 py-1 font-mono text-[11px] text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
-                      >
-                        {if expanded, do: "Minimize", else: "Expand"}
-                      </button>
-                    </div>
-
-                    <%= if expanded do %>
-                      <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                        <h5 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                          1) Define Scale
-                        </h5>
-
-                        <div class="max-w-xl">
-                          <MenschWeb.PitchClassKeyboard.mini
-                            id={"progression-transform-scale-tonic-#{index}"}
-                            label="Tonic"
-                            event="set_transform_pitch_class"
-                            selected_key={
-                              selected_tonic_keyboard_key(%{
-                                opts: %{"tonic" => transform.opts["tonic"]}
-                              })
-                            }
-                            selected_key_color="#f6d365"
-                            value_index={index}
-                            value_field="tonic"
-                          />
-                        </div>
-
-                        <div class="grid gap-3 md:grid-cols-2">
-                          <label class="space-y-1">
-                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                              Scale Family
-                            </span>
-                            <form phx-change="set_transform_scale_family">
-                              <input type="hidden" name="index" value={index} />
-                              <select
-                                name="family"
-                                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                              <option
+                                :for={item <- transform_scale_family_options}
+                                value={item.value}
+                                selected={item.selected}
                               >
-                                <option
-                                  :for={item <- transform_scale_family_options}
-                                  value={item.value}
-                                  selected={item.selected}
-                                >
-                                  {item.label}
-                                </option>
-                              </select>
-                            </form>
-                          </label>
+                                {item.label}
+                              </option>
+                            </select>
+                          </form>
+                        </label>
 
-                          <label class="space-y-1">
-                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                              Mode
-                            </span>
-                            <%= if transform_scale_mode_options == [] do %>
-                              <div class="rounded-sm border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 font-mono text-xs text-zinc-500">
-                                No mode (standalone scale)
-                              </div>
-                            <% else %>
-                              <form phx-change="set_transform_scale_mode">
-                                <input type="hidden" name="index" value={index} />
-                                <select
-                                  name="scale_mode"
-                                  class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
-                                >
-                                  <option
-                                    :for={item <- transform_scale_mode_options}
-                                    value={item.value}
-                                    selected={item.selected}
-                                  >
-                                    {item.label}
-                                  </option>
-                                </select>
-                              </form>
-                            <% end %>
-                          </label>
-                        </div>
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Mode
+                          </span>
+                          <form phx-change="set_transform_scale_mode">
+                            <input type="hidden" name="index" value={stage.index} />
+                            <select
+                              name="scale_mode"
+                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            >
+                              <option
+                                :for={item <- transform_scale_mode_options}
+                                value={item.value}
+                                selected={item.selected}
+                              >
+                                {item.label}
+                              </option>
+                            </select>
+                          </form>
+                        </label>
                       </div>
 
-                      <div class="space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3">
-                        <h5 class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                          2) Chord Strategy
-                        </h5>
-
-                        <div class="grid gap-3 md:grid-cols-2">
-                          <label class="space-y-1">
-                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                              Strategy
-                            </span>
-                            <form phx-change="set_transform_strategy">
-                              <input type="hidden" name="index" value={index} />
-                              <select
-                                name="strategy"
-                                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Strategy
+                          </span>
+                          <form phx-change="set_transform_strategy">
+                            <input type="hidden" name="index" value={stage.index} />
+                            <select
+                              name="strategy"
+                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            >
+                              <option
+                                :for={item <- transform_strategy_options}
+                                value={item.value}
+                                selected={item.selected}
                               >
-                                <option
-                                  :for={item <- transform_strategy_options}
-                                  value={item.value}
-                                  selected={item.selected}
-                                >
-                                  {item.label}
-                                </option>
-                              </select>
-                            </form>
-                          </label>
+                                {item.label}
+                              </option>
+                            </select>
+                          </form>
+                        </label>
 
-                          <label class="space-y-1">
-                            <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                              Chord Shape
-                            </span>
-                            <form phx-change="set_transform_shape">
-                              <input type="hidden" name="index" value={index} />
-                              <select
-                                name="shape"
-                                class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                        <label class="space-y-1">
+                          <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                            Chord Shape
+                          </span>
+                          <form phx-change="set_transform_shape">
+                            <input type="hidden" name="index" value={stage.index} />
+                            <select
+                              name="shape"
+                              class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1.5 font-mono text-xs text-zinc-100"
+                            >
+                              <option
+                                :for={item <- transform_shape_options}
+                                value={item.value}
+                                selected={item.selected}
                               >
-                                <option
-                                  :for={item <- transform_shape_options}
-                                  value={item.value}
-                                  selected={item.selected}
-                                >
-                                  {item.label}
-                                </option>
-                              </select>
-                            </form>
-                          </label>
-                        </div>
+                                {item.label}
+                              </option>
+                            </select>
+                          </form>
+                        </label>
                       </div>
-                    <% else %>
-                      <p class="font-mono text-xs text-zinc-300">
-                        {String.upcase(transform.opts["tonic"] || "c")} · {transform.opts["family"] ||
-                          "major"} · mode {transform.opts["scale_mode"] || "1"} · {transform.opts[
-                          "strategy"
-                        ] || "tertian"}/{transform.opts["shape"] || "triad"}
-                      </p>
-                    <% end %>
-                  </div>
-                <% end %>
-              </div>
-            </div>
-
-            <div class="space-y-1">
-              <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                Add Transform
-              </span>
-              <div class="flex flex-wrap items-center gap-2">
-                <button
-                  :for={id <- transform_ids()}
-                  type="button"
-                  phx-click="add_transform"
-                  phx-value-transform_id={id}
-                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
-                >
-                  {transform_label(id)}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              phx-click="open_save_modal"
-              class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-4 py-2 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
-            >
-              Save Progression
-            </button>
-          </div>
-
-          <div :if={@error_message} class="rounded-sm border border-rose-500/40 bg-rose-950/30 p-3">
-            <p class="font-mono text-xs text-rose-200">{@error_message}</p>
-          </div>
-
-          <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/40 p-3">
-            <h3 class="mb-2 font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-              Chords List
-            </h3>
-            <div class="space-y-4">
-              <div
-                :for={card <- @chord_cards}
-                class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
-              >
-                <div class="flex flex-col gap-3 md:flex-row md:items-start">
-                  <button
-                    type="button"
-                    phx-click="play_chord"
-                    phx-value-index={card.index}
-                    class="w-56 shrink-0 rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-2 text-center font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
-                  >
-                    {card.degree} · {card.symbol}
-                  </button>
-
-                  <div class="min-w-0 flex-1 md:max-w-4xl">
-                    <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
-                      <FullPianoKeyboard.keyboard
-                        id={"progression-keyboard-#{card.index}"}
-                        keys={card.keyboard_keys}
-                        height_class="h-28"
-                        show_bottom_lane={false}
-                        color_mode={:dark}
-                      />
                     </div>
-
-                    <p class="mt-2 font-mono text-[11px] text-zinc-400">{card.named_notes}</p>
-                  </div>
+                  <% end %>
                 </div>
-              </div>
+              <% end %>
             </div>
           </div>
         </div>
@@ -1078,15 +919,27 @@ defmodule MenschWeb.ProgressionLive do
 
   defp run_pipeline(socket) do
     with {:ok, source_fn} <- {:ok, source_from_blueprint(socket.assigns.blueprint_progression)},
-         {:ok, transforms} <- transforms_to_funs(socket.assigns.transforms),
-         {:ok, progression} <- Progression.run_with_source(source_fn, transforms) do
+         {:ok, source_progression} <- source_fn.(),
+         {:ok, stage_progressions} <-
+           build_stage_progressions(source_progression, socket.assigns.transforms),
+         progression when is_struct(progression, ChordProgression) <-
+           List.last(stage_progressions) do
       socket
+      |> assign(:stage_progressions, stage_progressions)
       |> assign(:progression, progression)
       |> assign(:chords, progression.chords)
       |> assign(:error_message, nil)
     else
+      nil ->
+        socket
+        |> assign(:stage_progressions, [])
+        |> assign(:progression, nil)
+        |> assign(:chords, [])
+        |> assign(:error_message, "No progression stages available")
+
       {:error, reason} ->
         socket
+        |> assign(:stage_progressions, [])
         |> assign(:progression, nil)
         |> assign(:chords, [])
         |> assign(:error_message, format_error(reason))
@@ -1099,15 +952,25 @@ defmodule MenschWeb.ProgressionLive do
     |> run_pipeline()
   end
 
-  defp transforms_to_funs(transforms) when is_list(transforms) do
+  defp build_stage_progressions(%ChordProgression{} = source_progression, transforms)
+       when is_list(transforms) do
     transforms
-    |> Enum.reduce_while({:ok, []}, fn transform, {:ok, acc} ->
-      case transform_to_fun(transform) do
-        {:ok, fun} -> {:cont, {:ok, acc ++ [fun]}}
-        {:error, reason} -> {:halt, {:error, reason}}
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, [source_progression]}, fn {transform, transform_index},
+                                                         {:ok, acc} ->
+      with {:ok, transform_fun} <- transform_to_fun(transform),
+           current when is_struct(current, ChordProgression) <- List.last(acc),
+           {:ok, next_progression} <- transform_fun.(current) do
+        {:cont, {:ok, acc ++ [next_progression]}}
+      else
+        {:error, reason} -> {:halt, {:error, {:transform_failed, transform_index, reason}}}
+        _ -> {:halt, {:error, {:transform_failed, transform_index, :invalid_result}}}
       end
     end)
   end
+
+  defp build_stage_progressions(_source_progression, _transforms),
+    do: {:error, {:source_failed, :invalid_source}}
 
   defp transform_to_fun(%{id: "ensure_bass_ascending", opts: opts}) do
     include_foreign_bass = Map.get(opts, "include_foreign_bass", false)
@@ -1183,10 +1046,7 @@ defmodule MenschWeb.ProgressionLive do
 
   defp source_from_blueprint(_), do: CreateEmptyProgression.source()
 
-  defp default_save_metadata(%{name: name, description: description}, nil),
-    do: {name, description}
-
-  defp default_save_metadata(_progression, %ChordProgression{} = blueprint_progression) do
+  defp default_save_metadata(%ChordProgression{} = blueprint_progression, stage_index, _timestamp) do
     blueprint_name =
       blueprint_progression
       |> Map.get(:name, "Chord Progression")
@@ -1201,14 +1061,37 @@ defmodule MenschWeb.ProgressionLive do
       |> to_string()
       |> String.trim()
 
-    derived_description =
+    name =
+      if stage_index == 0,
+        do: "#{base_name} (variation)",
+        else: "#{base_name} (variation · step #{stage_index})"
+
+    description_prefix =
+      if stage_index == 0,
+        do: "Variation of #{base_name}.",
+        else: "Variation of #{base_name}, after step #{stage_index}."
+
+    description =
       if blueprint_description == "" do
-        "Variation of #{base_name}"
+        description_prefix
       else
-        "Variation of #{base_name}. #{blueprint_description}"
+        "#{description_prefix} #{blueprint_description}"
       end
 
-    {"#{base_name} (variation)", derived_description}
+    {name, description}
+  end
+
+  defp default_save_metadata(nil, stage_index, timestamp) do
+    base_name = "Progression #{timestamp}"
+
+    name = "#{base_name} (step #{stage_index})"
+
+    description =
+      if stage_index == 0,
+        do: "Created from empty source at #{timestamp}.",
+        else: "Created from empty source at #{timestamp}, after step #{stage_index}."
+
+    {name, description}
   end
 
   defp transform_ids, do: @transform_ids
@@ -1277,6 +1160,28 @@ defmodule MenschWeb.ProgressionLive do
 
       _ ->
         transforms
+    end
+  end
+
+  defp insert_transform_after_stage(transforms, stage_index_param, transform) do
+    max_stage_index = max(length(transforms), 0)
+
+    stage_index =
+      case Integer.parse(to_string(stage_index_param)) do
+        {parsed, ""} -> min(max(parsed, 0), max_stage_index)
+        _ -> max_stage_index
+      end
+
+    insert_index = min(max(stage_index + 1, 0), length(transforms))
+    List.insert_at(transforms, insert_index, transform)
+  end
+
+  defp parse_stage_index(stage_index_param, stage_progressions) do
+    max_stage_index = max(length(stage_progressions) - 1, 0)
+
+    case Integer.parse(to_string(stage_index_param)) do
+      {parsed, ""} -> min(max(parsed, 0), max_stage_index)
+      _ -> max_stage_index
     end
   end
 
@@ -1570,18 +1475,6 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
-  defp append_transform_expanded?(%{opts: opts}) when is_map(opts) do
-    Map.get(opts, "expanded", true) != false
-  end
-
-  defp append_transform_expanded?(_transform), do: true
-
-  defp append_scale_generated_transform_expanded?(%{opts: opts}) when is_map(opts) do
-    Map.get(opts, "expanded", true) != false
-  end
-
-  defp append_scale_generated_transform_expanded?(_transform), do: true
-
   defp chord_kind_label(:triad), do: "Triad"
   defp chord_kind_label(:seventh), do: "Seventh"
   defp chord_kind_label(:add6), do: "Add 6"
@@ -1613,6 +1506,21 @@ defmodule MenschWeb.ProgressionLive do
       _ -> Integer.to_string(degree)
     end
   end
+
+  defp build_stage_cards(stage_progressions) when is_list(stage_progressions) do
+    stage_progressions
+    |> Enum.with_index()
+    |> Enum.map(fn {progression, index} ->
+      chords = if is_struct(progression, ChordProgression), do: progression.chords, else: []
+
+      %{
+        index: index,
+        chord_cards: build_chord_cards(chords)
+      }
+    end)
+  end
+
+  defp build_stage_cards(_), do: []
 
   defp build_chord_cards(chords) when is_list(chords) do
     chords
@@ -1654,10 +1562,6 @@ defmodule MenschWeb.ProgressionLive do
   defp toggle_button_classes(false) do
     "rounded-sm border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 font-mono text-xs text-zinc-200 transition-colors duration-150 hover:border-zinc-500"
   end
-
-  defp voicing_type_options, do: @voicing_type_options
-  defp doubling_options, do: @doubling_options
-  defp inversion_resolution_mode_options, do: @inversion_resolution_mode_options
 
   defp format_error({:source_failed, reason}), do: "Source failed: #{inspect(reason)}"
 
