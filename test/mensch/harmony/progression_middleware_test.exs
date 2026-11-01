@@ -6,7 +6,9 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
   alias Mensch.Harmony.Progression
   alias Mensch.Harmony.Progression.Middleware.AppendChord
   alias Mensch.Harmony.Progression.Middleware.AppendScaleGeneratedChords
+  alias Mensch.Harmony.Progression.Middleware.DeleteChordsFromProgression
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
+  alias Mensch.Harmony.Progression.Middleware.ReorderChordProgression
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
 
@@ -215,6 +217,126 @@ defmodule Mensch.Harmony.ProgressionMiddlewareTest do
 
     assert ChordSpec.root(chord) == :d
     assert ChordSpec.quality(chord) == :min
+  end
+
+  test "reorder_chord_progression reorders chords by provided order" do
+    c =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    f =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :f, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    g =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :g, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [c, f, g]}
+
+    middleware = ReorderChordProgression.middleware(order: [2, 0, 1])
+
+    assert {:ok, %ChordProgression{chords: reordered}} = middleware.(progression)
+    assert Enum.map(reordered, &ChordSpec.root/1) == [:g, :c, :f]
+  end
+
+  test "reorder_chord_progression normalizes invalid or stale order" do
+    c =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    d =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    e =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :e, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [c, d, e]}
+
+    middleware = ReorderChordProgression.middleware(order: [2, 2, 9])
+
+    assert {:ok, %ChordProgression{chords: reordered}} = middleware.(progression)
+    assert Enum.map(reordered, &ChordSpec.root/1) == [:e, :c, :d]
+  end
+
+  test "delete_chords_from_progression deletes selected chord indices" do
+    c =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    d =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    e =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :e, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [c, d, e]}
+
+    middleware = DeleteChordsFromProgression.middleware(deleted_indices: [1])
+
+    assert {:ok, %ChordProgression{chords: kept}} = middleware.(progression)
+    assert Enum.map(kept, &ChordSpec.root/1) == [:c, :e]
+  end
+
+  test "delete_chords_from_progression ignores invalid and duplicate indices" do
+    c =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :c, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    d =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :d, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    e =
+      ChordSpec.new!(%{
+        harmonic_identity: %ChordSpec.HarmonicIdentity{root: :e, quality: :maj},
+        octave: 3,
+        inversion: 0
+      })
+
+    progression = %ChordProgression{name: "test", description: "test", chords: [c, d, e]}
+
+    middleware = DeleteChordsFromProgression.middleware(deleted_indices: [2, 2, 10, -1])
+
+    assert {:ok, %ChordProgression{chords: kept}} = middleware.(progression)
+    assert Enum.map(kept, &ChordSpec.root/1) == [:c, :d]
   end
 
   test "create_empty_progression source returns progression with no chords" do

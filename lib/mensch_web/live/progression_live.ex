@@ -6,7 +6,9 @@ defmodule MenschWeb.ProgressionLive do
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Progression.Middleware.AppendChord
   alias Mensch.Harmony.Progression.Middleware.AppendScaleGeneratedChords
+  alias Mensch.Harmony.Progression.Middleware.DeleteChordsFromProgression
   alias Mensch.Harmony.Progression.Middleware.EnsureBassAscending
+  alias Mensch.Harmony.Progression.Middleware.ReorderChordProgression
   alias Mensch.Harmony.Progression.Middleware.TransposeAll
   alias Mensch.Harmony.Progression.Source.CreateEmptyProgression
   alias Mensch.Harmony.Resolver
@@ -37,6 +39,8 @@ defmodule MenschWeb.ProgressionLive do
   @transform_ids [
     "ensure_bass_ascending",
     "transpose_all",
+    "reorder_chord_progression",
+    "delete_chords_from_progression",
     "append_chord",
     "append_scale_generated_chords"
   ]
@@ -317,6 +321,67 @@ defmodule MenschWeb.ProgressionLive do
           {:ok, _shape} -> Map.put(opts, "shape", shape)
           {:error, _reason} -> opts
         end
+      end)
+
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "move_reorder_chord",
+        %{"index" => index, "position" => position, "direction" => direction},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        transform_index = parse_non_negative_integer(index)
+        stage_progression = Enum.at(socket.assigns.stage_progressions, transform_index)
+        chord_count = if stage_progression, do: length(stage_progression.chords), else: 0
+
+        current_order = normalize_reorder_order(Map.get(opts, "order"), chord_count)
+        current_position = parse_non_negative_integer(position)
+
+        new_order =
+          case direction do
+            "up" -> move_item_by_position(current_order, current_position, -1)
+            "down" -> move_item_by_position(current_order, current_position, 1)
+            _ -> current_order
+          end
+
+        Map.put(opts, "order", new_order)
+      end)
+
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "toggle_delete_chord",
+        %{"index" => index, "chord_index" => chord_index},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        transform_index = parse_non_negative_integer(index)
+        stage_progression = Enum.at(socket.assigns.stage_progressions, transform_index)
+        chord_count = if stage_progression, do: length(stage_progression.chords), else: 0
+
+        current_deleted_indices =
+          normalize_deleted_indices(Map.get(opts, "deleted_indices"), chord_count)
+
+        parsed_chord_index = parse_non_negative_integer(chord_index)
+
+        updated_deleted_indices =
+          if parsed_chord_index in current_deleted_indices do
+            Enum.reject(current_deleted_indices, &(&1 == parsed_chord_index))
+          else
+            normalize_deleted_indices(
+              current_deleted_indices ++ [parsed_chord_index],
+              chord_count
+            )
+          end
+
+        Map.put(opts, "deleted_indices", updated_deleted_indices)
       end)
 
     {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
@@ -628,6 +693,126 @@ defmodule MenschWeb.ProgressionLive do
                           value={transform.opts["semitones"]}
                         />
                       </form>
+                    </div>
+                  <% end %>
+
+                  <%= if transform.id == "reorder_chord_progression" do %>
+                    <% stage_cards = stage.chord_cards || [] %>
+                    <% reorder_order =
+                      normalize_reorder_order(transform.opts["order"], length(stage_cards)) %>
+                    <% ordered_cards = reorder_cards_for_order(stage_cards, reorder_order) %>
+
+                    <div class="space-y-2">
+                      <p class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                        Reorder Chords
+                      </p>
+
+                      <div
+                        :if={ordered_cards == []}
+                        class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
+                      >
+                        <p class="font-mono text-xs text-zinc-400">No chords available to reorder.</p>
+                      </div>
+
+                      <div :if={ordered_cards != []} class="space-y-2">
+                        <div
+                          :for={{card, position} <- Enum.with_index(ordered_cards)}
+                          class="flex items-center gap-2 rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-2"
+                        >
+                          <span class="w-6 text-center font-mono text-xs text-zinc-400">{position + 1}</span>
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate font-mono text-xs text-zinc-100">
+                              {card.degree} · {card.symbol}
+                            </p>
+                            <p class="font-mono text-[11px] text-zinc-500">{card.named_notes}</p>
+                          </div>
+
+                          <div class="flex items-center gap-1">
+                            <button
+                              type="button"
+                              phx-click="move_reorder_chord"
+                              phx-value-index={stage.index}
+                              phx-value-position={position}
+                              phx-value-direction="up"
+                              disabled={position == 0}
+                              class="rounded-sm border border-zinc-600 px-2 py-1 font-mono text-[11px] text-zinc-200 enabled:hover:border-zinc-500 disabled:opacity-40"
+                            >
+                              Up
+                            </button>
+                            <button
+                              type="button"
+                              phx-click="move_reorder_chord"
+                              phx-value-index={stage.index}
+                              phx-value-position={position}
+                              phx-value-direction="down"
+                              disabled={position == length(ordered_cards) - 1}
+                              class="rounded-sm border border-zinc-600 px-2 py-1 font-mono text-[11px] text-zinc-200 enabled:hover:border-zinc-500 disabled:opacity-40"
+                            >
+                              Down
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
+
+                  <%= if transform.id == "delete_chords_from_progression" do %>
+                    <% stage_cards = stage.chord_cards || [] %>
+                    <% deleted_indices =
+                      normalize_deleted_indices(
+                        transform.opts["deleted_indices"],
+                        length(stage_cards)
+                      ) %>
+
+                    <div class="space-y-2">
+                      <p class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                        Delete Chords
+                      </p>
+
+                      <div
+                        :if={stage_cards == []}
+                        class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
+                      >
+                        <p class="font-mono text-xs text-zinc-400">No chords available.</p>
+                      </div>
+
+                      <div :if={stage_cards != []} class="space-y-2">
+                        <div
+                          :for={card <- stage_cards}
+                          class={
+                            if card.index in deleted_indices,
+                              do:
+                                "flex items-center gap-2 rounded-sm border border-rose-700/70 bg-rose-950/20 p-2",
+                              else:
+                                "flex items-center gap-2 rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-2"
+                          }
+                        >
+                          <span class="w-6 text-center font-mono text-xs text-zinc-400">{card.index +
+                            1}</span>
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate font-mono text-xs text-zinc-100">
+                              {card.degree} · {card.symbol}
+                            </p>
+                            <p class="font-mono text-[11px] text-zinc-500">{card.named_notes}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            phx-click="toggle_delete_chord"
+                            phx-value-index={stage.index}
+                            phx-value-chord_index={card.index}
+                            class={
+                              if card.index in deleted_indices,
+                                do:
+                                  "rounded-sm border border-zinc-500 px-2 py-1 font-mono text-[11px] text-zinc-200 hover:border-zinc-400",
+                                else:
+                                  "rounded-sm border border-rose-800/80 px-2 py-1 font-mono text-[11px] text-rose-200 hover:border-rose-700"
+                            }
+                          >
+                            {if card.index in deleted_indices, do: "Restore", else: "Delete"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   <% end %>
 
@@ -983,6 +1168,26 @@ defmodule MenschWeb.ProgressionLive do
     end
   end
 
+  defp transform_to_fun(%{id: "reorder_chord_progression", opts: opts}) do
+    order =
+      case Map.get(opts, "order") do
+        value when is_list(value) -> value
+        _ -> []
+      end
+
+    {:ok, ReorderChordProgression.middleware(order: order)}
+  end
+
+  defp transform_to_fun(%{id: "delete_chords_from_progression", opts: opts}) do
+    deleted_indices =
+      case Map.get(opts, "deleted_indices") do
+        value when is_list(value) -> value
+        _ -> []
+      end
+
+    {:ok, DeleteChordsFromProgression.middleware(deleted_indices: deleted_indices)}
+  end
+
   defp transform_to_fun(%{id: "append_chord", opts: opts}) do
     with {:ok, chord_spec} <- append_chord_spec_from_opts(opts) do
       {:ok, AppendChord.middleware(chord_spec: chord_spec)}
@@ -1102,6 +1307,8 @@ defmodule MenschWeb.ProgressionLive do
 
   defp transform_label("ensure_bass_ascending"), do: "Ensure Bass Ascending"
   defp transform_label("transpose_all"), do: "Transpose All"
+  defp transform_label("reorder_chord_progression"), do: "Reorder Chord Progression"
+  defp transform_label("delete_chords_from_progression"), do: "Delete Chords From Progression"
   defp transform_label("append_chord"), do: "Append Chord"
   defp transform_label("append_scale_generated_chords"), do: "Append Scale-Generated Chords"
   defp transform_label(_), do: "Unknown Transform"
@@ -1112,6 +1319,14 @@ defmodule MenschWeb.ProgressionLive do
 
   defp default_transform_config("transpose_all") do
     %{id: "transpose_all", opts: %{"semitones" => 12}}
+  end
+
+  defp default_transform_config("reorder_chord_progression") do
+    %{id: "reorder_chord_progression", opts: %{"order" => []}}
+  end
+
+  defp default_transform_config("delete_chords_from_progression") do
+    %{id: "delete_chords_from_progression", opts: %{"deleted_indices" => []}}
   end
 
   defp default_transform_config("append_chord") do
@@ -1184,6 +1399,75 @@ defmodule MenschWeb.ProgressionLive do
       _ -> max_stage_index
     end
   end
+
+  defp parse_non_negative_integer(value) do
+    case Integer.parse(to_string(value)) do
+      {parsed, ""} when parsed >= 0 -> parsed
+      _ -> 0
+    end
+  end
+
+  defp move_item_by_position(items, position, delta) when is_list(items) do
+    target = position + delta
+
+    if position >= 0 and position < length(items) and target >= 0 and target < length(items) do
+      value = Enum.at(items, position)
+
+      items
+      |> List.delete_at(position)
+      |> List.insert_at(target, value)
+    else
+      items
+    end
+  end
+
+  defp normalize_reorder_order(order, chord_count)
+       when is_integer(chord_count) and chord_count >= 0 do
+    base =
+      case order do
+        value when is_list(value) ->
+          value
+          |> Enum.filter(&(is_integer(&1) and &1 >= 0 and &1 < chord_count))
+          |> Enum.reduce([], fn index, acc -> if index in acc, do: acc, else: acc ++ [index] end)
+
+        _ ->
+          []
+      end
+
+    missing =
+      if chord_count > 0 do
+        Enum.to_list(0..(chord_count - 1))
+      else
+        []
+      end
+      |> Enum.reject(&(&1 in base))
+
+    base ++ missing
+  end
+
+  defp normalize_deleted_indices(indices, chord_count)
+       when is_integer(chord_count) and chord_count >= 0 do
+    case indices do
+      value when is_list(value) ->
+        value
+        |> Enum.filter(&(is_integer(&1) and &1 >= 0 and &1 < chord_count))
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      _ ->
+        []
+    end
+  end
+
+  defp reorder_cards_for_order(cards, order) when is_list(cards) and is_list(order) do
+    card_by_index = Map.new(cards, fn card -> {card.index, card} end)
+
+    order
+    |> Enum.map(&Map.get(card_by_index, &1))
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp reorder_cards_for_order(_cards, _order), do: []
 
   defp update_transform_opts(transforms, index_param, updater) do
     case Integer.parse(to_string(index_param)) do
