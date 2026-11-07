@@ -57,26 +57,6 @@ defmodule MenschWeb.ProgressionLive do
 
   @shape_order [:triad, :seventh, :ninth, :eleventh, :thirteenth, :add6, :six_nine]
 
-  @voicing_type_options [
-    %{value: "close", label: "Close"},
-    %{value: "open", label: "Open"}
-  ]
-
-  @doubling_options [
-    %{value: "auto", label: "Auto"},
-    %{value: "root", label: "Root"},
-    %{value: "top", label: "Top"},
-    %{value: "third", label: "Third"},
-    %{value: "fifth", label: "Fifth"},
-    %{value: "guide_tones", label: "Guide Tones"},
-    %{value: "bass", label: "Bass"}
-  ]
-
-  @inversion_resolution_mode_options [
-    %{value: "per_step_centered", label: "Per Step Centered"},
-    %{value: "anchor_then_wander", label: "Anchor Then Wander"}
-  ]
-
   @impl true
   def mount(params, _session, socket) do
     scratch_timestamp = NaiveDateTime.local_now() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
@@ -123,28 +103,6 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
-  def handle_event("toggle_append_transform_ui", %{"index" => index}, socket) do
-    transforms =
-      update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        expanded = Map.get(opts, "expanded", true)
-        Map.put(opts, "expanded", !expanded)
-      end)
-
-    {:noreply, assign(socket, :transforms, transforms)}
-  end
-
-  @impl true
-  def handle_event("toggle_append_scale_generated_ui", %{"index" => index}, socket) do
-    transforms =
-      update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        expanded = Map.get(opts, "expanded", true)
-        Map.put(opts, "expanded", !expanded)
-      end)
-
-    {:noreply, assign(socket, :transforms, transforms)}
-  end
-
-  @impl true
   def handle_event(
         "set_transform_bool",
         %{"index" => index, "field" => field, "value" => value},
@@ -180,94 +138,17 @@ defmodule MenschWeb.ProgressionLive do
   end
 
   @impl true
-  def handle_event(
-        "set_transform_optional_integer",
-        %{"index" => index, "field" => field, "value" => value},
-        socket
-      ) do
-    transforms =
-      update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        case parse_optional_integer(value, field) do
-          {:ok, parsed} -> Map.put(opts, field, parsed)
-          {:error, _reason} -> opts
-        end
-      end)
-
-    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
-  end
-
-  @impl true
-  def handle_event(
-        "set_transform_pitch_class",
-        %{"index" => index, "field" => field, "pitch_class" => pitch_class},
-        socket
-      ) do
-    transforms =
-      update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        if Map.has_key?(@pitch_class_from_param, pitch_class),
-          do: Map.put(opts, field, pitch_class),
-          else: opts
-      end)
-
-    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
-  end
-
-  @impl true
-  def handle_event(
-        "set_transform_quality",
-        %{"index" => index, "quality" => quality},
-        socket
-      ) do
-    transforms =
-      update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        if Map.has_key?(@quality_from_param, quality),
-          do: Map.put(opts, "quality", quality),
-          else: opts
-      end)
-
-    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
-  end
-
-  @impl true
-  def handle_event(
-        "set_transform_text",
-        %{"index" => index, "field" => field, "value" => value},
-        socket
-      ) do
-    transforms =
-      update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        case field do
-          "voicing_type" ->
-            if value in Enum.map(@voicing_type_options, & &1.value),
-              do: Map.put(opts, field, value),
-              else: opts
-
-          "doubling" ->
-            if value in Enum.map(@doubling_options, & &1.value),
-              do: Map.put(opts, field, value),
-              else: opts
-
-          "inversion_resolution_mode" ->
-            if value in Enum.map(@inversion_resolution_mode_options, & &1.value),
-              do: Map.put(opts, field, value),
-              else: opts
-
-          _ ->
-            opts
-        end
-      end)
-
-    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
-  end
-
-  @impl true
   def handle_event("set_transform_scale_family", %{"index" => index, "family" => family}, socket) do
     transforms =
       update_transform_opts(socket.assigns.transforms, index, fn opts ->
         case parse_family(family, socket.assigns.scale_families) do
           {:ok, family_id} ->
-            mode = default_mode_for_family(socket.assigns.scale_families, family_id)
-            opts |> Map.put("family", family) |> Map.put("scale_mode", mode)
+            family_value = Atom.to_string(family_id)
+            default_mode = default_mode_for_family(socket.assigns.scale_families, family_id)
+
+            opts
+            |> Map.put("family", family_value)
+            |> Map.put("scale_mode", default_mode)
 
           {:error, _reason} ->
             opts
@@ -285,8 +166,8 @@ defmodule MenschWeb.ProgressionLive do
       ) do
     transforms =
       update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        case parse_positive_integer(scale_mode) do
-          {:ok, _mode} -> Map.put(opts, "scale_mode", scale_mode)
+        case parse_scale_mode(scale_mode) do
+          {:ok, mode} -> Map.put(opts, "scale_mode", Integer.to_string(mode))
           {:error, _reason} -> opts
         end
       end)
@@ -300,8 +181,14 @@ defmodule MenschWeb.ProgressionLive do
       update_transform_opts(socket.assigns.transforms, index, fn opts ->
         case parse_strategy(strategy, socket.assigns.chord_strategies) do
           {:ok, _strategy} ->
-            shape = default_shape_for_strategy(strategy, socket.assigns.chord_strategies)
-            opts |> Map.put("strategy", strategy) |> Map.put("shape", shape)
+            strategy_value = strategy
+
+            default_shape =
+              default_shape_for_strategy(strategy_value, socket.assigns.chord_strategies)
+
+            opts
+            |> Map.put("strategy", strategy_value)
+            |> Map.put("shape", default_shape)
 
           {:error, _reason} ->
             opts
@@ -315,11 +202,40 @@ defmodule MenschWeb.ProgressionLive do
   def handle_event("set_transform_shape", %{"index" => index, "shape" => shape}, socket) do
     transforms =
       update_transform_opts(socket.assigns.transforms, index, fn opts ->
-        strategy = Map.get(opts, "strategy")
-
-        case parse_shape_for_strategy(shape, strategy, socket.assigns.chord_strategies) do
-          {:ok, _shape} -> Map.put(opts, "shape", shape)
+        case parse_shape(shape) do
+          {:ok, parsed_shape} -> Map.put(opts, "shape", Atom.to_string(parsed_shape))
           {:error, _reason} -> opts
+        end
+      end)
+
+    {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
+  end
+
+  @impl true
+  def handle_event("set_transform_quality", %{"index" => index, "quality" => quality}, socket) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        case parse_quality(quality) do
+          {:ok, parsed_quality} -> Map.put(opts, "quality", Atom.to_string(parsed_quality))
+          {:error, _reason} -> opts
+        end
+      end)
+
+    {:noreply, assign(socket, :transforms, transforms)}
+  end
+
+  @impl true
+  def handle_event(
+        "set_transform_pitch_class",
+        %{"index" => index, "field" => field, "pitch_class" => pitch_class},
+        socket
+      ) do
+    transforms =
+      update_transform_opts(socket.assigns.transforms, index, fn opts ->
+        if field in ["tonic", "foreign_bass"] do
+          Map.put(opts, field, pitch_class)
+        else
+          opts
         end
       end)
 
@@ -338,17 +254,12 @@ defmodule MenschWeb.ProgressionLive do
         stage_progression = Enum.at(socket.assigns.stage_progressions, transform_index)
         chord_count = if stage_progression, do: length(stage_progression.chords), else: 0
 
-        current_order = normalize_reorder_order(Map.get(opts, "order"), chord_count)
-        current_position = parse_non_negative_integer(position)
+        order = normalize_reorder_order(Map.get(opts, "order"), chord_count)
+        position_value = parse_non_negative_integer(position)
+        delta = if direction == "up", do: -1, else: 1
+        moved_order = move_item_by_position(order, position_value, delta)
 
-        new_order =
-          case direction do
-            "up" -> move_item_by_position(current_order, current_position, -1)
-            "down" -> move_item_by_position(current_order, current_position, 1)
-            _ -> current_order
-          end
-
-        Map.put(opts, "order", new_order)
+        Map.put(opts, "order", moved_order)
       end)
 
     {:noreply, assign_transforms_and_run_pipeline(socket, transforms)}
@@ -470,27 +381,18 @@ defmodule MenschWeb.ProgressionLive do
       end
 
     case chord do
-      %ChordSpec{} = chord_spec ->
-        notes = Resolver.resolve(chord_spec)
-        play_notes_for_3s(socket, notes)
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid chord selection")}
+      %ChordSpec{} = chord_spec -> play_notes_for_3s(socket, Resolver.resolve(chord_spec))
+      _ -> {:noreply, put_flash(socket, :error, "Invalid chord")}
     end
   end
 
   @impl true
   def handle_event("play_append_transform_chord", %{"index" => index}, socket) do
-    transform =
-      case Integer.parse(to_string(index)) do
-        {parsed, ""} -> Enum.at(socket.assigns.transforms, parsed)
-        _ -> nil
-      end
+    transform = Enum.at(socket.assigns.transforms, parse_non_negative_integer(index))
 
     with %{id: "append_chord", opts: opts} <- transform,
          {:ok, chord_spec} <- append_chord_spec_from_opts(opts) do
-      notes = Resolver.resolve(chord_spec)
-      play_notes_for_3s(socket, notes)
+      play_notes_for_3s(socket, Resolver.resolve(chord_spec))
     else
       _ -> {:noreply, put_flash(socket, :error, "Invalid append chord settings")}
     end
@@ -543,83 +445,125 @@ defmodule MenschWeb.ProgressionLive do
               :for={stage <- @stage_cards}
               class="space-y-3"
             >
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
-                  {if stage.index == 0,
-                    do: "Stage 0 · Initial Progression",
-                    else: "Stage #{stage.index} · Result"}
-                </h3>
+              <.pipeline_card body_class="space-y-4" card_bg_class="bg-zinc-950/25">
+                <:header>
+                  <.pipeline_card_header
+                    kind={:stage}
+                    title={
+                      if stage.index == 0,
+                        do: "Stage 0 · Initial Progression",
+                        else: "Stage #{stage.index} · Result"
+                    }
+                  >
+                    <:actions>
+                      <button
+                        id={"save-stage-#{stage.index}"}
+                        type="button"
+                        phx-click="open_save_modal"
+                        phx-value-stage_index={stage.index}
+                        disabled={stage.chord_cards == []}
+                        class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Save This Stage
+                      </button>
+                    </:actions>
+                  </.pipeline_card_header>
+                </:header>
 
-                <button
-                  id={"save-stage-#{stage.index}"}
-                  type="button"
-                  phx-click="open_save_modal"
-                  phx-value-stage_index={stage.index}
-                  disabled={stage.chord_cards == []}
-                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Save This Stage
-                </button>
-              </div>
-
-              <div
-                :if={stage.chord_cards == []}
-                class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
-              >
-                <p class="font-mono text-xs text-zinc-400">No chords in this stage yet.</p>
-              </div>
-
-              <div :if={stage.chord_cards != []} class="space-y-4">
                 <div
-                  :for={card <- stage.chord_cards}
+                  :if={stage.chord_cards == []}
                   class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
                 >
-                  <div class="flex flex-col gap-3 md:flex-row md:items-start">
-                    <button
-                      type="button"
-                      phx-click="play_chord"
-                      phx-value-stage_index={stage.index}
-                      phx-value-index={card.index}
-                      class="w-56 shrink-0 rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-2 text-center font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
-                    >
-                      {card.degree} · {card.symbol}
-                    </button>
+                  <p class="font-mono text-xs text-zinc-400">No chords in this stage yet.</p>
+                </div>
 
-                    <div class="min-w-0 flex-1 md:max-w-4xl">
-                      <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
-                        <FullPianoKeyboard.keyboard
-                          id={"progression-keyboard-#{stage.index}-#{card.index}"}
-                          keys={card.keyboard_keys}
-                          height_class="h-28"
-                          show_bottom_lane={false}
-                          color_mode={:dark}
-                        />
+                <div :if={stage.chord_cards != []} class="space-y-4">
+                  <div
+                    :for={card <- stage.chord_cards}
+                    class="rounded-sm border border-zinc-700/60 bg-zinc-950/65 p-3"
+                  >
+                    <div class="flex flex-col gap-3 md:flex-row md:items-start">
+                      <button
+                        type="button"
+                        phx-click="play_chord"
+                        phx-value-stage_index={stage.index}
+                        phx-value-index={card.index}
+                        class="w-56 shrink-0 rounded-sm border border-emerald-300 bg-emerald-400/20 px-3 py-2 text-center font-mono text-xs font-semibold text-emerald-100 transition-colors duration-150 hover:bg-emerald-400/30"
+                      >
+                        {card.degree} · {card.symbol}
+                      </button>
+
+                      <div class="min-w-0 flex-1 md:max-w-4xl">
+                        <div class="rounded-md border border-zinc-700/70 bg-zinc-950 p-2">
+                          <FullPianoKeyboard.keyboard
+                            id={"progression-keyboard-#{stage.index}-#{card.index}"}
+                            keys={card.keyboard_keys}
+                            height_class="h-28"
+                            show_bottom_lane={false}
+                            color_mode={:dark}
+                          />
+                        </div>
+
+                        <p class="mt-2 font-mono text-[11px] text-zinc-400">{card.named_notes}</p>
                       </div>
-
-                      <p class="mt-2 font-mono text-[11px] text-zinc-400">{card.named_notes}</p>
                     </div>
                   </div>
                 </div>
-              </div>
+              </.pipeline_card>
 
-              <div class="space-y-2 rounded-sm border border-zinc-700/70 p-3">
-                <% has_transform_after_stage = stage.index < length(@transforms) %>
-                <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
-                  Insert Transform After Stage {stage.index}
-                </span>
-                <div class="flex flex-wrap items-center gap-2">
-                  <button
-                    :for={id <- transform_ids()}
-                    type="button"
-                    phx-click="add_transform"
-                    phx-value-stage_index={stage.index}
-                    phx-value-transform_id={id}
-                    disabled={has_transform_after_stage}
-                    class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {transform_label(id)}
-                  </button>
-                </div>
+              <div :if={stage.index == length(@transforms)}>
+                <.pipeline_card body_class="" card_bg_class="bg-zinc-950/20">
+                  <:header>
+                    <.pipeline_card_header kind={:transforms} title="Transforms" />
+                  </:header>
+
+                  <div class="flex flex-wrap items-start justify-start gap-2">
+                    <div
+                      :for={{group, group_index} <- Enum.with_index(transform_groups())}
+                      class={[
+                        "space-y-2",
+                        group_index > 0 && "border-l border-zinc-700/70 pl-2"
+                      ]}
+                    >
+                      <p class="font-mono text-[11px] uppercase tracking-wide text-zinc-500">
+                        {group.label}
+                      </p>
+
+                      <div class="flex flex-wrap items-center gap-2">
+                        <button
+                          :for={id <- group.ids}
+                          type="button"
+                          phx-click="add_transform"
+                          phx-value-stage_index={stage.index}
+                          phx-value-transform_id={id}
+                          title={transform_label(id)}
+                          aria-label={transform_label(id)}
+                          class="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-zinc-600 bg-zinc-900/70 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <%= case id do %>
+                            <% "append_chord" -> %>
+                              <span class="relative inline-flex h-4 w-5 items-end justify-center">
+                                <span class="h-3 w-1 rounded-[1px] bg-zinc-100"></span>
+                                <span class="h-3 w-1 rounded-[1px] bg-zinc-100"></span>
+                                <span class="h-3 w-1 rounded-[1px] bg-zinc-100"></span>
+                                <span class="pointer-events-none absolute left-[7px] top-0 h-2 w-1 rounded-[1px] bg-zinc-800"></span>
+                                <span class="pointer-events-none absolute left-[11px] top-0 h-2 w-1 rounded-[1px] bg-zinc-800"></span>
+                              </span>
+                            <% "append_scale_generated_chords" -> %>
+                              <span class="inline-flex h-4 w-5 items-end justify-between">
+                                <span class="h-1 w-1.5 rounded-[1px] bg-zinc-100"></span>
+                                <span class="h-2 w-1.5 rounded-[1px] bg-zinc-100"></span>
+                                <span class="h-3 w-1.5 rounded-[1px] bg-zinc-100"></span>
+                              </span>
+                            <% _ -> %>
+                              <.icon name={transform_icon(id)} class="h-4 w-4" />
+                          <% end %>
+                          <span class="sr-only">{transform_label(id)}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </.pipeline_card>
               </div>
 
               <%= if stage.index < length(@transforms) do %>
@@ -629,20 +573,24 @@ defmodule MenschWeb.ProgressionLive do
                     do: append_chord_preview(transform.opts),
                     else: nil %>
 
-                <div class="space-y-3 rounded-sm border border-amber-500/30 p-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="font-mono text-xs text-zinc-200">
-                      Transform {stage.index + 1}: {transform_label(transform.id)}
-                    </p>
-                    <button
-                      type="button"
-                      phx-click="remove_transform"
-                      phx-value-index={stage.index}
-                      class="rounded-sm border border-rose-500/50 bg-rose-900/20 px-2 py-1 font-mono text-[11px] text-rose-200 transition-colors duration-150 hover:bg-rose-900/40"
+                <.pipeline_card body_class="space-y-3" card_bg_class="bg-zinc-950/20">
+                  <:header>
+                    <.pipeline_card_header
+                      kind={:transform}
+                      title={"Transform #{stage.index + 1}: #{transform_label(transform.id)}"}
                     >
-                      Remove
-                    </button>
-                  </div>
+                      <:actions>
+                        <button
+                          type="button"
+                          phx-click="remove_transform"
+                          phx-value-index={stage.index}
+                          class="rounded-sm border border-rose-500/50 bg-rose-900/20 px-2 py-1 font-mono text-[11px] text-rose-200 transition-colors duration-150 hover:bg-rose-900/40"
+                        >
+                          Remove
+                        </button>
+                      </:actions>
+                    </.pipeline_card_header>
+                  </:header>
 
                   <%= if transform.id == "ensure_bass_ascending" do %>
                     <label class="inline-flex items-center gap-2 font-mono text-xs text-zinc-200">
@@ -710,7 +658,9 @@ defmodule MenschWeb.ProgressionLive do
                         :if={ordered_cards == []}
                         class="rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-3"
                       >
-                        <p class="font-mono text-xs text-zinc-400">No chords available to reorder.</p>
+                        <p class="font-mono text-xs text-zinc-400">
+                          No chords available to reorder.
+                        </p>
                       </div>
 
                       <div :if={ordered_cards != []} class="space-y-2">
@@ -1031,7 +981,7 @@ defmodule MenschWeb.ProgressionLive do
                       </div>
                     </div>
                   <% end %>
-                </div>
+                </.pipeline_card>
               <% end %>
             </div>
           </div>
@@ -1100,6 +1050,55 @@ defmodule MenschWeb.ProgressionLive do
     </Layouts.app>
     """
   end
+
+  attr :body_class, :string, default: ""
+  attr :card_bg_class, :string, default: "bg-zinc-950/20"
+  slot :header, required: true
+  slot :inner_block, required: true
+
+  defp pipeline_card(assigns) do
+    ~H"""
+    <div class={["overflow-hidden rounded-sm border border-zinc-600/80", @card_bg_class]}>
+      {render_slot(@header)}
+      <div class={["p-3", @body_class]}>{render_slot(@inner_block)}</div>
+    </div>
+    """
+  end
+
+  attr :kind, :atom, required: true
+  attr :title, :string, required: true
+  slot :actions
+
+  defp pipeline_card_header(assigns) do
+    ~H"""
+    <div class="flex items-center justify-between gap-2 border-b border-zinc-700/70 bg-zinc-900/30 px-3 py-2.5">
+      <div class="flex min-w-0 items-center gap-2">
+        <span class={[
+          "inline-flex items-center justify-center rounded-sm border p-1",
+          card_header_cue_classes(@kind)
+        ]}>
+          <.icon name={card_header_icon(@kind)} class="h-3 w-3" />
+        </span>
+        <p class="truncate font-mono text-[11px] uppercase tracking-wide text-zinc-300">{@title}</p>
+      </div>
+
+      <div :if={@actions != []} class="shrink-0">{render_slot(@actions)}</div>
+    </div>
+    """
+  end
+
+  defp card_header_icon(:stage), do: "hero-squares-2x2"
+  defp card_header_icon(:transforms), do: "hero-wrench-screwdriver"
+  defp card_header_icon(:transform), do: "hero-adjustments-horizontal"
+  defp card_header_icon(_), do: "hero-cog-6-tooth"
+
+  defp card_header_cue_classes(:stage), do: "border-amber-500/50 bg-amber-900/40 text-amber-200"
+  defp card_header_cue_classes(:transforms), do: "border-sky-500/50 bg-sky-900/40 text-sky-200"
+
+  defp card_header_cue_classes(:transform),
+    do: "border-emerald-500/50 bg-emerald-900/40 text-emerald-200"
+
+  defp card_header_cue_classes(_), do: "border-zinc-500/60 bg-zinc-800/80 text-zinc-100"
 
   defp run_pipeline(socket) do
     with {:ok, source_fn} <- {:ok, source_from_blueprint(socket.assigns.blueprint_progression)},
@@ -1298,7 +1297,17 @@ defmodule MenschWeb.ProgressionLive do
     {name, description}
   end
 
-  defp transform_ids, do: @transform_ids
+  defp transform_groups do
+    [
+      %{label: "GENERATION", ids: ["append_chord", "append_scale_generated_chords"]},
+      %{label: "HARMONY", ids: ["ensure_bass_ascending", "transpose_all"]},
+      %{
+        label: "STRUCTURE",
+        ids: ["reorder_chord_progression", "delete_chords_from_progression"]
+      }
+    ]
+  end
+
   defp qualities, do: @qualities
 
   defp valid_transform_id(transform_id) when transform_id in @transform_ids, do: transform_id
@@ -1311,6 +1320,14 @@ defmodule MenschWeb.ProgressionLive do
   defp transform_label("append_chord"), do: "Append Chord"
   defp transform_label("append_scale_generated_chords"), do: "Append Scale-Generated Chords"
   defp transform_label(_), do: "Unknown Transform"
+
+  defp transform_icon("ensure_bass_ascending"), do: "hero-arrow-trending-up"
+  defp transform_icon("transpose_all"), do: "hero-arrows-up-down"
+  defp transform_icon("reorder_chord_progression"), do: "hero-queue-list"
+  defp transform_icon("delete_chords_from_progression"), do: "hero-trash"
+  defp transform_icon("append_chord"), do: "hero-plus-circle"
+  defp transform_icon("append_scale_generated_chords"), do: "hero-sparkles"
+  defp transform_icon(_), do: "hero-cog-6-tooth"
 
   defp default_transform_config("ensure_bass_ascending") do
     %{id: "ensure_bass_ascending", opts: %{"include_foreign_bass" => false}}
@@ -1655,17 +1672,6 @@ defmodule MenschWeb.ProgressionLive do
       Enum.find_index(@shape_order, &(&1 == shape)) || 999
     end)
   end
-
-  defp parse_positive_integer(value) when is_integer(value) and value > 0, do: {:ok, value}
-
-  defp parse_positive_integer(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {num, ""} when num > 0 -> {:ok, num}
-      _ -> {:error, :invalid_integer}
-    end
-  end
-
-  defp parse_positive_integer(_value), do: {:error, :invalid_integer}
 
   defp parse_quality(value) when is_binary(value) do
     case Map.get(@quality_from_param, value) do
