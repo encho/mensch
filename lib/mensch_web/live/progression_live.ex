@@ -431,13 +431,12 @@ defmodule MenschWeb.ProgressionLive do
     case Enum.at(socket.assigns.stage_progressions, stage_index) do
       %{chords: chords} when is_list(chords) and chords != [] ->
         case ChordProgressions.create_progression(name, description, chords) do
-          {:ok, record} ->
+          {:ok, _record} ->
             {:noreply,
              socket
              |> assign(:save_modal_open, false)
              |> assign(:save_stage_index, nil)
-             |> put_flash(:info, "Progression saved")
-             |> push_navigate(to: ~p"/chord-progressions/#{record.id}")}
+             |> put_flash(:info, "Progression saved")}
 
           {:error, :name_required} ->
             {:noreply, put_flash(socket, :error, "Name is required")}
@@ -542,7 +541,7 @@ defmodule MenschWeb.ProgressionLive do
           <div class="space-y-4">
             <div
               :for={stage <- @stage_cards}
-              class="rounded-sm border border-zinc-600/70 bg-zinc-950/40 p-3 space-y-3"
+              class="space-y-3"
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
@@ -603,7 +602,7 @@ defmodule MenschWeb.ProgressionLive do
                 </div>
               </div>
 
-              <div class="space-y-2 rounded-sm border border-dashed border-zinc-600/70 bg-zinc-950/20 p-3">
+              <div class="space-y-2 rounded-sm border border-zinc-700/70 p-3">
                 <% has_transform_after_stage = stage.index < length(@transforms) %>
                 <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
                   Insert Transform After Stage {stage.index}
@@ -630,7 +629,7 @@ defmodule MenschWeb.ProgressionLive do
                     do: append_chord_preview(transform.opts),
                     else: nil %>
 
-                <div class="space-y-3 rounded-sm border border-amber-500/30 bg-zinc-900/70 p-3">
+                <div class="space-y-3 rounded-sm border border-amber-500/30 p-3">
                   <div class="flex items-center justify-between gap-2">
                     <p class="font-mono text-xs text-zinc-200">
                       Transform {stage.index + 1}: {transform_label(transform.id)}

@@ -61,7 +61,7 @@ defmodule MenschWeb.ProgressionLiveTest do
       }
     })
 
-    assert_redirect(view, ~p"/chord-progressions/blueprint_name_variation")
+    assert render(view) =~ "Progression saved"
 
     assert {:ok, saved} = ChordProgressions.fetch_progression("blueprint_name_variation")
 
