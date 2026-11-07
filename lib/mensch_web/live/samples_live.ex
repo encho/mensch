@@ -164,9 +164,9 @@ defmodule MenschWeb.SamplesLive do
         "bpm" -> &{&1.bpm, String.downcase(&1.name)}
         "time_signature" -> &{&1.time_signature_sort, String.downcase(&1.name)}
         "duration" -> &{&1.duration_mbeats, String.downcase(&1.name)}
-        "created_at" -> &{&1.created_at || ~U[1970-01-01 00:00:00Z], String.downcase(&1.name)}
+        "created_at" -> &{created_at_sort_value(&1.created_at), String.downcase(&1.name)}
         "machines" -> &{&1.machines_label, String.downcase(&1.name)}
-        _ -> &{&1.created_at || ~U[1970-01-01 00:00:00Z], String.downcase(&1.name)}
+        _ -> &{created_at_sort_value(&1.created_at), String.downcase(&1.name)}
       end
 
     Enum.sort_by(rows, sorter, sort_direction(dir))
@@ -197,4 +197,9 @@ defmodule MenschWeb.SamplesLive do
   end
 
   defp created_at_label(_), do: "-"
+
+  defp created_at_sort_value(%DateTime{} = created_at),
+    do: DateTime.to_unix(created_at, :microsecond)
+
+  defp created_at_sort_value(_), do: 0
 end
