@@ -7,6 +7,7 @@ defmodule Mensch.ChordMatrices do
   """
 
   alias Mensch.Harmony.ChordMatrix
+  alias Mensch.Harmony.ChordSpec
 
   @type chord_matrix_record :: %{
           version: pos_integer(),
@@ -15,6 +16,8 @@ defmodule Mensch.ChordMatrices do
           updated_at: String.t(),
           chord_matrix: ChordMatrix.t()
         }
+
+  @current_version 2
 
   @spec list_chord_matrices() :: [map()]
   def list_chord_matrices do
@@ -77,7 +80,7 @@ defmodule Mensch.ChordMatrices do
       now = now_iso8601()
 
       record = %{
-        version: 1,
+        version: @current_version,
         id: id,
         inserted_at: now,
         updated_at: now,
@@ -93,6 +96,34 @@ defmodule Mensch.ChordMatrices do
   end
 
   def create_chord_matrix(_number_rows, _number_columns), do: {:error, :invalid_params}
+
+  @spec assign_chord_to_pad(String.t(), integer(), integer(), ChordSpec.t(), map()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def assign_chord_to_pad(
+        id,
+        row,
+        column,
+        %ChordSpec{} = chord_spec,
+        %{} = source
+      )
+      when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.assign_chord_to_pad(chord_matrix, row, column, chord_spec, source)
+    end)
+  end
+
+  def assign_chord_to_pad(_id, _row, _column, _chord_spec, _source),
+    do: {:error, :invalid_params}
+
+  @spec clear_pad_assignment(String.t(), integer(), integer()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def clear_pad_assignment(id, row, column) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.clear_pad_assignment(chord_matrix, row, column)
+    end)
+  end
+
+  def clear_pad_assignment(_id, _row, _column), do: {:error, :invalid_params}
 
   defp normalize_loaded_record(id, %{} = record) do
     with chord_matrix_value when not is_nil(chord_matrix_value) <- Map.get(record, :chord_matrix),
@@ -114,6 +145,22 @@ defmodule Mensch.ChordMatrices do
   defp normalize_chord_matrix(%ChordMatrix{} = chord_matrix), do: ChordMatrix.new(chord_matrix)
   defp normalize_chord_matrix(%{} = chord_matrix_map), do: ChordMatrix.new(chord_matrix_map)
   defp normalize_chord_matrix(_), do: {:error, :invalid_chord_matrix}
+
+  defp update_chord_matrix(id, updater) when is_function(updater, 1) do
+    with {:ok, record} <- fetch_chord_matrix(id),
+         {:ok, updated_chord_matrix} <- updater.(record.chord_matrix) do
+      updated_record = %{
+        record
+        | version: @current_version,
+          updated_at: now_iso8601(),
+          chord_matrix: updated_chord_matrix
+      }
+
+      with :ok <- write_term_file(chord_matrix_path(id), updated_record) do
+        {:ok, updated_record}
+      end
+    end
+  end
 
   defp unique_id do
     timestamp =
