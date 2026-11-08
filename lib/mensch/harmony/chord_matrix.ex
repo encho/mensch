@@ -217,6 +217,54 @@ defmodule Mensch.Harmony.ChordMatrix do
     end
   end
 
+  @spec move_row_up(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def move_row_up(%__MODULE__{} = chord_matrix, row_index) do
+    with {:ok, normalized_row_index} <- parse_non_negative_integer(row_index),
+         :ok <- ensure_row_in_bounds(chord_matrix, normalized_row_index),
+         true <- normalized_row_index > 0 do
+      {:ok, swap_rows(chord_matrix, normalized_row_index, normalized_row_index - 1)}
+    else
+      false -> {:error, :out_of_bounds}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec move_row_down(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def move_row_down(%__MODULE__{} = chord_matrix, row_index) do
+    with {:ok, normalized_row_index} <- parse_non_negative_integer(row_index),
+         :ok <- ensure_row_in_bounds(chord_matrix, normalized_row_index),
+         true <- normalized_row_index < chord_matrix.number_rows - 1 do
+      {:ok, swap_rows(chord_matrix, normalized_row_index, normalized_row_index + 1)}
+    else
+      false -> {:error, :out_of_bounds}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec move_column_left(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def move_column_left(%__MODULE__{} = chord_matrix, column_index) do
+    with {:ok, normalized_column_index} <- parse_non_negative_integer(column_index),
+         :ok <- ensure_column_in_bounds(chord_matrix, normalized_column_index),
+         true <- normalized_column_index > 0 do
+      {:ok, swap_columns(chord_matrix, normalized_column_index, normalized_column_index - 1)}
+    else
+      false -> {:error, :out_of_bounds}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec move_column_right(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def move_column_right(%__MODULE__{} = chord_matrix, column_index) do
+    with {:ok, normalized_column_index} <- parse_non_negative_integer(column_index),
+         :ok <- ensure_column_in_bounds(chord_matrix, normalized_column_index),
+         true <- normalized_column_index < chord_matrix.number_columns - 1 do
+      {:ok, swap_columns(chord_matrix, normalized_column_index, normalized_column_index + 1)}
+    else
+      false -> {:error, :out_of_bounds}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp parse_positive_integer(value) when is_integer(value) and value > 0, do: {:ok, value}
 
   defp parse_positive_integer(_value), do: {:error, :invalid_dimension}
@@ -275,6 +323,42 @@ defmodule Mensch.Harmony.ChordMatrix do
       end)
 
     %__MODULE__{chord_matrix | assignments: shifted_assignments}
+  end
+
+  defp swap_rows(%__MODULE__{} = chord_matrix, row_a, row_b) do
+    swapped_assignments =
+      Enum.reduce(chord_matrix.assignments, %{}, fn
+        {{row, column}, assignment}, acc when row == row_a ->
+          updated_assignment = %{assignment | row: row_b}
+          Map.put(acc, {row_b, column}, updated_assignment)
+
+        {{row, column}, assignment}, acc when row == row_b ->
+          updated_assignment = %{assignment | row: row_a}
+          Map.put(acc, {row_a, column}, updated_assignment)
+
+        {{row, column}, assignment}, acc ->
+          Map.put(acc, {row, column}, assignment)
+      end)
+
+    %__MODULE__{chord_matrix | assignments: swapped_assignments}
+  end
+
+  defp swap_columns(%__MODULE__{} = chord_matrix, column_a, column_b) do
+    swapped_assignments =
+      Enum.reduce(chord_matrix.assignments, %{}, fn
+        {{row, column}, assignment}, acc when column == column_a ->
+          updated_assignment = %{assignment | column: column_b}
+          Map.put(acc, {row, column_b}, updated_assignment)
+
+        {{row, column}, assignment}, acc when column == column_b ->
+          updated_assignment = %{assignment | column: column_a}
+          Map.put(acc, {row, column_a}, updated_assignment)
+
+        {{row, column}, assignment}, acc ->
+          Map.put(acc, {row, column}, assignment)
+      end)
+
+    %__MODULE__{chord_matrix | assignments: swapped_assignments}
   end
 
   defp parse_assignments(assignments, number_rows, number_columns) when is_map(assignments) do

@@ -154,6 +154,52 @@ defmodule Mensch.ChordMatricesTest do
     assert Map.has_key?(removed_record.chord_matrix.assignments, {0, 1})
   end
 
+  test "move_row_up and move_row_down swap assignment rows" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(3, 2)
+
+    assert {:ok, _record} =
+             ChordMatrices.assign_chord_to_pad(
+               matrix_record.id,
+               2,
+               1,
+               chord(:a, :min7),
+               %{
+                 source_progression_id: "row_move",
+                 source_progression_name: "Row Move",
+                 source_chord_index: 0
+               }
+             )
+
+    assert {:ok, moved_up_record} = ChordMatrices.move_row_up(matrix_record.id, 2)
+    assert Map.has_key?(moved_up_record.chord_matrix.assignments, {1, 1})
+
+    assert {:ok, moved_down_record} = ChordMatrices.move_row_down(matrix_record.id, 1)
+    assert Map.has_key?(moved_down_record.chord_matrix.assignments, {2, 1})
+  end
+
+  test "move_column_left and move_column_right swap assignment columns" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 3)
+
+    assert {:ok, _record} =
+             ChordMatrices.assign_chord_to_pad(
+               matrix_record.id,
+               1,
+               2,
+               chord(:b, :maj7),
+               %{
+                 source_progression_id: "column_move",
+                 source_progression_name: "Column Move",
+                 source_chord_index: 0
+               }
+             )
+
+    assert {:ok, moved_left_record} = ChordMatrices.move_column_left(matrix_record.id, 2)
+    assert Map.has_key?(moved_left_record.chord_matrix.assignments, {1, 1})
+
+    assert {:ok, moved_right_record} = ChordMatrices.move_column_right(matrix_record.id, 1)
+    assert Map.has_key?(moved_right_record.chord_matrix.assignments, {1, 2})
+  end
+
   defp chord(root, quality) do
     ChordSpec.new!(%{
       harmonic_identity: %ChordSpec.HarmonicIdentity{root: root, quality: quality},

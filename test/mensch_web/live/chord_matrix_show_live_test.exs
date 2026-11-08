@@ -137,16 +137,50 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert render(view) =~ "3 rows x 3 columns"
 
     view
+    |> element("#row-header-0")
+    |> render_click()
+
+    view
     |> element("#row-remove")
     |> render_click()
 
     assert render(view) =~ "2 rows x 3 columns"
 
     view
+    |> element("#column-header-0")
+    |> render_click()
+
+    view
     |> element("#column-remove")
     |> render_click()
 
     assert render(view) =~ "2 rows x 2 columns"
+  end
+
+  test "moves selected row and column", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(3, 3)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> element("#row-header-1")
+    |> render_click()
+
+    view
+    |> element("#row-move-up")
+    |> render_click()
+
+    assert render(view) =~ "Moved selected row up"
+
+    view
+    |> element("#column-header-1")
+    |> render_click()
+
+    view
+    |> element("#column-move-right")
+    |> render_click()
+
+    assert render(view) =~ "Moved selected column right"
   end
 
   defp chord(root, quality) do

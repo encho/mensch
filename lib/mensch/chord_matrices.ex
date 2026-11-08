@@ -182,6 +182,43 @@ defmodule Mensch.ChordMatrices do
 
   def remove_column(_id, _column_index), do: {:error, :invalid_params}
 
+  @spec move_row_up(String.t(), integer()) :: {:ok, chord_matrix_record()} | {:error, term()}
+  def move_row_up(id, row_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.move_row_up(chord_matrix, row_index)
+    end)
+  end
+
+  def move_row_up(_id, _row_index), do: {:error, :invalid_params}
+
+  @spec move_row_down(String.t(), integer()) :: {:ok, chord_matrix_record()} | {:error, term()}
+  def move_row_down(id, row_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.move_row_down(chord_matrix, row_index)
+    end)
+  end
+
+  def move_row_down(_id, _row_index), do: {:error, :invalid_params}
+
+  @spec move_column_left(String.t(), integer()) :: {:ok, chord_matrix_record()} | {:error, term()}
+  def move_column_left(id, column_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.move_column_left(chord_matrix, column_index)
+    end)
+  end
+
+  def move_column_left(_id, _column_index), do: {:error, :invalid_params}
+
+  @spec move_column_right(String.t(), integer()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def move_column_right(id, column_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.move_column_right(chord_matrix, column_index)
+    end)
+  end
+
+  def move_column_right(_id, _column_index), do: {:error, :invalid_params}
+
   defp normalize_loaded_record(id, %{} = record) do
     with chord_matrix_value when not is_nil(chord_matrix_value) <- Map.get(record, :chord_matrix),
          {:ok, chord_matrix} <- normalize_chord_matrix(chord_matrix_value) do

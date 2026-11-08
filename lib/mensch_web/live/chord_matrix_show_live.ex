@@ -64,8 +64,8 @@ defmodule MenschWeb.ChordMatrixShowLive do
       socket =
         socket
         |> assign(:selected_pad, {normalized_row, normalized_column})
-        |> assign(:selected_row, normalized_row)
-        |> assign(:selected_column, normalized_column)
+        |> assign(:selected_row, nil)
+        |> assign(:selected_column, nil)
         |> assign_keyboard_from_selected_pad()
 
       if socket.assigns.chord_matrix_play_mode do
@@ -93,7 +93,12 @@ defmodule MenschWeb.ChordMatrixShowLive do
   def handle_event("select_row", %{"row" => row}, socket) do
     with {:ok, normalized_row} <- parse_non_negative_integer(row),
          :ok <- ensure_row_in_bounds(socket.assigns.record, normalized_row) do
-      {:noreply, assign(socket, :selected_row, normalized_row)}
+      {:noreply,
+       socket
+       |> assign(:selected_row, normalized_row)
+       |> assign(:selected_column, nil)
+       |> assign(:selected_pad, nil)
+       |> assign_keyboard_from_selected_pad()}
     else
       _ -> {:noreply, put_flash(socket, :error, "Invalid row selection")}
     end
@@ -103,7 +108,12 @@ defmodule MenschWeb.ChordMatrixShowLive do
   def handle_event("select_column", %{"column" => column}, socket) do
     with {:ok, normalized_column} <- parse_non_negative_integer(column),
          :ok <- ensure_column_in_bounds(socket.assigns.record, normalized_column) do
-      {:noreply, assign(socket, :selected_column, normalized_column)}
+      {:noreply,
+       socket
+       |> assign(:selected_column, normalized_column)
+       |> assign(:selected_row, nil)
+       |> assign(:selected_pad, nil)
+       |> assign_keyboard_from_selected_pad()}
     else
       _ -> {:noreply, put_flash(socket, :error, "Invalid column selection")}
     end
@@ -144,6 +154,42 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Insert failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("move_selected_row_up", _params, socket) do
+    with row when is_integer(row) <- socket.assigns.selected_row,
+         true <- row > 0,
+         {:ok, record} <- ChordMatrices.move_row_up(socket.assigns.record.id, row) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:selected_row, row - 1)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Moved selected row up")}
+    else
+      nil -> {:noreply, put_flash(socket, :error, "Select a row first")}
+      false -> {:noreply, put_flash(socket, :error, "Selected row is already at the top")}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, "Move failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("move_selected_row_down", _params, socket) do
+    with row when is_integer(row) <- socket.assigns.selected_row,
+         true <- row < socket.assigns.record.chord_matrix.number_rows - 1,
+         {:ok, record} <- ChordMatrices.move_row_down(socket.assigns.record.id, row) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:selected_row, row + 1)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Moved selected row down")}
+    else
+      nil -> {:noreply, put_flash(socket, :error, "Select a row first")}
+      false -> {:noreply, put_flash(socket, :error, "Selected row is already at the bottom")}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, "Move failed: #{inspect(reason)}")}
     end
   end
 
@@ -211,6 +257,52 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Insert failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("move_selected_column_left", _params, socket) do
+    with column when is_integer(column) <- socket.assigns.selected_column,
+         true <- column > 0,
+         {:ok, record} <- ChordMatrices.move_column_left(socket.assigns.record.id, column) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:selected_column, column - 1)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Moved selected column left")}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a column first")}
+
+      false ->
+        {:noreply, put_flash(socket, :error, "Selected column is already at the left edge")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Move failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("move_selected_column_right", _params, socket) do
+    with column when is_integer(column) <- socket.assigns.selected_column,
+         true <- column < socket.assigns.record.chord_matrix.number_columns - 1,
+         {:ok, record} <- ChordMatrices.move_column_right(socket.assigns.record.id, column) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:selected_column, column + 1)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Moved selected column right")}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a column first")}
+
+      false ->
+        {:noreply, put_flash(socket, :error, "Selected column is already at the right edge")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Move failed: #{inspect(reason)}")}
     end
   end
 
@@ -409,6 +501,28 @@ defmodule MenschWeb.ChordMatrixShowLive do
                       </span>
                     </button>
                     <button
+                      id="row-move-up"
+                      type="button"
+                      phx-click="move_selected_row_up"
+                      disabled={is_nil(@selected_row) or @selected_row == 0}
+                      title="Move selected row up"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <.icon name="hero-chevron-double-up" class="size-4" />
+                    </button>
+                    <button
+                      id="row-move-down"
+                      type="button"
+                      phx-click="move_selected_row_down"
+                      disabled={
+                        is_nil(@selected_row) or @selected_row >= @record.chord_matrix.number_rows - 1
+                      }
+                      title="Move selected row down"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <.icon name="hero-chevron-double-down" class="size-4" />
+                    </button>
+                    <button
                       id="row-remove"
                       type="button"
                       phx-click="remove_selected_row"
@@ -449,6 +563,29 @@ defmodule MenschWeb.ChordMatrixShowLive do
                       </span>
                     </button>
                     <button
+                      id="column-move-left"
+                      type="button"
+                      phx-click="move_selected_column_left"
+                      disabled={is_nil(@selected_column) or @selected_column == 0}
+                      title="Move selected column left"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <.icon name="hero-chevron-double-left" class="size-4" />
+                    </button>
+                    <button
+                      id="column-move-right"
+                      type="button"
+                      phx-click="move_selected_column_right"
+                      disabled={
+                        is_nil(@selected_column) or
+                          @selected_column >= @record.chord_matrix.number_columns - 1
+                      }
+                      title="Move selected column right"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <.icon name="hero-chevron-double-right" class="size-4" />
+                    </button>
+                    <button
                       id="column-remove"
                       type="button"
                       phx-click="remove_selected_column"
@@ -461,10 +598,6 @@ defmodule MenschWeb.ChordMatrixShowLive do
                   </div>
 
                   <div class="flex items-center gap-2">
-                    <p class="font-mono text-[11px] text-zinc-400">
-                      Click a pad, then assign a chord from the side panel.
-                    </p>
-
                     <button
                       id="toggle-matrix-play-mode"
                       type="button"
