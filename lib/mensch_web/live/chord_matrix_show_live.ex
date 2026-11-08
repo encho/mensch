@@ -23,6 +23,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:progressions, ChordProgressions.list_progressions())
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
+     |> assign(:bulk_assign_confirm, nil)
      |> assign(:preview_note_channels, [])
      |> assign(:preview_stop_ref, nil)}
   end
@@ -407,6 +408,31 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
       _ ->
         {:noreply, put_flash(socket, :error, "Invalid chord assignment")}
+    end
+  end
+
+  @impl true
+  def handle_event(
+        "assign_progression_to_selection",
+        %{"progression_id" => progression_id},
+        socket
+      ) do
+    assign_progression_to_selection(socket, progression_id, false)
+  end
+
+  @impl true
+  def handle_event("cancel_bulk_assign_truncate", _params, socket) do
+    {:noreply, assign(socket, :bulk_assign_confirm, nil)}
+  end
+
+  @impl true
+  def handle_event("confirm_bulk_assign_truncate", _params, socket) do
+    case socket.assigns.bulk_assign_confirm do
+      %{progression_id: progression_id} ->
+        assign_progression_to_selection(socket, progression_id, true)
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Nothing to confirm")}
     end
   end
 
@@ -803,6 +829,17 @@ defmodule MenschWeb.ChordMatrixShowLive do
                         <p class="font-mono text-xs text-zinc-400">Unable to load progression.</p>
                       <% progression_record -> %>
                         <div class="space-y-1.5">
+                          <button
+                            id={"assign-sequence-#{item.id}"}
+                            type="button"
+                            phx-click="assign_progression_to_selection"
+                            phx-value-progression_id={item.id}
+                            disabled={is_nil(axis_selection(@selected_row, @selected_column))}
+                            class="w-full rounded-sm border border-amber-500/80 bg-amber-900/20 px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wide text-amber-100 transition-colors duration-150 enabled:hover:border-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {assign_selection_button_label(@selected_row, @selected_column)}
+                          </button>
+
                           <div
                             :for={
                               {chord_spec, chord_index} <-
@@ -844,10 +881,173 @@ defmodule MenschWeb.ChordMatrixShowLive do
             </div>
           </aside>
         </div>
+
+        <%= if @bulk_assign_confirm do %>
+          <div
+            id="bulk-assign-modal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 px-4"
+          >
+            <div class="w-full max-w-md rounded-sm border border-zinc-600 bg-zinc-900 p-4 shadow-2xl">
+              <h4 class="font-mono text-sm text-zinc-100">Confirm Truncated Assignment</h4>
+              <p class="mt-2 font-mono text-xs text-zinc-300">
+                {truncate_confirmation_message(@bulk_assign_confirm)}
+              </p>
+
+              <div class="mt-3 flex items-center justify-end gap-2">
+                <button
+                  id="bulk-assign-cancel"
+                  type="button"
+                  phx-click="cancel_bulk_assign_truncate"
+                  class="rounded-sm border border-zinc-600 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 transition-colors duration-150 hover:border-zinc-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  id="bulk-assign-confirm"
+                  type="button"
+                  phx-click="confirm_bulk_assign_truncate"
+                  class="rounded-sm border border-amber-500/90 bg-amber-900/30 px-2.5 py-1.5 font-mono text-[11px] text-amber-100 transition-colors duration-150 hover:border-amber-300"
+                >
+                  Assign Available Pads
+                </button>
+              </div>
+            </div>
+          </div>
+        <% end %>
       </section>
     </Layouts.app>
     """
   end
+
+  defp axis_selection(selected_row, selected_column) do
+    cond do
+      is_integer(selected_row) -> {:row, selected_row}
+      is_integer(selected_column) -> {:column, selected_column}
+      true -> nil
+    end
+  end
+
+  defp assign_selection_button_label(selected_row, selected_column) do
+    case axis_selection(selected_row, selected_column) do
+      {:row, row} -> "Assign Full Progression To Row #{row + 1}"
+      {:column, column} -> "Assign Full Progression To Column #{column + 1}"
+      nil -> "Select a row or column first"
+    end
+  end
+
+  defp truncate_confirmation_message(%{
+         progression_name: progression_name,
+         target_label: target_label,
+         total_chords: total_chords,
+         capacity: capacity
+       }) do
+    overflow_count = max(total_chords - capacity, 0)
+
+    "#{progression_name} has #{total_chords} chords but #{target_label} only has #{capacity} pads. " <>
+      "Proceed and assign the first #{capacity} chords only? The last #{overflow_count} chords will be skipped."
+  end
+
+  defp assign_progression_to_selection(socket, progression_id, force_truncate?) do
+    case axis_selection(socket.assigns.selected_row, socket.assigns.selected_column) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a row or column first")}
+
+      {axis, axis_index} ->
+        with {:ok, progression} <- fetch_progression_for_assignment(socket, progression_id) do
+          capacity = axis_capacity(socket.assigns.record, axis)
+          total_chords = length(progression.chords)
+
+          cond do
+            total_chords > capacity and not force_truncate? ->
+              target_label = axis_target_label(axis, axis_index)
+
+              {:noreply,
+               assign(socket, :bulk_assign_confirm, %{
+                 progression_id: progression_id,
+                 progression_name: progression.name,
+                 target_label: target_label,
+                 total_chords: total_chords,
+                 capacity: capacity
+               })}
+
+            true ->
+              persist_progression_assignment(
+                socket,
+                progression_id,
+                progression,
+                axis,
+                axis_index,
+                total_chords,
+                capacity
+              )
+          end
+        else
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Assignment failed: #{inspect(reason)}")}
+        end
+    end
+  end
+
+  defp persist_progression_assignment(
+         socket,
+         progression_id,
+         progression,
+         axis,
+         axis_index,
+         total_chords,
+         capacity
+       ) do
+    result =
+      case axis do
+        :row ->
+          ChordMatrices.assign_progression_to_row(
+            socket.assigns.record.id,
+            axis_index,
+            progression_id,
+            progression.name,
+            progression.chords
+          )
+
+        :column ->
+          ChordMatrices.assign_progression_to_column(
+            socket.assigns.record.id,
+            axis_index,
+            progression_id,
+            progression.name,
+            progression.chords
+          )
+      end
+
+    case result do
+      {:ok, record} ->
+        assigned_count = min(total_chords, capacity)
+        skipped_count = max(total_chords - capacity, 0)
+        target_label = axis_target_label(axis, axis_index)
+
+        message =
+          if skipped_count > 0 do
+            "Assigned #{assigned_count} chord(s) to #{target_label}. Skipped #{skipped_count} trailing chord(s)."
+          else
+            "Assigned #{assigned_count} chord(s) to #{target_label}."
+          end
+
+        {:noreply,
+         socket
+         |> assign(:record, record)
+         |> assign(:bulk_assign_confirm, nil)
+         |> assign_keyboard_from_selected_pad()
+         |> put_flash(:info, message)}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Assignment failed: #{inspect(reason)}")}
+    end
+  end
+
+  defp axis_capacity(record, :row), do: record.chord_matrix.number_columns
+  defp axis_capacity(record, :column), do: record.chord_matrix.number_rows
+
+  defp axis_target_label(:row, axis_index), do: "selected row #{axis_index + 1}"
+  defp axis_target_label(:column, axis_index), do: "selected column #{axis_index + 1}"
 
   defp parse_non_negative_integer(value) when is_integer(value) and value >= 0, do: {:ok, value}
 

@@ -183,6 +183,118 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert render(view) =~ "Moved selected column right"
   end
 
+  test "assigns full progression across selected row and clears remaining pads", %{conn: conn} do
+    assert {:ok, progression_record} =
+             ChordProgressions.create_progression(
+               "Row Fill",
+               "",
+               [chord(:c, :maj7), chord(:g, :min7)]
+             )
+
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 4)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> element("#row-header-0")
+    |> render_click()
+
+    view
+    |> element("#toggle-progression-#{progression_record.id}")
+    |> render_click()
+
+    view
+    |> element("#assign-sequence-#{progression_record.id}")
+    |> render_click()
+
+    assert render(view) =~ "Assigned 2 chord(s) to selected row 1."
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+
+    row_assignments = persisted.chord_matrix.assignments
+
+    assert ChordSpec.root(row_assignments[{0, 0}].chord_spec) == :c
+    assert ChordSpec.root(row_assignments[{0, 1}].chord_spec) == :g
+    assert Map.get(row_assignments, {0, 2}) == nil
+    assert Map.get(row_assignments, {0, 3}) == nil
+  end
+
+  test "assigns full progression across selected column from top to bottom", %{conn: conn} do
+    assert {:ok, progression_record} =
+             ChordProgressions.create_progression(
+               "Column Fill",
+               "",
+               [chord(:d, :min7), chord(:f, :maj7)]
+             )
+
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(4, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> element("#column-header-1")
+    |> render_click()
+
+    view
+    |> element("#toggle-progression-#{progression_record.id}")
+    |> render_click()
+
+    view
+    |> element("#assign-sequence-#{progression_record.id}")
+    |> render_click()
+
+    assert render(view) =~ "Assigned 2 chord(s) to selected column 2."
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+
+    column_assignments = persisted.chord_matrix.assignments
+
+    assert ChordSpec.root(column_assignments[{0, 1}].chord_spec) == :d
+    assert ChordSpec.root(column_assignments[{1, 1}].chord_spec) == :f
+    assert Map.get(column_assignments, {2, 1}) == nil
+    assert Map.get(column_assignments, {3, 1}) == nil
+  end
+
+  test "shows truncation modal and assigns only available pads after confirmation", %{conn: conn} do
+    assert {:ok, progression_record} =
+             ChordProgressions.create_progression(
+               "Too Long",
+               "",
+               [chord(:c, :maj7), chord(:d, :min7), chord(:e, :min7)]
+             )
+
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(1, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> element("#row-header-0")
+    |> render_click()
+
+    view
+    |> element("#toggle-progression-#{progression_record.id}")
+    |> render_click()
+
+    view
+    |> element("#assign-sequence-#{progression_record.id}")
+    |> render_click()
+
+    assert has_element?(view, "#bulk-assign-modal")
+
+    assert {:ok, before_confirm} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert before_confirm.chord_matrix.assignments == %{}
+
+    view
+    |> element("#bulk-assign-confirm")
+    |> render_click()
+
+    assert render(view) =~ "Assigned 2 chord(s) to selected row 1. Skipped 1 trailing chord(s)."
+
+    assert {:ok, after_confirm} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert ChordSpec.root(after_confirm.chord_matrix.assignments[{0, 0}].chord_spec) == :c
+    assert ChordSpec.root(after_confirm.chord_matrix.assignments[{0, 1}].chord_spec) == :d
+  end
+
   defp chord(root, quality) do
     ChordSpec.new!(%{
       harmonic_identity: %ChordSpec.HarmonicIdentity{root: root, quality: quality},

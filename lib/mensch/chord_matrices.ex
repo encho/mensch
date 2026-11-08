@@ -219,6 +219,54 @@ defmodule Mensch.ChordMatrices do
 
   def move_column_right(_id, _column_index), do: {:error, :invalid_params}
 
+  @spec assign_progression_to_row(String.t(), integer(), String.t(), String.t(), [ChordSpec.t()]) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def assign_progression_to_row(id, row_index, progression_id, progression_name, chords)
+      when is_binary(id) and is_integer(row_index) and is_binary(progression_id) and
+             is_binary(progression_name) and is_list(chords) do
+    update_chord_matrix(id, fn chord_matrix ->
+      assign_progression_to_axis(
+        chord_matrix,
+        :row,
+        row_index,
+        progression_id,
+        progression_name,
+        chords
+      )
+    end)
+  end
+
+  def assign_progression_to_row(_id, _row_index, _progression_id, _progression_name, _chords),
+    do: {:error, :invalid_params}
+
+  @spec assign_progression_to_column(String.t(), integer(), String.t(), String.t(), [
+          ChordSpec.t()
+        ]) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def assign_progression_to_column(id, column_index, progression_id, progression_name, chords)
+      when is_binary(id) and is_integer(column_index) and is_binary(progression_id) and
+             is_binary(progression_name) and is_list(chords) do
+    update_chord_matrix(id, fn chord_matrix ->
+      assign_progression_to_axis(
+        chord_matrix,
+        :column,
+        column_index,
+        progression_id,
+        progression_name,
+        chords
+      )
+    end)
+  end
+
+  def assign_progression_to_column(
+        _id,
+        _column_index,
+        _progression_id,
+        _progression_name,
+        _chords
+      ),
+      do: {:error, :invalid_params}
+
   defp normalize_loaded_record(id, %{} = record) do
     with chord_matrix_value when not is_nil(chord_matrix_value) <- Map.get(record, :chord_matrix),
          {:ok, chord_matrix} <- normalize_chord_matrix(chord_matrix_value) do
@@ -254,6 +302,67 @@ defmodule Mensch.ChordMatrices do
         {:ok, updated_record}
       end
     end
+  end
+
+  defp assign_progression_to_axis(
+         %ChordMatrix{} = chord_matrix,
+         axis,
+         axis_index,
+         progression_id,
+         progression_name,
+         chords
+       )
+       when axis in [:row, :column] do
+    with true <- Enum.all?(chords, &match?(%ChordSpec{}, &1)),
+         :ok <- ensure_axis_index_in_bounds(chord_matrix, axis, axis_index) do
+      capacity = axis_capacity(chord_matrix, axis)
+      chords_for_slots = Enum.take(chords, capacity)
+      chord_count = length(chords_for_slots)
+
+      0..(capacity - 1)
+      |> Enum.reduce_while({:ok, chord_matrix}, fn offset, {:ok, acc} ->
+        {row, column} = axis_coordinate(axis, axis_index, offset)
+
+        if offset < chord_count do
+          chord_spec = Enum.at(chords_for_slots, offset)
+
+          case ChordMatrix.assign_chord_to_pad(acc, row, column, chord_spec, %{
+                 source_progression_id: progression_id,
+                 source_progression_name: progression_name,
+                 source_chord_index: offset
+               }) do
+            {:ok, next} -> {:cont, {:ok, next}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+        else
+          case ChordMatrix.clear_pad_assignment(acc, row, column) do
+            {:ok, next} -> {:cont, {:ok, next}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+        end
+      end)
+    else
+      false -> {:error, :invalid_params}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp axis_capacity(%ChordMatrix{} = chord_matrix, :row), do: chord_matrix.number_columns
+  defp axis_capacity(%ChordMatrix{} = chord_matrix, :column), do: chord_matrix.number_rows
+
+  defp axis_coordinate(:row, row_index, offset), do: {row_index, offset}
+  defp axis_coordinate(:column, column_index, offset), do: {offset, column_index}
+
+  defp ensure_axis_index_in_bounds(%ChordMatrix{} = chord_matrix, :row, axis_index) do
+    if axis_index >= 0 and axis_index < chord_matrix.number_rows,
+      do: :ok,
+      else: {:error, :out_of_bounds}
+  end
+
+  defp ensure_axis_index_in_bounds(%ChordMatrix{} = chord_matrix, :column, axis_index) do
+    if axis_index >= 0 and axis_index < chord_matrix.number_columns,
+      do: :ok,
+      else: {:error, :out_of_bounds}
   end
 
   defp unique_id do
