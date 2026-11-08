@@ -146,6 +146,39 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert persisted.chord_matrix.duration_mbeats == 6000
   end
 
+  test "shows default frame mbeats and allows updating it", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    assert render(view) =~ "Frame 50 mbeats"
+
+    view
+    |> form("#matrix-frame-mbeats-form", %{"chord_matrix" => %{"frame_mbeats" => "25"}})
+    |> render_submit()
+
+    assert render(view) =~ "Frame mbeats updated"
+    assert render(view) =~ "Frame 25 mbeats"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.frame_mbeats == 25
+  end
+
+  test "rejects invalid frame mbeats updates", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> form("#matrix-frame-mbeats-form", %{"chord_matrix" => %{"frame_mbeats" => "30"}})
+    |> render_submit()
+
+    assert render(view) =~ "Frame mbeats must be a positive divisor of 1000"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.frame_mbeats == 50
+  end
+
   test "rejects invalid duration updates", %{conn: conn} do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
 

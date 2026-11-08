@@ -1,10 +1,11 @@
 %{
   id: "chord_matrix_2026_11_07_17_06_57_26",
-  version: 6,
+  version: 7,
   chord_matrix: %Mensch.Harmony.ChordMatrix{
     number_rows: 3,
     number_columns: 8,
     bpm: 120,
+    frame_mbeats: 50,
     duration_mbeats: 4000,
     time_signature: {4, 4},
     machine: %{
@@ -459,5 +460,5 @@
     }
   },
   inserted_at: "2026-11-07T17:06:57Z",
-  updated_at: "2026-11-08T15:38:42Z"
+  updated_at: "2026-11-08T15:52:18Z"
 }

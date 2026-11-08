@@ -20,6 +20,7 @@ defmodule Mensch.Harmony.ChordMatrix do
     :number_rows,
     :number_columns,
     bpm: 120,
+    frame_mbeats: 50,
     duration_mbeats: 4000,
     time_signature: @default_time_signature,
     machine: @default_machine,
@@ -34,6 +35,7 @@ defmodule Mensch.Harmony.ChordMatrix do
           number_rows: pos_integer(),
           number_columns: pos_integer(),
           bpm: pos_integer(),
+          frame_mbeats: pos_integer(),
           duration_mbeats: pos_integer(),
           time_signature: {pos_integer(), pos_integer()},
           machine: %{blueprint_id: String.t(), additional_params: map()},
@@ -51,6 +53,7 @@ defmodule Mensch.Harmony.ChordMatrix do
     with {:ok, number_rows} <- parse_positive_integer(Map.get(attrs_map, :number_rows)),
          {:ok, number_columns} <- parse_positive_integer(Map.get(attrs_map, :number_columns)),
          {:ok, bpm} <- parse_positive_integer(Map.get(attrs_map, :bpm, 120)),
+         {:ok, frame_mbeats} <- parse_frame_mbeats(Map.get(attrs_map, :frame_mbeats, 50)),
          {:ok, duration_mbeats} <-
            parse_positive_integer(Map.get(attrs_map, :duration_mbeats, 4000)),
          {:ok, time_signature} <-
@@ -67,6 +70,7 @@ defmodule Mensch.Harmony.ChordMatrix do
          number_rows: number_rows,
          number_columns: number_columns,
          bpm: bpm,
+         frame_mbeats: frame_mbeats,
          duration_mbeats: duration_mbeats,
          time_signature: time_signature,
          machine: machine,
@@ -139,6 +143,17 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   def set_bpm(_chord_matrix, _bpm), do: {:error, :invalid_bpm}
+
+  @spec set_frame_mbeats(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def set_frame_mbeats(%__MODULE__{} = chord_matrix, frame_mbeats) do
+    with {:ok, normalized_frame_mbeats} <- parse_frame_mbeats(frame_mbeats) do
+      {:ok, %__MODULE__{chord_matrix | frame_mbeats: normalized_frame_mbeats}}
+    else
+      {:error, :invalid_frame_mbeats} -> {:error, :invalid_frame_mbeats}
+    end
+  end
+
+  def set_frame_mbeats(_chord_matrix, _frame_mbeats), do: {:error, :invalid_frame_mbeats}
 
   @spec set_duration_mbeats(t(), integer()) :: {:ok, t()} | {:error, term()}
   def set_duration_mbeats(%__MODULE__{} = chord_matrix, duration_mbeats) do
@@ -339,6 +354,16 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   defp parse_time_signature(_value), do: {:error, :invalid_time_signature}
+
+  defp parse_frame_mbeats(value) do
+    with {:ok, parsed_value} <- parse_positive_integer(value),
+         true <- rem(1000, parsed_value) == 0 do
+      {:ok, parsed_value}
+    else
+      false -> {:error, :invalid_frame_mbeats}
+      {:error, :invalid_dimension} -> {:error, :invalid_frame_mbeats}
+    end
+  end
 
   defp parse_machine_config(%{} = machine_config) do
     blueprint_id =

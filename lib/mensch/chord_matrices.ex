@@ -18,7 +18,7 @@ defmodule Mensch.ChordMatrices do
           chord_matrix: ChordMatrix.t()
         }
 
-  @current_version 6
+  @current_version 7
 
   @spec list_chord_matrices() :: [map()]
   def list_chord_matrices do
@@ -232,6 +232,17 @@ defmodule Mensch.ChordMatrices do
   end
 
   def update_bpm(_id, _bpm), do: {:error, :invalid_params}
+
+  @spec update_frame_mbeats(String.t(), integer()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def update_frame_mbeats(id, frame_mbeats)
+      when is_binary(id) and is_integer(frame_mbeats) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.set_frame_mbeats(chord_matrix, frame_mbeats)
+    end)
+  end
+
+  def update_frame_mbeats(_id, _frame_mbeats), do: {:error, :invalid_params}
 
   @spec update_duration_mbeats(String.t(), integer()) ::
           {:ok, chord_matrix_record()} | {:error, term()}

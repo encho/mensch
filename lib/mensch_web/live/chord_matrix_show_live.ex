@@ -2,6 +2,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
   use MenschWeb, :live_view
 
   alias Mensch.ChordMatrices
+  alias Mensch.ChordMatrixPadPlayer
   alias Mensch.ChordProgressions
   alias Mensch.Harmony.ChordMatrix
   alias Mensch.Harmony.ChordSpec
@@ -27,6 +28,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
      |> assign(:bpm_form, to_form(%{"bpm" => "120"}, as: :chord_matrix))
+     |> assign(:frame_mbeats_form, frame_mbeats_form(50))
      |> assign(:duration_form, duration_form(4000))
      |> assign(:time_signature_form, time_signature_form({4, 4}))
      |> assign(:machine_settings, machine_settings)
@@ -44,6 +46,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
          socket
          |> assign(:record, record)
          |> assign(:bpm_form, bpm_form(record.chord_matrix.bpm))
+         |> assign(:frame_mbeats_form, frame_mbeats_form(record.chord_matrix.frame_mbeats))
          |> assign(:duration_form, duration_form(record.chord_matrix.duration_mbeats))
          |> assign(:time_signature_form, time_signature_form(record.chord_matrix.time_signature))
          |> assign_machine_settings(record.chord_matrix.machine)
@@ -82,12 +85,24 @@ defmodule MenschWeb.ChordMatrixShowLive do
         |> assign_keyboard_from_selected_pad()
 
       if socket.assigns.chord_matrix_play_mode do
-        case pad_assignment(socket.assigns.record, normalized_row, normalized_column) do
-          %{chord_spec: %ChordSpec{} = chord_spec} ->
-            play_notes_for_3s(socket, Resolver.resolve(chord_spec))
+        socket = stop_preview(socket)
 
-          _ ->
+        case ChordMatrixPadPlayer.play_pad(
+               socket.assigns.record,
+               normalized_row,
+               normalized_column
+             ) do
+          :ok ->
             {:noreply, socket}
+
+          {:error, :pad_unassigned} ->
+            {:noreply, socket}
+
+          {:error, :disconnected} ->
+            {:noreply, put_flash(socket, :error, "MIDI is disconnected")}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Pad playback failed: #{inspect(reason)}")}
         end
       else
         {:noreply, socket}
@@ -126,6 +141,34 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to update BPM: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("update_frame_mbeats", %{"chord_matrix" => %{"frame_mbeats" => value}}, socket) do
+    with {:ok, parsed_frame_mbeats} <- parse_positive_integer(value),
+         {:ok, record} <-
+           ChordMatrices.update_frame_mbeats(socket.assigns.record.id, parsed_frame_mbeats) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:frame_mbeats_form, frame_mbeats_form(record.chord_matrix.frame_mbeats))
+       |> put_flash(:info, "Frame mbeats updated")}
+    else
+      {:error, :invalid_integer} ->
+        {:noreply,
+         socket
+         |> assign(:frame_mbeats_form, frame_mbeats_form(value))
+         |> put_flash(:error, "Frame mbeats must be a positive divisor of 1000")}
+
+      {:error, :invalid_frame_mbeats} ->
+        {:noreply,
+         socket
+         |> assign(:frame_mbeats_form, frame_mbeats_form(value))
+         |> put_flash(:error, "Frame mbeats must be a positive divisor of 1000")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to update frame mbeats: #{inspect(reason)}")}
     end
   end
 
@@ -656,6 +699,9 @@ defmodule MenschWeb.ChordMatrixShowLive do
                   {@record.chord_matrix.bpm} BPM
                 </span>
                 <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
+                  Frame {@record.chord_matrix.frame_mbeats} mbeats
+                </span>
+                <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
                   {@record.chord_matrix.duration_mbeats} mbeats
                 </span>
                 <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
@@ -687,6 +733,29 @@ defmodule MenschWeb.ChordMatrixShowLive do
                     class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
                   >
                     Save BPM
+                  </button>
+                </.form>
+
+                <.form
+                  for={@frame_mbeats_form}
+                  id="matrix-frame-mbeats-form"
+                  phx-submit="update_frame_mbeats"
+                  class="flex flex-wrap items-end gap-2"
+                >
+                  <.input
+                    field={@frame_mbeats_form[:frame_mbeats]}
+                    type="number"
+                    min="1"
+                    label="Frame (mbeats)"
+                    required
+                  />
+
+                  <button
+                    id="matrix-frame-mbeats-save"
+                    type="submit"
+                    class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                  >
+                    Save Frame
                   </button>
                 </.form>
 
@@ -1410,6 +1479,10 @@ defmodule MenschWeb.ChordMatrixShowLive do
     to_form(%{"duration_mbeats" => to_string(value)}, as: :chord_matrix)
   end
 
+  defp frame_mbeats_form(value) do
+    to_form(%{"frame_mbeats" => to_string(value)}, as: :chord_matrix)
+  end
+
   defp time_signature_form({num, den}) do
     to_form(
       %{
@@ -1764,7 +1837,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
     |> Enum.count(fn {_row, column} -> column == column_index end)
   end
 
-  defp play_notes_for_3s(socket, notes, source_label \\ "Previewing chord") do
+  defp play_notes_for_3s(socket, notes, source_label) do
     final_notes = Enum.filter(notes, &is_integer/1)
 
     cond do
