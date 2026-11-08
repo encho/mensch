@@ -271,13 +271,13 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
 
-    assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='false']")
+    assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='true']")
 
     view
     |> element("#toggle-matrix-play-mode")
     |> render_click()
 
-    assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='true']")
+    assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='false']")
   end
 
   test "inserts and removes selected row and column", %{conn: conn} do

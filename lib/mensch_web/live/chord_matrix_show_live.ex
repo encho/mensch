@@ -21,7 +21,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:selected_pad, nil)
      |> assign(:selected_row, nil)
      |> assign(:selected_column, nil)
-     |> assign(:chord_matrix_play_mode, false)
+     |> assign(:chord_matrix_play_mode, true)
      |> assign(:keyboard_active_notes, [])
      |> assign(:keyboard_source, "No chord selected")
      |> assign(:progressions, ChordProgressions.list_progressions())
