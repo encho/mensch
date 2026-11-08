@@ -821,6 +821,9 @@ defmodule MenschWeb.ChordMatrixShowLive do
                       <p class="mt-2 font-mono text-xs text-zinc-400">No chord assigned.</p>
                     <% assignment -> %>
                       <div class="mt-2 space-y-1 rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-2">
+                        <p class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                          Chord Spec
+                        </p>
                         <p class="font-mono text-xs text-zinc-200">
                           {ChordSpec.symbol_label(assignment.chord_spec)}
                         </p>
