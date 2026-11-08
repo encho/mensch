@@ -499,20 +499,20 @@ defmodule MenschWeb.ChordMatrixShowLive do
     [
       "aspect-square w-full rounded-sm border px-1.5 py-1 text-left outline-none",
       "transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out",
-      "focus-visible:ring-2 focus-visible:ring-sky-300/80 focus-visible:ring-offset-0",
+      "focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:[--tw-ring-color:var(--cm-pad-focus-ring)]",
       if(assigned?,
         do:
-          "border-emerald-500/70 bg-emerald-700/25 text-emerald-50 hover:border-emerald-300/80 hover:bg-emerald-600/30 shadow-[0_6px_16px_rgba(5,46,22,0.35)]",
+          "[border-color:var(--cm-pad-assigned-border)] [background-color:var(--cm-pad-assigned-bg)] [color:var(--cm-pad-assigned-text)] hover:[border-color:var(--cm-pad-assigned-border-hover)] hover:[background-color:var(--cm-pad-assigned-bg-hover)] [box-shadow:var(--cm-pad-assigned-shadow)]",
         else:
-          "border-zinc-700/70 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500/90 hover:bg-zinc-800/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),inset_0_0_0_1px_rgba(0,0,0,0.35)]"
+          "[border-color:var(--cm-pad-unassigned-border)] [background-color:var(--cm-pad-unassigned-bg)] [color:var(--cm-pad-unassigned-text)] hover:[border-color:var(--cm-pad-unassigned-border-hover)] hover:[background-color:var(--cm-pad-unassigned-bg-hover)] [box-shadow:var(--cm-pad-unassigned-shadow)]"
       ),
       if(selected?,
         do:
           if(assigned?,
             do:
-              "border-2 border-emerald-300/90 bg-emerald-600/35 text-emerald-50 shadow-[0_0_0_1px_rgba(110,231,183,0.45),0_8px_20px_rgba(6,78,59,0.35)]",
+              "border-2 [border-color:var(--cm-pad-assigned-active-border)] [background-color:var(--cm-pad-assigned-active-bg)] [color:var(--cm-pad-assigned-active-text)] [box-shadow:var(--cm-pad-assigned-active-shadow)]",
             else:
-              "border-2 border-zinc-500/90 bg-zinc-800/95 text-zinc-100 shadow-[0_0_0_1px_rgba(161,161,170,0.25),0_8px_20px_rgba(9,9,11,0.35)]"
+              "border-2 [border-color:var(--cm-pad-unassigned-active-border)] [background-color:var(--cm-pad-unassigned-active-bg)] [color:var(--cm-pad-unassigned-active-text)] [box-shadow:var(--cm-pad-unassigned-active-shadow)]"
           ),
         else: ""
       )

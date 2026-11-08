@@ -103,6 +103,33 @@
    --ui-chart-x-bar-gridline-color: var(--ui-grid-bar);
    --ui-chart-x-bar-gridline-opacity: 0.45;
    --ui-chart-x-bar-gridline-width: 1.4;
+
+   /* Chord matrix pad palette */
+   --cm-pad-focus-ring: rgba(125, 211, 252, 0.8);
+
+   --cm-pad-assigned-border: rgba(99, 102, 241, 0.7);
+   --cm-pad-assigned-bg: rgba(30, 27, 75, 0.45);
+   --cm-pad-assigned-text: rgba(224, 231, 255, 1);
+   --cm-pad-assigned-border-hover: rgba(129, 140, 248, 0.9);
+   --cm-pad-assigned-bg-hover: rgba(49, 46, 129, 0.55);
+   --cm-pad-assigned-shadow: 0 6px 16px rgba(30, 27, 75, 0.4);
+
+   --cm-pad-unassigned-border: rgba(82, 82, 91, 0.9);
+   --cm-pad-unassigned-bg: rgba(39, 39, 42, 0.95);
+   --cm-pad-unassigned-text: rgba(228, 228, 231, 1);
+   --cm-pad-unassigned-border-hover: rgba(113, 113, 122, 0.95);
+   --cm-pad-unassigned-bg-hover: rgba(63, 63, 70, 0.95);
+   --cm-pad-unassigned-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+
+   --cm-pad-assigned-active-border: rgba(224, 231, 255, 1);
+   --cm-pad-assigned-active-bg: rgba(165, 180, 252, 0.9);
+   --cm-pad-assigned-active-text: rgba(248, 250, 252, 1);
+   --cm-pad-assigned-active-shadow: 0 0 0 1px rgba(224, 231, 255, 0.7), 0 0 20px rgba(129, 140, 248, 0.4), 0 12px 28px rgba(30, 27, 75, 0.35);
+
+   --cm-pad-unassigned-active-border: rgba(244, 244, 245, 1);
+   --cm-pad-unassigned-active-bg: rgba(228, 228, 231, 0.95);
+   --cm-pad-unassigned-active-text: rgba(24, 24, 27, 1);
+   --cm-pad-unassigned-active-shadow: 0 0 0 1px rgba(244, 244, 245, 0.75), 0 0 18px rgba(161, 161, 170, 0.35), 0 12px 28px rgba(39, 39, 42, 0.35);
 }
 
 .ui-radius-btn {
