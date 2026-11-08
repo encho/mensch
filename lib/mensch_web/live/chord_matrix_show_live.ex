@@ -556,13 +556,28 @@ defmodule MenschWeb.ChordMatrixShowLive do
                         )
                       }
                     >
+                      <%= if @selected_pad != {row, col} do %>
+                        <span
+                          :if={@selected_row == row and @selected_column == col}
+                          class="pointer-events-none absolute inset-0 rounded-[inherit] bg-[var(--cm-pad-intersection-cue)] cm-pad-intersection-pulse"
+                        ></span>
+                        <span
+                          :if={@selected_row == row and @selected_column != col}
+                          class="pointer-events-none absolute inset-0 rounded-[inherit] bg-[var(--cm-pad-row-cue)]"
+                        ></span>
+                        <span
+                          :if={@selected_column == col and @selected_row != row}
+                          class="pointer-events-none absolute inset-0 rounded-[inherit] bg-[var(--cm-pad-column-cue)]"
+                        ></span>
+                      <% end %>
+
                       <%= case pad_assignment(@record, row, col) do %>
                         <% nil -> %>
-                          <span class="flex h-full w-full items-center justify-center font-mono text-[10px] text-zinc-500">
+                          <span class="relative z-10 flex h-full w-full items-center justify-center font-mono text-[10px] text-zinc-500">
                             {row},{col}
                           </span>
                         <% assignment -> %>
-                          <span class="flex h-full w-full items-center justify-center">
+                          <span class="relative z-10 flex h-full w-full items-center justify-center">
                             <span class="w-full truncate text-center font-mono text-base font-semibold leading-none tracking-tight text-inherit">
                               {ChordSpec.symbol_label(assignment.chord_spec)}
                             </span>
@@ -774,7 +789,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
   defp pad_cell_classes(selected?, assigned?) do
     [
-      "aspect-square w-full rounded-sm border px-1.5 py-1 text-left outline-none",
+      "relative aspect-square w-full overflow-hidden rounded-sm border px-1.5 py-1 text-left outline-none",
       "transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out",
       "focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:[--tw-ring-color:var(--cm-pad-focus-ring)]",
       if(assigned?,
