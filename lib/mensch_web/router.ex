@@ -28,6 +28,7 @@ defmodule MenschWeb.Router do
     live "/chord-matrix/:id", ChordMatrixShowLive
     live "/scale-lab", ScaleLabLive
     live "/scale-chord-lab", ScaleChordLabLive
+    post "/panic-stop", SafetyController, :panic_stop
     get "/exports/sample/:index/bitwig-mpe.mid", ExportController, :bitwig_mpe_midi
     get "/exports/sample/:index/mpe-events.txt", ExportController, :mpe_report
   end

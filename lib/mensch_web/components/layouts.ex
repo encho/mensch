@@ -79,6 +79,19 @@ defmodule MenschWeb.Layouts do
             />
           </form>
           <div class="ui-gap-control flex items-center">
+            <form method="post" action={~p"/panic-stop"}>
+              <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+              <button
+                type="submit"
+                id="global-panic-stop"
+                title="Emergency stop all notes"
+                aria-label="Emergency stop all notes"
+                class="ui-radius-btn relative flex size-9 items-center justify-center border border-rose-500/70 bg-rose-900/30 text-rose-100 transition-colors duration-150 hover:border-rose-300 hover:bg-rose-700/40"
+              >
+                <.icon name="hero-stop" class="size-4" />
+              </button>
+            </form>
+
             <.link
               navigate={~p"/samples"}
               title="Sample library"

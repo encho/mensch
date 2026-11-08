@@ -4,7 +4,7 @@
   chord_matrix: %Mensch.Harmony.ChordMatrix{
     number_rows: 2,
     number_columns: 8,
-    bpm: 100,
+    bpm: 60,
     frame_mbeats: 50,
     duration_mbeats: 4000,
     time_signature: {4, 4},
@@ -173,6 +173,6 @@
       }
     }
   },
-  updated_at: "2026-11-08T15:57:36Z",
+  updated_at: "2026-11-08T16:09:21Z",
   inserted_at: "2026-11-08T11:03:43Z"
 }

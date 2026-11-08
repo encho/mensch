@@ -280,6 +280,47 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='false']")
   end
 
+  test "shows detail mpe charts only when enabled and a pad is pressed", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(1, 1)
+
+    assert {:ok, _updated_record} =
+             ChordMatrices.assign_chord_to_pad(
+               matrix_record.id,
+               0,
+               0,
+               chord(:c, :maj7),
+               %{
+                 source_progression_id: "test",
+                 source_progression_name: "Test",
+                 source_chord_index: 0
+               }
+             )
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    assert has_element?(view, "#pad-mpe-detail-panel")
+    assert render(view) =~ "MPE charts are hidden"
+
+    view
+    |> element("#toggle-display-detail-mpe-data")
+    |> render_click()
+
+    assert has_element?(view, "#pad-mpe-detail-panel")
+    assert render(view) =~ "Detail MPE Data"
+
+    view
+    |> element("#pad-0-0")
+    |> render_click()
+
+    assert render(view) =~ "Note matrix"
+    assert render(view) =~ "Pressure"
+    assert render(view) =~ "Slide (Aftertouch)"
+    assert render(view) =~ "Bend (Vibrato)"
+
+    rendered = render(view)
+    assert rendered =~ ~r/Note matrix.*Pressure/s
+  end
+
   test "inserts and removes selected row and column", %{conn: conn} do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
 

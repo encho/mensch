@@ -7,8 +7,13 @@ defmodule MenschWeb.ChordMatrixShowLive do
   alias Mensch.Harmony.ChordMatrix
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Resolver
+  alias Mensch.SampleContext
   alias Mensch.SampleBlueprint
+  alias Mensch.PerformanceAssembler
   alias MenschWeb.FullPianoKeyboard
+
+  @mpe_chart_colors ["#FF7A1A", "#2FD5C8", "#75B8FF", "#B188FF", "#9BF25A", "#FF5D8F"]
+  @mpe_chart_height 84
 
   @impl true
   def mount(_params, _session, socket) do
@@ -22,8 +27,19 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:selected_row, nil)
      |> assign(:selected_column, nil)
      |> assign(:chord_matrix_play_mode, true)
+     |> assign(:show_detail_mpe_data, false)
      |> assign(:keyboard_active_notes, [])
      |> assign(:keyboard_source, "No chord selected")
+     |> assign(:latest_pad_performance, nil)
+     |> assign(:note_matrix, [])
+     |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
+     |> assign(:pressure_chart, [])
+     |> assign(:slide_chart, [])
+     |> assign(:bend_chart, [])
+     |> assign(:pressure_axis, pressure_slide_axis())
+     |> assign(:slide_axis, pressure_slide_axis())
+     |> assign(:bend_axis, bend_axis({-1.0, 1.0}))
+     |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
      |> assign(:progressions, ChordProgressions.list_progressions())
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
@@ -87,19 +103,27 @@ defmodule MenschWeb.ChordMatrixShowLive do
       if socket.assigns.chord_matrix_play_mode do
         socket = stop_preview(socket)
 
-        case ChordMatrixPadPlayer.play_pad(
+        case ChordMatrixPadPlayer.performance_for_pad(
                socket.assigns.record,
                normalized_row,
                normalized_column
              ) do
-          :ok ->
-            {:noreply, socket}
+          {:ok, performance} ->
+            socket = maybe_assign_detail_mpe_data(socket, performance)
+
+            case ChordMatrixPadPlayer.play_performance(performance) do
+              :ok ->
+                {:noreply, socket}
+
+              {:error, :disconnected} ->
+                {:noreply, put_flash(socket, :error, "MIDI is disconnected")}
+
+              {:error, reason} ->
+                {:noreply, put_flash(socket, :error, "Pad playback failed: #{inspect(reason)}")}
+            end
 
           {:error, :pad_unassigned} ->
-            {:noreply, socket}
-
-          {:error, :disconnected} ->
-            {:noreply, put_flash(socket, :error, "MIDI is disconnected")}
+            {:noreply, clear_detail_mpe_data(socket)}
 
           {:error, reason} ->
             {:noreply, put_flash(socket, :error, "Pad playback failed: #{inspect(reason)}")}
@@ -115,6 +139,18 @@ defmodule MenschWeb.ChordMatrixShowLive do
   @impl true
   def handle_event("toggle_matrix_play_mode", _params, socket) do
     {:noreply, assign(socket, :chord_matrix_play_mode, !socket.assigns.chord_matrix_play_mode)}
+  end
+
+  @impl true
+  def handle_event("toggle_display_detail_mpe_data", _params, socket) do
+    show_detail_mpe_data = !socket.assigns.show_detail_mpe_data
+
+    socket =
+      socket
+      |> assign(:show_detail_mpe_data, show_detail_mpe_data)
+      |> maybe_refresh_detail_mpe_data()
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -1070,6 +1106,98 @@ defmodule MenschWeb.ChordMatrixShowLive do
                 />
               </div>
 
+              <div
+                id="pad-mpe-detail-panel"
+                class="mt-3 space-y-2 rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-2"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                      Detail MPE Data
+                    </h4>
+                    <p
+                      :if={@latest_pad_performance && @show_detail_mpe_data}
+                      class="font-mono text-[10px] text-zinc-400"
+                    >
+                      {@latest_pad_performance.bpm} BPM · {elem(
+                        @latest_pad_performance.time_signature,
+                        0
+                      )}/{elem(@latest_pad_performance.time_signature, 1)}
+                    </p>
+                  </div>
+
+                  <button
+                    id="toggle-display-detail-mpe-data"
+                    type="button"
+                    phx-click="toggle_display_detail_mpe_data"
+                    role="switch"
+                    aria-checked={to_string(@show_detail_mpe_data)}
+                    class="group inline-flex items-center gap-2 rounded-sm border border-zinc-700/80 bg-zinc-900/60 px-2 py-1 transition-colors duration-150 hover:border-zinc-500"
+                  >
+                    <span class="font-mono text-[10px] uppercase tracking-wide text-zinc-300">Show MPE Charts</span>
+                    <span class={[
+                      "relative h-4 w-8 rounded-full border transition-colors duration-200",
+                      if(@show_detail_mpe_data,
+                        do: "border-emerald-300/90 bg-emerald-500/60",
+                        else: "border-zinc-500/80 bg-zinc-800"
+                      )
+                    ]}>
+                      <span class={[
+                        "absolute top-0.5 size-2.5 rounded-full bg-zinc-100 transition-transform duration-200",
+                        if(@show_detail_mpe_data, do: "translate-x-4", else: "translate-x-0.5")
+                      ]}></span>
+                    </span>
+                  </button>
+                </div>
+
+                <div
+                  :if={not @show_detail_mpe_data}
+                  class="rounded-sm border border-zinc-700/60 bg-zinc-950/80 p-2 font-mono text-xs text-zinc-400"
+                >
+                  MPE charts are hidden. Toggle "Show MPE Charts" to display them.
+                </div>
+
+                <div
+                  :if={
+                    @show_detail_mpe_data and
+                      @note_matrix == [] and
+                      @pressure_chart == [] and @slide_chart == [] and @bend_chart == []
+                  }
+                  class="rounded-sm border border-zinc-700/60 bg-zinc-950/80 p-2 font-mono text-xs text-zinc-400"
+                >
+                  Click an assigned pad while play mode is on to render expression charts.
+                </div>
+
+                <div
+                  :if={
+                    @show_detail_mpe_data and
+                      (@note_matrix != [] or
+                         @pressure_chart != [] or @slide_chart != [] or @bend_chart != [])
+                  }
+                  class="space-y-2"
+                >
+                  <.note_matrix_chart note_matrix={@note_matrix} grid={@note_matrix_grid} />
+                  <.mpe_chart
+                    title="Pressure"
+                    chart={@pressure_chart}
+                    grid={@chart_grid}
+                    axis={@pressure_axis}
+                  />
+                  <.mpe_chart
+                    title="Slide (Aftertouch)"
+                    chart={@slide_chart}
+                    grid={@chart_grid}
+                    axis={@slide_axis}
+                  />
+                  <.mpe_chart
+                    title="Bend (Vibrato)"
+                    chart={@bend_chart}
+                    grid={@chart_grid}
+                    axis={@bend_axis}
+                  />
+                </div>
+              </div>
+
               <div class="mt-3 overflow-x-auto">
                 <div
                   id="chord-matrix-board"
@@ -1471,6 +1599,78 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
   defp parse_positive_integer(_value), do: {:error, :invalid_integer}
 
+  defp maybe_refresh_detail_mpe_data(socket) do
+    cond do
+      not socket.assigns.show_detail_mpe_data ->
+        socket
+
+      not match?({row, col} when is_integer(row) and is_integer(col), socket.assigns.selected_pad) ->
+        clear_detail_mpe_data(socket)
+
+      true ->
+        {row, col} = socket.assigns.selected_pad
+
+        case ChordMatrixPadPlayer.performance_for_pad(socket.assigns.record, row, col) do
+          {:ok, performance} -> assign_detail_mpe_data(socket, performance)
+          _ -> clear_detail_mpe_data(socket)
+        end
+    end
+  end
+
+  defp maybe_assign_detail_mpe_data(socket, performance) do
+    if socket.assigns.show_detail_mpe_data do
+      assign_detail_mpe_data(socket, performance)
+    else
+      socket
+    end
+  end
+
+  defp assign_detail_mpe_data(socket, %{frames: frames, duration_ms: duration_ms} = performance) do
+    frame_mbeats = socket.assigns.record.chord_matrix.frame_mbeats
+
+    sample_context =
+      SampleContext.new!(%{
+        bpm: performance.bpm,
+        time_signature: performance.time_signature,
+        frame_mbeats: frame_mbeats
+      })
+
+    total_mbeats = detail_total_mbeats(frames, duration_ms, sample_context)
+    color_map = note_color_map(frames)
+    bend_range = value_range(frames)
+
+    socket
+    |> assign(:latest_pad_performance, performance)
+    |> assign(:note_matrix, build_note_matrix(frames, color_map, total_mbeats))
+    |> assign(:note_matrix_grid, note_matrix_grid_model(sample_context, total_mbeats))
+    |> assign(
+      :pressure_chart,
+      build_mpe_chart(frames, :pressure, {0, 127}, color_map, total_mbeats)
+    )
+    |> assign(:slide_chart, build_mpe_chart(frames, :slide, {0, 127}, color_map, total_mbeats))
+    |> assign(:bend_chart, build_mpe_chart(frames, :bend, bend_range, color_map, total_mbeats))
+    |> assign(:pressure_axis, pressure_slide_axis())
+    |> assign(:slide_axis, pressure_slide_axis())
+    |> assign(:bend_axis, bend_axis(bend_range))
+    |> assign(:chart_grid, chart_grid_model(sample_context, total_mbeats))
+  end
+
+  defp assign_detail_mpe_data(socket, _performance), do: clear_detail_mpe_data(socket)
+
+  defp clear_detail_mpe_data(socket) do
+    socket
+    |> assign(:latest_pad_performance, nil)
+    |> assign(:note_matrix, [])
+    |> assign(:note_matrix_grid, %{subbeat_pcts: [], beat_pcts: [], bar_pcts: []})
+    |> assign(:pressure_chart, [])
+    |> assign(:slide_chart, [])
+    |> assign(:bend_chart, [])
+    |> assign(:pressure_axis, pressure_slide_axis())
+    |> assign(:slide_axis, pressure_slide_axis())
+    |> assign(:bend_axis, bend_axis({-1.0, 1.0}))
+    |> assign(:chart_grid, %{subbeat_xs: [], beat_xs: [], bar_xs: []})
+  end
+
   defp bpm_form(value) do
     to_form(%{"bpm" => to_string(value)}, as: :chord_matrix)
   end
@@ -1517,6 +1717,407 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
   defp machine_field_input_step(%{type: :float} = field),
     do: to_string(Map.get(field, :step, 0.1))
+
+  defp detail_total_mbeats(frames, duration_ms, %SampleContext{} = sample_context) do
+    mbeat_by_duration = SampleContext.ms_to_mbeats(sample_context, duration_ms)
+    mbeat_by_frames = frames |> List.last() |> then(&if(&1, do: &1.at_mbeat, else: 0))
+    max(max(mbeat_by_duration, mbeat_by_frames), 1)
+  end
+
+  defp chart_grid_model(%SampleContext{} = sample_context, total_mbeats) do
+    width = 600
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
+    mbeats_per_subbeat = max(div(mbeats_per_beat, 4), 1)
+    total_mbeats = max(total_mbeats, 1)
+
+    %{
+      subbeat_xs: chart_grid_xs(total_mbeats, mbeats_per_subbeat, width),
+      beat_xs: chart_grid_xs(total_mbeats, mbeats_per_beat, width),
+      bar_xs: chart_grid_xs(total_mbeats, mbeats_per_bar, width)
+    }
+  end
+
+  defp note_matrix_grid_model(%SampleContext{} = sample_context, total_mbeats) do
+    mbeats_per_bar = SampleContext.mbeats_per_bar(sample_context)
+    mbeats_per_beat = SampleContext.mbeats_per_beat(sample_context)
+    mbeats_per_subbeat = max(div(mbeats_per_beat, 4), 1)
+    total_mbeats = max(total_mbeats, 1)
+
+    %{
+      subbeat_pcts: timeline_pct_marks(total_mbeats, mbeats_per_subbeat),
+      beat_pcts: timeline_pct_marks(total_mbeats, mbeats_per_beat),
+      bar_pcts: timeline_pct_marks(total_mbeats, mbeats_per_bar)
+    }
+  end
+
+  defp timeline_pct_marks(total_mbeats, step) do
+    0..total_mbeats//step
+    |> Enum.map(fn mbeat -> Float.round(mbeat / total_mbeats * 100, 3) end)
+  end
+
+  defp chart_grid_xs(total_mbeats, step, width) do
+    0..total_mbeats//step
+    |> Enum.map(fn mbeat -> Float.round(mbeat / total_mbeats * width, 2) end)
+  end
+
+  defp build_mpe_chart(frames, value_key, {min_v, max_v}, color_map, total_mbeats) do
+    total_mbeats = max(total_mbeats, 1)
+
+    frames
+    |> Enum.flat_map(fn frame ->
+      x = max(frame.at_mbeat, 0) / total_mbeats * 600
+
+      Enum.map(frame.notes, fn note ->
+        {note_series_key(note), x, Map.fetch!(note, value_key)}
+      end)
+    end)
+    |> Enum.group_by(fn {series_key, _x, _value} -> series_key end, fn {_series_key, x, value} ->
+      {x, value}
+    end)
+    |> Enum.map(fn {series_key, points} ->
+      %{
+        series_key: series_key,
+        color: Map.fetch!(color_map, series_key),
+        points: chart_points(points, min_v, max_v)
+      }
+    end)
+    |> Enum.sort_by(& &1.series_key)
+  end
+
+  defp note_color_map(frames) do
+    frames
+    |> Enum.flat_map(& &1.notes)
+    |> Enum.uniq_by(&note_series_key/1)
+    |> Enum.sort_by(&note_series_key/1)
+    |> Enum.with_index()
+    |> Map.new(fn {note, index} ->
+      {note_series_key(note), Enum.at(@mpe_chart_colors, rem(index, length(@mpe_chart_colors)))}
+    end)
+  end
+
+  defp build_note_matrix(frames, color_map, total_mbeats) do
+    total_mbeats = max(total_mbeats, 1)
+
+    segments =
+      frames
+      |> Enum.flat_map(fn frame ->
+        Enum.map(frame.notes, &{&1, frame.at_mbeat})
+      end)
+      |> Enum.group_by(fn {note, _at_mbeat} -> note_series_key(note) end)
+      |> Enum.flat_map(fn {series_key, entries} ->
+        {channel, midi_note_number} = series_channel_note(series_key)
+
+        entries
+        |> lifecycle_segments(total_mbeats)
+        |> Enum.map(fn %{start_mbeat: start_mbeat, end_mbeat: end_mbeat, label: label} ->
+          left_pct = start_mbeat / total_mbeats * 100
+          width_pct = max((end_mbeat - start_mbeat) / total_mbeats * 100, 0.5)
+
+          style =
+            "left: #{Float.round(left_pct * 1.0, 2)}%; " <>
+              "width: #{Float.round(width_pct * 1.0, 2)}%; " <>
+              "background-color: #{Map.fetch!(color_map, series_key)};"
+
+          %{
+            style: style,
+            channel: channel,
+            midi_note: midi_note_number,
+            label: label
+          }
+        end)
+      end)
+
+    case segments do
+      [] ->
+        []
+
+      _ ->
+        rows_by_note = Enum.group_by(segments, & &1.midi_note)
+        {min_note, max_note} = rows_by_note |> Map.keys() |> Enum.min_max()
+
+        for note_number <- max_note..min_note//-1 do
+          case Map.get(rows_by_note, note_number) do
+            nil ->
+              {note_name, octave} = PerformanceAssembler.note_name(note_number)
+
+              %{
+                midi_note: note_number,
+                label: "#{note_name}#{octave}",
+                segments: []
+              }
+
+            note_segments ->
+              %{
+                midi_note: note_number,
+                label: note_segments |> hd() |> Map.fetch!(:label),
+                segments: Enum.map(note_segments, &%{style: &1.style})
+              }
+          end
+        end
+    end
+  end
+
+  defp lifecycle_segments(entries, total_mbeats) do
+    {segments, open_segment} =
+      entries
+      |> Enum.sort_by(fn {_note, at_mbeat} -> at_mbeat end)
+      |> Enum.reduce({[], nil}, fn {note, at_mbeat}, {acc, open} ->
+        label = note_label(note)
+
+        cond do
+          note.note_on and is_nil(open) ->
+            {acc, %{start_mbeat: at_mbeat, label: label}}
+
+          note.note_on and not is_nil(open) ->
+            closed = Map.put(open, :end_mbeat, at_mbeat)
+            {[closed | acc], %{start_mbeat: at_mbeat, label: label}}
+
+          note.note_off and not is_nil(open) ->
+            closed = Map.put(open, :end_mbeat, at_mbeat)
+            {[closed | acc], nil}
+
+          true ->
+            {acc, open}
+        end
+      end)
+
+    segments =
+      if is_nil(open_segment) do
+        segments
+      else
+        [Map.put(open_segment, :end_mbeat, total_mbeats) | segments]
+      end
+
+    segments
+    |> Enum.reverse()
+    |> Enum.filter(fn segment -> segment.end_mbeat >= segment.start_mbeat end)
+  end
+
+  defp note_label(note) do
+    cond do
+      is_atom(Map.get(note, :note_name)) and is_integer(Map.get(note, :octave)) ->
+        "#{Map.get(note, :note_name)}#{Map.get(note, :octave)}"
+
+      is_integer(Map.get(note, :midi_note)) ->
+        {note_name, octave} = PerformanceAssembler.note_name(Map.get(note, :midi_note))
+        "#{note_name}#{octave}"
+
+      true ->
+        "note"
+    end
+  end
+
+  defp series_channel_note({channel, note, _note_instance_id}), do: {channel, note}
+
+  defp note_series_key(note) do
+    {
+      Map.get(note, :channel, -1),
+      Map.get(note, :midi_note, 0),
+      Map.get(note, :note_instance_id, 0)
+    }
+  end
+
+  defp chart_points(points, min_v, max_v) do
+    range = max(max_v - min_v, 0.0001)
+
+    points
+    |> Enum.sort_by(fn {x, _value} -> x end)
+    |> Enum.map_join(" ", fn {x, value} ->
+      y = @mpe_chart_height - (value - min_v) / range * @mpe_chart_height
+      "#{Float.round(x * 1.0, 1)},#{Float.round(y * 1.0, 1)}"
+    end)
+  end
+
+  defp pressure_slide_axis do
+    %{
+      min: 0,
+      max: 127,
+      ticks: [
+        %{value: 0, label: "0"},
+        %{value: 32, label: "32"},
+        %{value: 64, label: "64"},
+        %{value: 96, label: "96"},
+        %{value: 127, label: "127"}
+      ]
+    }
+  end
+
+  defp bend_axis({min_v, max_v}) do
+    steps = 4
+
+    ticks =
+      for step_index <- 0..steps do
+        value = min_v + (max_v - min_v) * (step_index / steps)
+        %{value: value, label: format_bend_tick(value)}
+      end
+
+    %{min: min_v, max: max_v, ticks: ticks}
+  end
+
+  defp value_range(frames) do
+    values = for frame <- frames, note <- frame.notes, do: note.bend
+
+    case Enum.min_max(values) do
+      {same, same} -> {same - 0.0001, same + 0.0001}
+      {min_v, max_v} -> {min_v, max_v}
+    end
+  end
+
+  defp format_bend_tick(value) when is_number(value) do
+    value
+    |> Float.round(4)
+    |> :erlang.float_to_binary(decimals: 4)
+    |> String.replace(~r/0+$/, "")
+    |> String.replace(~r/\.$/, "")
+  end
+
+  attr :note_matrix, :list, required: true
+  attr :grid, :map, required: true
+
+  defp note_matrix_chart(assigns) do
+    ~H"""
+    <div id="note-matrix" class="space-y-1">
+      <div class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">Note matrix</div>
+      <div class="relative py-1.5">
+        <div
+          :for={x <- @grid.subbeat_pcts}
+          class="pointer-events-none absolute inset-y-0 z-0 w-px bg-zinc-700/30"
+          style={"left: #{x}%;"}
+        >
+        </div>
+        <div
+          :for={x <- @grid.beat_pcts}
+          class="pointer-events-none absolute inset-y-0 z-0 w-px bg-zinc-500/40"
+          style={"left: #{x}%;"}
+        >
+        </div>
+        <div
+          :for={x <- @grid.bar_pcts}
+          class="pointer-events-none absolute inset-y-0 z-0 w-[1.5px] bg-zinc-200/50"
+          style={"left: #{x}%;"}
+        >
+        </div>
+        <div
+          :for={{row, index} <- Enum.with_index(@note_matrix)}
+          class={[
+            "relative z-10 flex h-2.5 items-center border-b border-zinc-700/60 last:border-0",
+            rem(index, 2) == 0 && "bg-zinc-900/70"
+          ]}
+        >
+          <div
+            :for={segment <- row.segments}
+            class="absolute inset-y-0 z-20 opacity-85"
+            style={segment.style}
+          >
+          </div>
+          <span class="relative z-10 px-1 font-mono text-[5px] uppercase text-zinc-400">
+            {row.label}
+          </span>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :title, :string, required: true
+  attr :chart, :list, required: true
+  attr :grid, :map, required: true
+  attr :axis, :map, required: true
+
+  defp mpe_chart(assigns) do
+    ~H"""
+    <div>
+      <div class="font-mono text-[11px] uppercase tracking-wide text-zinc-400">{@title}</div>
+      <svg viewBox={"0 0 600 #{mpe_chart_height()}"} class="w-full overflow-visible bg-zinc-950">
+        <line
+          :for={x <- @grid.subbeat_xs}
+          x1={x}
+          y1="0"
+          x2={x}
+          y2={mpe_chart_height()}
+          stroke="var(--ui-chart-x-gridline-color)"
+          stroke-opacity="var(--ui-chart-x-gridline-opacity)"
+          stroke-width="var(--ui-chart-x-gridline-width)"
+        />
+        <line
+          :for={x <- @grid.beat_xs}
+          x1={x}
+          y1="0"
+          x2={x}
+          y2={mpe_chart_height()}
+          stroke="var(--ui-chart-x-beat-gridline-color)"
+          stroke-opacity="var(--ui-chart-x-beat-gridline-opacity)"
+          stroke-width="var(--ui-chart-x-beat-gridline-width)"
+        />
+        <line
+          :for={x <- @grid.bar_xs}
+          x1={x}
+          y1="0"
+          x2={x}
+          y2={mpe_chart_height()}
+          stroke="var(--ui-chart-x-bar-gridline-color)"
+          stroke-opacity="var(--ui-chart-x-bar-gridline-opacity)"
+          stroke-width="var(--ui-chart-x-bar-gridline-width)"
+        />
+        <polyline
+          :for={series <- @chart}
+          points={series.points}
+          fill="none"
+          stroke={series.color}
+          stroke-width="1.5"
+        />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2={mpe_chart_height()}
+          stroke="#d4d4d8"
+          stroke-opacity="0.85"
+          stroke-width="1.1"
+        />
+        <line
+          :for={tick <- @axis.ticks}
+          x1="0"
+          y1={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          x2="600"
+          y2={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          stroke="var(--ui-chart-y-gridline-color)"
+          stroke-opacity="var(--ui-chart-y-gridline-opacity)"
+          stroke-width="var(--ui-chart-y-gridline-width)"
+        />
+        <line
+          :for={tick <- @axis.ticks}
+          x1="0"
+          y1={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          x2="6"
+          y2={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          stroke="#d4d4d8"
+          stroke-opacity="0.8"
+          stroke-width="1"
+        />
+        <text
+          :for={tick <- @axis.ticks}
+          class="ui-chart-tick-label"
+          x="8"
+          y={chart_y_for_value(tick.value, @axis.min, @axis.max)}
+          fill="#d4d4d8"
+          dominant-baseline="middle"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
+        >
+          {tick.label}
+        </text>
+      </svg>
+    </div>
+    """
+  end
+
+  defp chart_y_for_value(value, min_v, max_v) do
+    range = max(max_v - min_v, 0.0001)
+    @mpe_chart_height - (value - min_v) / range * @mpe_chart_height
+  end
+
+  defp mpe_chart_height, do: @mpe_chart_height
 
   defp default_machine_settings do
     blueprint_id = SampleBlueprint.default_blueprint_id()

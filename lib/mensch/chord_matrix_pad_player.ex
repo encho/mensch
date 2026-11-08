@@ -19,13 +19,21 @@ defmodule Mensch.ChordMatrixPadPlayer do
   @spec play_pad(map(), integer(), integer()) :: :ok | {:error, term()}
   def play_pad(record, row, column)
       when is_map(record) and is_integer(row) and row >= 0 and is_integer(column) and column >= 0 do
-    with {:ok, performance} <- performance_for_pad(record, row, column),
-         :ok <- ensure_midi_connected() do
-      Player.play(performance)
+    with {:ok, performance} <- performance_for_pad(record, row, column) do
+      play_performance(performance)
     end
   end
 
   def play_pad(_record, _row, _column), do: {:error, :invalid_pad}
+
+  @spec play_performance(Performance.t()) :: :ok | {:error, term()}
+  def play_performance(%Performance{} = performance) do
+    with :ok <- ensure_midi_connected() do
+      Player.play(performance)
+    end
+  end
+
+  def play_performance(_performance), do: {:error, :invalid_performance}
 
   @spec performance_for_pad(map(), integer(), integer()) ::
           {:ok, Performance.t()} | {:error, term()}
