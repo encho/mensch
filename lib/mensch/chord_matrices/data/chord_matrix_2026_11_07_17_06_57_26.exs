@@ -86,6 +86,33 @@
         source_progression_name: "251",
         source_chord_index: 2
       },
+      {0, 7} => %{
+        column: 7,
+        row: 0,
+        chord_spec: %Mensch.Harmony.ChordSpec{
+          harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+            root: :d,
+            quality: :min,
+            foreign_bass: nil
+          },
+          octave: 3,
+          inversion: 0,
+          voicing: %Mensch.Harmony.ChordSpec.Voicing{
+            type: :close,
+            center_note: 60,
+            range_min: nil,
+            range_max: nil,
+            voice_count: nil,
+            doubling: :auto,
+            inversion_resolution_mode: :per_step_centered
+          },
+          min_voice_count: 3,
+          foreign_bass: nil
+        },
+        source_progression_id: "251",
+        source_progression_name: "251",
+        source_chord_index: 0
+      },
       {1, 0} => %{
         column: 0,
         row: 1,
@@ -275,6 +302,33 @@
         source_progression_name: "hello 1",
         source_chord_index: 6
       },
+      {1, 7} => %{
+        column: 7,
+        row: 1,
+        chord_spec: %Mensch.Harmony.ChordSpec{
+          harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+            root: :g,
+            quality: :maj,
+            foreign_bass: nil
+          },
+          octave: 3,
+          inversion: 0,
+          voicing: %Mensch.Harmony.ChordSpec.Voicing{
+            type: :close,
+            center_note: 72,
+            range_min: nil,
+            range_max: nil,
+            voice_count: nil,
+            doubling: :auto,
+            inversion_resolution_mode: :per_step_centered
+          },
+          min_voice_count: 3,
+          foreign_bass: nil
+        },
+        source_progression_id: "251",
+        source_progression_name: "251",
+        source_chord_index: 1
+      },
       {2, 0} => %{
         column: 0,
         row: 2,
@@ -463,9 +517,36 @@
         source_progression_id: "adfs",
         source_progression_name: "adfs",
         source_chord_index: 6
+      },
+      {2, 7} => %{
+        column: 7,
+        row: 2,
+        chord_spec: %Mensch.Harmony.ChordSpec{
+          harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
+            root: :c,
+            quality: :maj,
+            foreign_bass: nil
+          },
+          octave: 3,
+          inversion: 0,
+          voicing: %Mensch.Harmony.ChordSpec.Voicing{
+            type: :close,
+            center_note: 60,
+            range_min: nil,
+            range_max: nil,
+            voice_count: nil,
+            doubling: :auto,
+            inversion_resolution_mode: :per_step_centered
+          },
+          min_voice_count: 3,
+          foreign_bass: nil
+        },
+        source_progression_id: "251",
+        source_progression_name: "251",
+        source_chord_index: 2
       }
     }
   },
-  updated_at: "2026-11-08T10:52:16Z",
+  updated_at: "2026-11-08T10:53:14Z",
   inserted_at: "2026-11-07T17:06:57Z"
 }
