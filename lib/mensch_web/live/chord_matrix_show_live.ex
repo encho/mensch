@@ -6,6 +6,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
   alias Mensch.Harmony.ChordMatrix
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Resolver
+  alias MenschWeb.FullPianoKeyboard
 
   @impl true
   def mount(_params, _session, socket) do
@@ -15,6 +16,8 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:record, nil)
      |> assign(:selected_pad, nil)
      |> assign(:chord_matrix_play_mode, false)
+     |> assign(:keyboard_active_notes, [])
+     |> assign(:keyboard_source, "No chord selected")
      |> assign(:progressions, ChordProgressions.list_progressions())
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
@@ -26,7 +29,10 @@ defmodule MenschWeb.ChordMatrixShowLive do
   def handle_params(%{"id" => id}, _uri, socket) do
     case ChordMatrices.fetch_chord_matrix(id) do
       {:ok, record} ->
-        {:noreply, assign(socket, :record, record)}
+        {:noreply,
+         socket
+         |> assign(:record, record)
+         |> assign_keyboard_from_selected_pad()}
 
       {:error, :not_found} ->
         {:noreply,
@@ -53,7 +59,10 @@ defmodule MenschWeb.ChordMatrixShowLive do
          {:ok, normalized_column} <- parse_non_negative_integer(column),
          :ok <-
            ensure_selected_pad_in_bounds(socket.assigns.record, normalized_row, normalized_column) do
-      socket = assign(socket, :selected_pad, {normalized_row, normalized_column})
+      socket =
+        socket
+        |> assign(:selected_pad, {normalized_row, normalized_column})
+        |> assign_keyboard_from_selected_pad()
 
       if socket.assigns.chord_matrix_play_mode do
         case pad_assignment(socket.assigns.record, normalized_row, normalized_column) do
@@ -160,7 +169,11 @@ defmodule MenschWeb.ChordMatrixShowLive do
     with {:ok, progression} <- fetch_progression_for_assignment(socket, progression_id),
          {:ok, parsed_index} <- parse_non_negative_integer(chord_index),
          %ChordSpec{} = chord_spec <- Enum.at(progression.chords, parsed_index) do
-      play_notes_for_3s(socket, Resolver.resolve(chord_spec))
+      play_notes_for_3s(
+        socket,
+        Resolver.resolve(chord_spec),
+        "Previewing #{ChordSpec.symbol_label(chord_spec)}"
+      )
     else
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Preview failed: #{inspect(reason)}")}
@@ -186,33 +199,20 @@ defmodule MenschWeb.ChordMatrixShowLive do
       <section class="mx-auto w-full max-w-7xl space-y-4">
         <.page_heading
           title={if @record, do: "Chord Matrix #{@record.id}", else: "Chord Matrix"}
-          subtitle="Matrix detail and board view."
+          subtitle={if(@record, do: "Updated #{format_timestamp(@record.updated_at)}", else: "")}
         />
 
         <div :if={@record} class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
           <div class="space-y-3">
             <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/50 p-3">
-              <h3 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
-                Attributes
-              </h3>
-              <dl class="mt-2 grid gap-2 font-mono text-xs text-zinc-200 md:grid-cols-2">
-                <div>
-                  <dt class="text-zinc-400">ID</dt>
-                  <dd class="break-all">{@record.id}</dd>
-                </div>
-                <div>
-                  <dt class="text-zinc-400">Rows</dt>
-                  <dd>{@record.chord_matrix.number_rows}</dd>
-                </div>
-                <div>
-                  <dt class="text-zinc-400">Columns</dt>
-                  <dd>{@record.chord_matrix.number_columns}</dd>
-                </div>
-                <div>
-                  <dt class="text-zinc-400">Updated At</dt>
-                  <dd>{@record.updated_at}</dd>
-                </div>
-              </dl>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                  Size
+                </span>
+                <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
+                  {@record.chord_matrix.number_rows} rows x {@record.chord_matrix.number_columns} columns
+                </span>
+              </div>
             </div>
 
             <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/50 p-3">
@@ -230,18 +230,42 @@ defmodule MenschWeb.ChordMatrixShowLive do
                     id="toggle-matrix-play-mode"
                     type="button"
                     phx-click="toggle_matrix_play_mode"
-                    class={[
-                      "rounded-sm border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-colors duration-150",
-                      if(@chord_matrix_play_mode,
-                        do:
-                          "border-emerald-400/90 bg-emerald-500/20 text-emerald-100 hover:border-emerald-300",
-                        else: "border-zinc-600/90 bg-zinc-900/70 text-zinc-300 hover:border-zinc-400"
-                      )
-                    ]}
+                    role="switch"
+                    aria-checked={to_string(@chord_matrix_play_mode)}
+                    class="group inline-flex items-center gap-2 rounded-sm border border-zinc-600/80 bg-zinc-900/70 px-2 py-1.5 transition-colors duration-150 hover:border-zinc-400"
                   >
-                    Matrix Play Mode: {if @chord_matrix_play_mode, do: "On", else: "Off"}
+                    <span class="font-mono text-[10px] uppercase tracking-wide text-zinc-200">Play Mode</span>
+                    <span class={[
+                      "relative h-4 w-8 rounded-full border transition-colors duration-200",
+                      if(@chord_matrix_play_mode,
+                        do: "border-emerald-300/90 bg-emerald-500/60",
+                        else: "border-zinc-500/80 bg-zinc-800"
+                      )
+                    ]}>
+                      <span class={[
+                        "absolute top-0.5 size-2.5 rounded-full bg-zinc-100 transition-transform duration-200",
+                        if(@chord_matrix_play_mode, do: "translate-x-4", else: "translate-x-0.5")
+                      ]}></span>
+                    </span>
                   </button>
                 </div>
+              </div>
+
+              <div class="mt-3 space-y-2 rounded-sm border border-zinc-700/70 bg-zinc-950/70 p-2">
+                <div class="flex items-center justify-between gap-2">
+                  <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                    Active Chord Keyboard
+                  </h4>
+                  <p class="truncate font-mono text-[11px] text-zinc-400">{@keyboard_source}</p>
+                </div>
+
+                <FullPianoKeyboard.keyboard
+                  id="chord-matrix-active-keyboard"
+                  keys={piano_keys(@keyboard_active_notes)}
+                  height_class="h-28"
+                  show_bottom_lane={false}
+                  color_mode={:dark}
+                />
               </div>
 
               <div class="mt-3 overflow-x-auto">
@@ -269,14 +293,13 @@ defmodule MenschWeb.ChordMatrixShowLive do
                     >
                       <%= case pad_assignment(@record, row, col) do %>
                         <% nil -> %>
-                          <span class="font-mono text-[10px] text-zinc-500">{row},{col}</span>
+                          <span class="flex h-full w-full items-center justify-center font-mono text-[10px] text-zinc-500">
+                            {row},{col}
+                          </span>
                         <% assignment -> %>
-                          <span class="flex h-full flex-col items-start justify-between gap-1">
-                            <span class="w-full truncate font-mono text-base font-semibold leading-none tracking-tight text-inherit">
+                          <span class="flex h-full w-full items-center justify-center">
+                            <span class="w-full truncate text-center font-mono text-base font-semibold leading-none tracking-tight text-inherit">
                               {ChordSpec.symbol_label(assignment.chord_spec)}
-                            </span>
-                            <span class="font-mono text-[10px] uppercase tracking-wide text-inherit/80">
-                              Assigned
                             </span>
                           </span>
                       <% end %>
@@ -496,7 +519,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
     ]
   end
 
-  defp play_notes_for_3s(socket, notes) do
+  defp play_notes_for_3s(socket, notes, source_label \\ "Previewing chord") do
     final_notes = Enum.filter(notes, &is_integer/1)
 
     cond do
@@ -534,6 +557,8 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
               {:noreply,
                socket
+               |> assign(:keyboard_active_notes, Enum.uniq(final_notes))
+               |> assign(:keyboard_source, source_label)
                |> assign(:preview_note_channels, note_channels)
                |> assign(:preview_stop_ref, stop_ref)}
 
@@ -562,5 +587,44 @@ defmodule MenschWeb.ChordMatrixShowLive do
     socket
     |> assign(:preview_note_channels, [])
     |> assign(:preview_stop_ref, nil)
+    |> assign_keyboard_from_selected_pad()
   end
+
+  defp assign_keyboard_from_selected_pad(socket) do
+    case socket.assigns do
+      %{record: %{chord_matrix: %ChordMatrix{} = chord_matrix}, selected_pad: {row, col}} ->
+        case ChordMatrix.assignment_at(chord_matrix, row, col) do
+          %{chord_spec: %ChordSpec{} = chord_spec} ->
+            socket
+            |> assign(:keyboard_active_notes, Resolver.resolve(chord_spec))
+            |> assign(:keyboard_source, "Selected pad: #{ChordSpec.symbol_label(chord_spec)}")
+
+          _ ->
+            socket
+            |> assign(:keyboard_active_notes, [])
+            |> assign(:keyboard_source, "Selected pad is empty")
+        end
+
+      _ ->
+        socket
+        |> assign(:keyboard_active_notes, [])
+        |> assign(:keyboard_source, "No chord selected")
+    end
+  end
+
+  defp piano_keys(active_notes) when is_list(active_notes) do
+    FullPianoKeyboard.key_maps(active_notes: active_notes)
+  end
+
+  defp piano_keys(_active_notes), do: []
+
+  defp format_timestamp(value) when is_binary(value) do
+    with {:ok, datetime, _offset} <- DateTime.from_iso8601(value) do
+      Calendar.strftime(datetime, "%b %-d, %Y %-I:%M:%S %p UTC")
+    else
+      _ -> value
+    end
+  end
+
+  defp format_timestamp(value), do: to_string(value)
 end

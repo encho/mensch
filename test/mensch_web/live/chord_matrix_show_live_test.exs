@@ -76,7 +76,8 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     |> render_click()
 
     assert render(view) =~ "Assigned chord to pad"
-    assert has_element?(view, "#pad-0-0", "Assigned")
+    assert has_element?(view, "#chord-matrix-active-keyboard")
+    assert render(view) =~ "Selected pad"
 
     assert {:ok, persisted_after_assign} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
 
@@ -101,13 +102,13 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
 
-    assert has_element?(view, "#toggle-matrix-play-mode", "Matrix Play Mode: Off")
+    assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='false']")
 
     view
     |> element("#toggle-matrix-play-mode")
     |> render_click()
 
-    assert has_element?(view, "#toggle-matrix-play-mode", "Matrix Play Mode: On")
+    assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='true']")
   end
 
   defp chord(root, quality) do
