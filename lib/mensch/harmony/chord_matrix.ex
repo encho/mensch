@@ -115,6 +115,108 @@ defmodule Mensch.Harmony.ChordMatrix do
 
   def assignment_at(_chord_matrix, _row, _column), do: nil
 
+  @spec insert_row_before(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def insert_row_before(%__MODULE__{} = chord_matrix, row_index) do
+    with {:ok, normalized_row_index} <- parse_non_negative_integer(row_index),
+         :ok <- ensure_row_in_bounds(chord_matrix, normalized_row_index) do
+      {:ok,
+       shift_rows(chord_matrix, normalized_row_index, +1)
+       |> Map.update!(:number_rows, &(&1 + 1))}
+    end
+  end
+
+  @spec insert_row_after(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def insert_row_after(%__MODULE__{} = chord_matrix, row_index) do
+    with {:ok, normalized_row_index} <- parse_non_negative_integer(row_index),
+         :ok <- ensure_row_in_bounds(chord_matrix, normalized_row_index) do
+      insertion_index = normalized_row_index + 1
+
+      {:ok,
+       shift_rows(chord_matrix, insertion_index, +1)
+       |> Map.update!(:number_rows, &(&1 + 1))}
+    end
+  end
+
+  @spec remove_row(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def remove_row(%__MODULE__{} = chord_matrix, row_index) do
+    with true <- chord_matrix.number_rows > 1,
+         {:ok, normalized_row_index} <- parse_non_negative_integer(row_index),
+         :ok <- ensure_row_in_bounds(chord_matrix, normalized_row_index) do
+      {:ok,
+       %__MODULE__{
+         chord_matrix
+         | number_rows: chord_matrix.number_rows - 1,
+           assignments:
+             chord_matrix.assignments
+             |> Enum.reduce(%{}, fn
+               {{^normalized_row_index, _column}, _assignment}, acc ->
+                 acc
+
+               {{row, column}, assignment}, acc when row > normalized_row_index ->
+                 updated_assignment = %{assignment | row: row - 1}
+                 Map.put(acc, {row - 1, column}, updated_assignment)
+
+               {{row, column}, assignment}, acc ->
+                 Map.put(acc, {row, column}, assignment)
+             end)
+       }}
+    else
+      false -> {:error, :minimum_rows}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec insert_column_left(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def insert_column_left(%__MODULE__{} = chord_matrix, column_index) do
+    with {:ok, normalized_column_index} <- parse_non_negative_integer(column_index),
+         :ok <- ensure_column_in_bounds(chord_matrix, normalized_column_index) do
+      {:ok,
+       shift_columns(chord_matrix, normalized_column_index, +1)
+       |> Map.update!(:number_columns, &(&1 + 1))}
+    end
+  end
+
+  @spec insert_column_right(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def insert_column_right(%__MODULE__{} = chord_matrix, column_index) do
+    with {:ok, normalized_column_index} <- parse_non_negative_integer(column_index),
+         :ok <- ensure_column_in_bounds(chord_matrix, normalized_column_index) do
+      insertion_index = normalized_column_index + 1
+
+      {:ok,
+       shift_columns(chord_matrix, insertion_index, +1)
+       |> Map.update!(:number_columns, &(&1 + 1))}
+    end
+  end
+
+  @spec remove_column(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def remove_column(%__MODULE__{} = chord_matrix, column_index) do
+    with true <- chord_matrix.number_columns > 1,
+         {:ok, normalized_column_index} <- parse_non_negative_integer(column_index),
+         :ok <- ensure_column_in_bounds(chord_matrix, normalized_column_index) do
+      {:ok,
+       %__MODULE__{
+         chord_matrix
+         | number_columns: chord_matrix.number_columns - 1,
+           assignments:
+             chord_matrix.assignments
+             |> Enum.reduce(%{}, fn
+               {{_row, ^normalized_column_index}, _assignment}, acc ->
+                 acc
+
+               {{row, column}, assignment}, acc when column > normalized_column_index ->
+                 updated_assignment = %{assignment | column: column - 1}
+                 Map.put(acc, {row, column - 1}, updated_assignment)
+
+               {{row, column}, assignment}, acc ->
+                 Map.put(acc, {row, column}, assignment)
+             end)
+       }}
+    else
+      false -> {:error, :minimum_columns}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp parse_positive_integer(value) when is_integer(value) and value > 0, do: {:ok, value}
 
   defp parse_positive_integer(_value), do: {:error, :invalid_dimension}
@@ -129,6 +231,50 @@ defmodule Mensch.Harmony.ChordMatrix do
     else
       {:error, :out_of_bounds}
     end
+  end
+
+  defp ensure_row_in_bounds(%__MODULE__{} = chord_matrix, row) do
+    if row < chord_matrix.number_rows do
+      :ok
+    else
+      {:error, :out_of_bounds}
+    end
+  end
+
+  defp ensure_column_in_bounds(%__MODULE__{} = chord_matrix, column) do
+    if column < chord_matrix.number_columns do
+      :ok
+    else
+      {:error, :out_of_bounds}
+    end
+  end
+
+  defp shift_rows(%__MODULE__{} = chord_matrix, start_index, delta) do
+    shifted_assignments =
+      Enum.reduce(chord_matrix.assignments, %{}, fn
+        {{row, column}, assignment}, acc when row >= start_index ->
+          updated_assignment = %{assignment | row: row + delta}
+          Map.put(acc, {row + delta, column}, updated_assignment)
+
+        {{row, column}, assignment}, acc ->
+          Map.put(acc, {row, column}, assignment)
+      end)
+
+    %__MODULE__{chord_matrix | assignments: shifted_assignments}
+  end
+
+  defp shift_columns(%__MODULE__{} = chord_matrix, start_index, delta) do
+    shifted_assignments =
+      Enum.reduce(chord_matrix.assignments, %{}, fn
+        {{row, column}, assignment}, acc when column >= start_index ->
+          updated_assignment = %{assignment | column: column + delta}
+          Map.put(acc, {row, column + delta}, updated_assignment)
+
+        {{row, column}, assignment}, acc ->
+          Map.put(acc, {row, column}, assignment)
+      end)
+
+    %__MODULE__{chord_matrix | assignments: shifted_assignments}
   end
 
   defp parse_assignments(assignments, number_rows, number_columns) when is_map(assignments) do

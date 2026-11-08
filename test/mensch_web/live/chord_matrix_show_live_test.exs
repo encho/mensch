@@ -111,6 +111,44 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert has_element?(view, "#toggle-matrix-play-mode[aria-checked='true']")
   end
 
+  test "inserts and removes selected row and column", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> element("#row-header-0")
+    |> render_click()
+
+    view
+    |> element("#row-insert-after")
+    |> render_click()
+
+    assert render(view) =~ "3 rows x 2 columns"
+
+    view
+    |> element("#column-header-0")
+    |> render_click()
+
+    view
+    |> element("#column-insert-right")
+    |> render_click()
+
+    assert render(view) =~ "3 rows x 3 columns"
+
+    view
+    |> element("#row-remove")
+    |> render_click()
+
+    assert render(view) =~ "2 rows x 3 columns"
+
+    view
+    |> element("#column-remove")
+    |> render_click()
+
+    assert render(view) =~ "2 rows x 2 columns"
+  end
+
   defp chord(root, quality) do
     ChordSpec.new!(%{
       harmonic_identity: %ChordSpec.HarmonicIdentity{root: root, quality: quality},

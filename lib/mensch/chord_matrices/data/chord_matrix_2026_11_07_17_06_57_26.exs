@@ -2,12 +2,12 @@
   id: "chord_matrix_2026_11_07_17_06_57_26",
   version: 2,
   chord_matrix: %Mensch.Harmony.ChordMatrix{
-    number_rows: 2,
+    number_rows: 4,
     number_columns: 8,
     assignments: %{
-      {0, 0} => %{
+      {1, 0} => %{
         column: 0,
-        row: 0,
+        row: 1,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -32,9 +32,9 @@
         source_progression_name: "251",
         source_chord_index: 0
       },
-      {0, 1} => %{
+      {1, 1} => %{
         column: 1,
-        row: 0,
+        row: 1,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :g,
@@ -59,9 +59,9 @@
         source_progression_name: "251",
         source_chord_index: 1
       },
-      {0, 2} => %{
+      {1, 2} => %{
         column: 2,
-        row: 0,
+        row: 1,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :c,
@@ -86,9 +86,9 @@
         source_progression_name: "251",
         source_chord_index: 2
       },
-      {1, 0} => %{
+      {3, 0} => %{
         column: 0,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :c,
@@ -113,9 +113,9 @@
         source_progression_name: "hello 1",
         source_chord_index: 0
       },
-      {1, 1} => %{
+      {3, 1} => %{
         column: 1,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -140,9 +140,9 @@
         source_progression_name: "hello 1",
         source_chord_index: 1
       },
-      {1, 2} => %{
+      {3, 2} => %{
         column: 2,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :e,
@@ -167,9 +167,9 @@
         source_progression_name: "hello 1",
         source_chord_index: 2
       },
-      {1, 3} => %{
+      {3, 3} => %{
         column: 3,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :f,
@@ -194,9 +194,9 @@
         source_progression_name: "hello 1",
         source_chord_index: 3
       },
-      {1, 4} => %{
+      {3, 4} => %{
         column: 4,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :g,
@@ -221,9 +221,9 @@
         source_progression_name: "hello 1",
         source_chord_index: 4
       },
-      {1, 5} => %{
+      {3, 5} => %{
         column: 5,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :a,
@@ -248,9 +248,9 @@
         source_progression_name: "hello 1",
         source_chord_index: 5
       },
-      {1, 6} => %{
+      {3, 6} => %{
         column: 6,
-        row: 1,
+        row: 3,
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :b,
@@ -277,6 +277,6 @@
       }
     }
   },
-  updated_at: "2026-11-08T10:17:57Z",
+  updated_at: "2026-11-08T10:36:04Z",
   inserted_at: "2026-11-07T17:06:57Z"
 }

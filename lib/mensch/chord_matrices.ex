@@ -125,6 +125,63 @@ defmodule Mensch.ChordMatrices do
 
   def clear_pad_assignment(_id, _row, _column), do: {:error, :invalid_params}
 
+  @spec insert_row_before(String.t(), integer()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def insert_row_before(id, row_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.insert_row_before(chord_matrix, row_index)
+    end)
+  end
+
+  def insert_row_before(_id, _row_index), do: {:error, :invalid_params}
+
+  @spec insert_row_after(String.t(), integer()) :: {:ok, chord_matrix_record()} | {:error, term()}
+  def insert_row_after(id, row_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.insert_row_after(chord_matrix, row_index)
+    end)
+  end
+
+  def insert_row_after(_id, _row_index), do: {:error, :invalid_params}
+
+  @spec remove_row(String.t(), integer()) :: {:ok, chord_matrix_record()} | {:error, term()}
+  def remove_row(id, row_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.remove_row(chord_matrix, row_index)
+    end)
+  end
+
+  def remove_row(_id, _row_index), do: {:error, :invalid_params}
+
+  @spec insert_column_left(String.t(), integer()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def insert_column_left(id, column_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.insert_column_left(chord_matrix, column_index)
+    end)
+  end
+
+  def insert_column_left(_id, _column_index), do: {:error, :invalid_params}
+
+  @spec insert_column_right(String.t(), integer()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def insert_column_right(id, column_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.insert_column_right(chord_matrix, column_index)
+    end)
+  end
+
+  def insert_column_right(_id, _column_index), do: {:error, :invalid_params}
+
+  @spec remove_column(String.t(), integer()) :: {:ok, chord_matrix_record()} | {:error, term()}
+  def remove_column(id, column_index) when is_binary(id) do
+    update_chord_matrix(id, fn chord_matrix ->
+      ChordMatrix.remove_column(chord_matrix, column_index)
+    end)
+  end
+
+  def remove_column(_id, _column_index), do: {:error, :invalid_params}
+
   defp normalize_loaded_record(id, %{} = record) do
     with chord_matrix_value when not is_nil(chord_matrix_value) <- Map.get(record, :chord_matrix),
          {:ok, chord_matrix} <- normalize_chord_matrix(chord_matrix_value) do

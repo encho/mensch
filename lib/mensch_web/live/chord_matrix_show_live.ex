@@ -15,6 +15,8 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:midi_status, Mensch.Midi.Connection.status())
      |> assign(:record, nil)
      |> assign(:selected_pad, nil)
+     |> assign(:selected_row, nil)
+     |> assign(:selected_column, nil)
      |> assign(:chord_matrix_play_mode, false)
      |> assign(:keyboard_active_notes, [])
      |> assign(:keyboard_source, "No chord selected")
@@ -62,6 +64,8 @@ defmodule MenschWeb.ChordMatrixShowLive do
       socket =
         socket
         |> assign(:selected_pad, {normalized_row, normalized_column})
+        |> assign(:selected_row, normalized_row)
+        |> assign(:selected_column, normalized_column)
         |> assign_keyboard_from_selected_pad()
 
       if socket.assigns.chord_matrix_play_mode do
@@ -83,6 +87,160 @@ defmodule MenschWeb.ChordMatrixShowLive do
   @impl true
   def handle_event("toggle_matrix_play_mode", _params, socket) do
     {:noreply, assign(socket, :chord_matrix_play_mode, !socket.assigns.chord_matrix_play_mode)}
+  end
+
+  @impl true
+  def handle_event("select_row", %{"row" => row}, socket) do
+    with {:ok, normalized_row} <- parse_non_negative_integer(row),
+         :ok <- ensure_row_in_bounds(socket.assigns.record, normalized_row) do
+      {:noreply, assign(socket, :selected_row, normalized_row)}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Invalid row selection")}
+    end
+  end
+
+  @impl true
+  def handle_event("select_column", %{"column" => column}, socket) do
+    with {:ok, normalized_column} <- parse_non_negative_integer(column),
+         :ok <- ensure_column_in_bounds(socket.assigns.record, normalized_column) do
+      {:noreply, assign(socket, :selected_column, normalized_column)}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Invalid column selection")}
+    end
+  end
+
+  @impl true
+  def handle_event("insert_row_before_selected", _params, socket) do
+    with row when is_integer(row) <- socket.assigns.selected_row,
+         {:ok, record} <- ChordMatrices.insert_row_before(socket.assigns.record.id, row) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> adjust_selection_after_insert(:row_before, row, record)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Row inserted before selected row")}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a row first")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Insert failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("insert_row_after_selected", _params, socket) do
+    with row when is_integer(row) <- socket.assigns.selected_row,
+         {:ok, record} <- ChordMatrices.insert_row_after(socket.assigns.record.id, row) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> adjust_selection_after_insert(:row_after, row, record)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Row inserted after selected row")}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a row first")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Insert failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_selected_row", _params, socket) do
+    with row when is_integer(row) <- socket.assigns.selected_row,
+         true <- socket.assigns.record.chord_matrix.number_rows > 1,
+         deleted_count <- count_assignments_in_row(socket.assigns.record, row),
+         {:ok, record} <- ChordMatrices.remove_row(socket.assigns.record.id, row) do
+      message =
+        if deleted_count > 0,
+          do: "Removed selected row (#{deleted_count} assigned pad(s) deleted)",
+          else: "Removed selected row"
+
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> adjust_selection_after_remove(:row, row, record)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, message)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a row first")}
+
+      false ->
+        {:noreply, put_flash(socket, :error, "Matrix must keep at least one row")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Remove failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("insert_column_left_selected", _params, socket) do
+    with column when is_integer(column) <- socket.assigns.selected_column,
+         {:ok, record} <- ChordMatrices.insert_column_left(socket.assigns.record.id, column) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> adjust_selection_after_insert(:column_left, column, record)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Column inserted left of selected column")}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a column first")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Insert failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("insert_column_right_selected", _params, socket) do
+    with column when is_integer(column) <- socket.assigns.selected_column,
+         {:ok, record} <- ChordMatrices.insert_column_right(socket.assigns.record.id, column) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> adjust_selection_after_insert(:column_right, column, record)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, "Column inserted right of selected column")}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a column first")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Insert failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_selected_column", _params, socket) do
+    with column when is_integer(column) <- socket.assigns.selected_column,
+         true <- socket.assigns.record.chord_matrix.number_columns > 1,
+         deleted_count <- count_assignments_in_column(socket.assigns.record, column),
+         {:ok, record} <- ChordMatrices.remove_column(socket.assigns.record.id, column) do
+      message =
+        if deleted_count > 0,
+          do: "Removed selected column (#{deleted_count} assigned pad(s) deleted)",
+          else: "Removed selected column"
+
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> adjust_selection_after_remove(:column, column, record)
+       |> assign_keyboard_from_selected_pad()
+       |> put_flash(:info, message)}
+    else
+      nil ->
+        {:noreply, put_flash(socket, :error, "Select a column first")}
+
+      false ->
+        {:noreply, put_flash(socket, :error, "Matrix must keep at least one column")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Remove failed: #{inspect(reason)}")}
+    end
   end
 
   @impl true
@@ -221,33 +379,115 @@ defmodule MenschWeb.ChordMatrixShowLive do
                   Matrix Board
                 </h3>
 
-                <div class="flex items-center gap-2">
-                  <p class="font-mono text-[11px] text-zinc-400">
-                    Click a pad, then assign a chord from the side panel.
-                  </p>
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-1 rounded-sm border border-zinc-700/70 bg-zinc-950/70 px-1.5 py-1">
+                    <span class="font-mono text-[10px] uppercase tracking-wide text-zinc-400">Row</span>
+                    <button
+                      id="row-insert-before"
+                      type="button"
+                      phx-click="insert_row_before_selected"
+                      disabled={is_nil(@selected_row)}
+                      title="Add row before selected row"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span class="flex items-center gap-0.5">
+                        <.icon name="hero-plus" class="size-3.5" />
+                        <.icon name="hero-arrow-up" class="size-3.5" />
+                      </span>
+                    </button>
+                    <button
+                      id="row-insert-after"
+                      type="button"
+                      phx-click="insert_row_after_selected"
+                      disabled={is_nil(@selected_row)}
+                      title="Add row after selected row"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span class="flex items-center gap-0.5">
+                        <.icon name="hero-plus" class="size-3.5" />
+                        <.icon name="hero-arrow-down" class="size-3.5" />
+                      </span>
+                    </button>
+                    <button
+                      id="row-remove"
+                      type="button"
+                      phx-click="remove_selected_row"
+                      disabled={is_nil(@selected_row) or @record.chord_matrix.number_rows <= 1}
+                      title="Remove selected row"
+                      class="rounded-sm border border-rose-700/80 bg-rose-900/20 p-1 text-rose-200 transition-colors duration-150 enabled:hover:border-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <.icon name="hero-minus" class="size-4" />
+                    </button>
+                  </div>
 
-                  <button
-                    id="toggle-matrix-play-mode"
-                    type="button"
-                    phx-click="toggle_matrix_play_mode"
-                    role="switch"
-                    aria-checked={to_string(@chord_matrix_play_mode)}
-                    class="group inline-flex items-center gap-2 rounded-sm border border-zinc-600/80 bg-zinc-900/70 px-2 py-1.5 transition-colors duration-150 hover:border-zinc-400"
-                  >
-                    <span class="font-mono text-[10px] uppercase tracking-wide text-zinc-200">Play Mode</span>
-                    <span class={[
-                      "relative h-4 w-8 rounded-full border transition-colors duration-200",
-                      if(@chord_matrix_play_mode,
-                        do: "border-emerald-300/90 bg-emerald-500/60",
-                        else: "border-zinc-500/80 bg-zinc-800"
-                      )
-                    ]}>
+                  <div class="flex items-center gap-1 rounded-sm border border-zinc-700/70 bg-zinc-950/70 px-1.5 py-1">
+                    <span class="font-mono text-[10px] uppercase tracking-wide text-zinc-400">Column</span>
+                    <button
+                      id="column-insert-left"
+                      type="button"
+                      phx-click="insert_column_left_selected"
+                      disabled={is_nil(@selected_column)}
+                      title="Add column left of selected column"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span class="flex items-center gap-0.5">
+                        <.icon name="hero-plus" class="size-3.5" />
+                        <.icon name="hero-arrow-left" class="size-3.5" />
+                      </span>
+                    </button>
+                    <button
+                      id="column-insert-right"
+                      type="button"
+                      phx-click="insert_column_right_selected"
+                      disabled={is_nil(@selected_column)}
+                      title="Add column right of selected column"
+                      class="rounded-sm border border-zinc-600/80 bg-zinc-900/70 p-1 text-zinc-100 transition-colors duration-150 enabled:hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span class="flex items-center gap-0.5">
+                        <.icon name="hero-plus" class="size-3.5" />
+                        <.icon name="hero-arrow-right" class="size-3.5" />
+                      </span>
+                    </button>
+                    <button
+                      id="column-remove"
+                      type="button"
+                      phx-click="remove_selected_column"
+                      disabled={is_nil(@selected_column) or @record.chord_matrix.number_columns <= 1}
+                      title="Remove selected column"
+                      class="rounded-sm border border-rose-700/80 bg-rose-900/20 p-1 text-rose-200 transition-colors duration-150 enabled:hover:border-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <.icon name="hero-minus" class="size-4" />
+                    </button>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <p class="font-mono text-[11px] text-zinc-400">
+                      Click a pad, then assign a chord from the side panel.
+                    </p>
+
+                    <button
+                      id="toggle-matrix-play-mode"
+                      type="button"
+                      phx-click="toggle_matrix_play_mode"
+                      role="switch"
+                      aria-checked={to_string(@chord_matrix_play_mode)}
+                      class="group inline-flex items-center gap-2 rounded-sm border border-zinc-600/80 bg-zinc-900/70 px-2 py-1.5 transition-colors duration-150 hover:border-zinc-400"
+                    >
+                      <span class="font-mono text-[10px] uppercase tracking-wide text-zinc-200">Play Mode</span>
                       <span class={[
-                        "absolute top-0.5 size-2.5 rounded-full bg-zinc-100 transition-transform duration-200",
-                        if(@chord_matrix_play_mode, do: "translate-x-4", else: "translate-x-0.5")
-                      ]}></span>
-                    </span>
-                  </button>
+                        "relative h-4 w-8 rounded-full border transition-colors duration-200",
+                        if(@chord_matrix_play_mode,
+                          do: "border-emerald-300/90 bg-emerald-500/60",
+                          else: "border-zinc-500/80 bg-zinc-800"
+                        )
+                      ]}>
+                        <span class={[
+                          "absolute top-0.5 size-2.5 rounded-full bg-zinc-100 transition-transform duration-200",
+                          if(@chord_matrix_play_mode, do: "translate-x-4", else: "translate-x-0.5")
+                        ]}></span>
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -273,10 +513,35 @@ defmodule MenschWeb.ChordMatrixShowLive do
                   id="chord-matrix-board"
                   class="inline-grid gap-1"
                   style={
-                    "grid-template-columns: repeat(#{@record.chord_matrix.number_columns}, minmax(0, 6rem));"
+                    "grid-template-columns: 2rem repeat(#{@record.chord_matrix.number_columns}, minmax(0, 6rem));"
                   }
                 >
+                  <div class="h-8"></div>
+
+                  <button
+                    :for={col <- 0..(@record.chord_matrix.number_columns - 1)}
+                    id={"column-header-#{col}"}
+                    type="button"
+                    phx-click="select_column"
+                    phx-value-column={col}
+                    title={"Select column #{col + 1}"}
+                    class={column_header_classes(@selected_column == col)}
+                  >
+                    C{col + 1}
+                  </button>
+
                   <div :for={row <- 0..(@record.chord_matrix.number_rows - 1)} class="contents">
+                    <button
+                      id={"row-header-#{row}"}
+                      type="button"
+                      phx-click="select_row"
+                      phx-value-row={row}
+                      title={"Select row #{row + 1}"}
+                      class={row_header_classes(@selected_row == row)}
+                    >
+                      R{row + 1}
+                    </button>
+
                     <button
                       :for={col <- 0..(@record.chord_matrix.number_columns - 1)}
                       id={"pad-#{row}-#{col}"}
@@ -457,6 +722,18 @@ defmodule MenschWeb.ChordMatrixShowLive do
     end
   end
 
+  defp ensure_row_in_bounds(nil, _row), do: {:error, :invalid_record}
+
+  defp ensure_row_in_bounds(record, row) do
+    if row < record.chord_matrix.number_rows, do: :ok, else: {:error, :out_of_bounds}
+  end
+
+  defp ensure_column_in_bounds(nil, _column), do: {:error, :invalid_record}
+
+  defp ensure_column_in_bounds(record, column) do
+    if column < record.chord_matrix.number_columns, do: :ok, else: {:error, :out_of_bounds}
+  end
+
   defp ensure_progression_loaded(socket, id) do
     case Map.fetch(socket.assigns.progression_records, id) do
       {:ok, _record} ->
@@ -517,6 +794,167 @@ defmodule MenschWeb.ChordMatrixShowLive do
         else: ""
       )
     ]
+  end
+
+  defp row_header_classes(selected?) do
+    [
+      "flex h-full w-full items-center justify-center rounded-sm border font-mono text-[10px] transition-colors duration-150",
+      if(selected?,
+        do: "border-sky-300/90 bg-sky-500/25 text-sky-100",
+        else: "border-zinc-700/80 bg-zinc-900/70 text-zinc-400 hover:border-zinc-500"
+      )
+    ]
+  end
+
+  defp column_header_classes(selected?) do
+    [
+      "h-8 rounded-sm border font-mono text-[10px] transition-colors duration-150",
+      if(selected?,
+        do: "border-sky-300/90 bg-sky-500/25 text-sky-100",
+        else: "border-zinc-700/80 bg-zinc-900/70 text-zinc-400 hover:border-zinc-500"
+      )
+    ]
+  end
+
+  defp adjust_selection_after_insert(socket, operation, index, record) do
+    {new_selected_row, new_selected_column} =
+      case operation do
+        :row_before ->
+          {
+            shift_selected_index(socket.assigns.selected_row, index, :before),
+            socket.assigns.selected_column
+          }
+
+        :row_after ->
+          {
+            shift_selected_index(socket.assigns.selected_row, index + 1, :before),
+            socket.assigns.selected_column
+          }
+
+        :column_left ->
+          {
+            socket.assigns.selected_row,
+            shift_selected_index(socket.assigns.selected_column, index, :before)
+          }
+
+        :column_right ->
+          {
+            socket.assigns.selected_row,
+            shift_selected_index(socket.assigns.selected_column, index + 1, :before)
+          }
+      end
+
+    socket
+    |> assign(:selected_row, clamp_index(new_selected_row, record.chord_matrix.number_rows))
+    |> assign(
+      :selected_column,
+      clamp_index(new_selected_column, record.chord_matrix.number_columns)
+    )
+    |> assign(
+      :selected_pad,
+      shift_selected_pad(socket.assigns.selected_pad, operation, index, record)
+    )
+  end
+
+  defp adjust_selection_after_remove(socket, axis, removed_index, record) do
+    new_selected_row =
+      case axis do
+        :row -> clamp_index(socket.assigns.selected_row, record.chord_matrix.number_rows)
+        :column -> clamp_index(socket.assigns.selected_row, record.chord_matrix.number_rows)
+      end
+
+    new_selected_column =
+      case axis do
+        :row -> clamp_index(socket.assigns.selected_column, record.chord_matrix.number_columns)
+        :column -> clamp_index(socket.assigns.selected_column, record.chord_matrix.number_columns)
+      end
+
+    socket
+    |> assign(:selected_row, new_selected_row)
+    |> assign(:selected_column, new_selected_column)
+    |> assign(
+      :selected_pad,
+      shift_selected_pad_on_remove(socket.assigns.selected_pad, axis, removed_index, record)
+    )
+  end
+
+  defp shift_selected_index(nil, _insertion_index, _mode), do: nil
+
+  defp shift_selected_index(index, insertion_index, :before) when is_integer(index) do
+    if index >= insertion_index, do: index + 1, else: index
+  end
+
+  defp clamp_index(nil, _max), do: nil
+  defp clamp_index(_index, max) when max <= 0, do: nil
+
+  defp clamp_index(index, max) when is_integer(index) do
+    index
+    |> max(0)
+    |> min(max - 1)
+  end
+
+  defp shift_selected_pad(nil, _operation, _index, _record), do: nil
+
+  defp shift_selected_pad({row, column}, operation, index, record) do
+    shifted =
+      case operation do
+        :row_before -> if(row >= index, do: {row + 1, column}, else: {row, column})
+        :row_after -> if(row > index, do: {row + 1, column}, else: {row, column})
+        :column_left -> if(column >= index, do: {row, column + 1}, else: {row, column})
+        :column_right -> if(column > index, do: {row, column + 1}, else: {row, column})
+      end
+
+    clamp_pad(shifted, record)
+  end
+
+  defp shift_selected_pad_on_remove(nil, _axis, _removed_index, _record), do: nil
+
+  defp shift_selected_pad_on_remove({row, column}, :row, removed_index, record) do
+    shifted =
+      cond do
+        row == removed_index -> {min(removed_index, record.chord_matrix.number_rows - 1), column}
+        row > removed_index -> {row - 1, column}
+        true -> {row, column}
+      end
+
+    clamp_pad(shifted, record)
+  end
+
+  defp shift_selected_pad_on_remove({row, column}, :column, removed_index, record) do
+    shifted =
+      cond do
+        column == removed_index ->
+          {row, min(removed_index, record.chord_matrix.number_columns - 1)}
+
+        column > removed_index ->
+          {row, column - 1}
+
+        true ->
+          {row, column}
+      end
+
+    clamp_pad(shifted, record)
+  end
+
+  defp clamp_pad({row, column}, %{chord_matrix: chord_matrix}) do
+    cond do
+      chord_matrix.number_rows <= 0 or chord_matrix.number_columns <= 0 -> nil
+      row < 0 or column < 0 -> nil
+      row >= chord_matrix.number_rows or column >= chord_matrix.number_columns -> nil
+      true -> {row, column}
+    end
+  end
+
+  defp count_assignments_in_row(record, row_index) do
+    record.chord_matrix.assignments
+    |> Map.values()
+    |> Enum.count(&(&1.row == row_index))
+  end
+
+  defp count_assignments_in_column(record, column_index) do
+    record.chord_matrix.assignments
+    |> Map.values()
+    |> Enum.count(&(&1.column == column_index))
   end
 
   defp play_notes_for_3s(socket, notes, source_label \\ "Previewing chord") do

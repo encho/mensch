@@ -104,6 +104,56 @@ defmodule Mensch.ChordMatricesTest do
     assert loaded.chord_matrix.assignments == %{}
   end
 
+  test "insert and remove row shifts assignments as expected" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    assert {:ok, _record} =
+             ChordMatrices.assign_chord_to_pad(
+               matrix_record.id,
+               1,
+               0,
+               chord(:f, :maj7),
+               %{
+                 source_progression_id: "row_shift",
+                 source_progression_name: "Row Shift",
+                 source_chord_index: 0
+               }
+             )
+
+    assert {:ok, inserted_record} = ChordMatrices.insert_row_before(matrix_record.id, 1)
+    assert inserted_record.chord_matrix.number_rows == 3
+    assert Map.has_key?(inserted_record.chord_matrix.assignments, {2, 0})
+
+    assert {:ok, removed_record} = ChordMatrices.remove_row(matrix_record.id, 1)
+    assert removed_record.chord_matrix.number_rows == 2
+    assert Map.has_key?(removed_record.chord_matrix.assignments, {1, 0})
+  end
+
+  test "insert and remove column shifts assignments as expected" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    assert {:ok, _record} =
+             ChordMatrices.assign_chord_to_pad(
+               matrix_record.id,
+               0,
+               1,
+               chord(:d, :min7),
+               %{
+                 source_progression_id: "column_shift",
+                 source_progression_name: "Column Shift",
+                 source_chord_index: 0
+               }
+             )
+
+    assert {:ok, inserted_record} = ChordMatrices.insert_column_left(matrix_record.id, 1)
+    assert inserted_record.chord_matrix.number_columns == 3
+    assert Map.has_key?(inserted_record.chord_matrix.assignments, {0, 2})
+
+    assert {:ok, removed_record} = ChordMatrices.remove_column(matrix_record.id, 1)
+    assert removed_record.chord_matrix.number_columns == 2
+    assert Map.has_key?(removed_record.chord_matrix.assignments, {0, 1})
+  end
+
   defp chord(root, quality) do
     ChordSpec.new!(%{
       harmonic_identity: %ChordSpec.HarmonicIdentity{root: root, quality: quality},
