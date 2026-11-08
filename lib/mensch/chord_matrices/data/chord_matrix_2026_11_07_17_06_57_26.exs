@@ -1,11 +1,19 @@
 %{
   id: "chord_matrix_2026_11_07_17_06_57_26",
-  version: 4,
+  version: 5,
   chord_matrix: %Mensch.Harmony.ChordMatrix{
     number_rows: 3,
     number_columns: 8,
     bpm: 120,
     time_signature: {4, 4},
+    machine: %{
+      blueprint_id: "progression__alternating_wander__dv1",
+      additional_params: %{
+        "direction_mode" => "alternate",
+        "number_of_inversions" => 8,
+        "pressure_attack_mbeats" => 50.0
+      }
+    },
     assignments: %{
       {0, 0} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
@@ -450,5 +458,5 @@
     }
   },
   inserted_at: "2026-11-07T17:06:57Z",
-  updated_at: "2026-11-08T15:24:06Z"
+  updated_at: "2026-11-08T15:34:32Z"
 }

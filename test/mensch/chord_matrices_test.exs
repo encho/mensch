@@ -3,6 +3,7 @@ defmodule Mensch.ChordMatricesTest do
 
   alias Mensch.ChordMatrices
   alias Mensch.Harmony.ChordSpec
+  alias Mensch.SampleBlueprint
 
   setup do
     original_dir = Application.get_env(:mensch, :chord_matrices_dir)
@@ -33,6 +34,11 @@ defmodule Mensch.ChordMatricesTest do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
     assert matrix_record.chord_matrix.bpm == 120
     assert matrix_record.chord_matrix.time_signature == {4, 4}
+
+    assert matrix_record.chord_matrix.machine.blueprint_id ==
+             SampleBlueprint.default_blueprint_id()
+
+    assert is_map(matrix_record.chord_matrix.machine.additional_params)
 
     assert {:ok, updated_record} =
              ChordMatrices.assign_chord_to_pad(
@@ -129,6 +135,37 @@ defmodule Mensch.ChordMatricesTest do
 
     assert {:error, :invalid_time_signature} =
              ChordMatrices.update_time_signature(matrix_record.id, {0, 4})
+  end
+
+  test "update_machine persists blueprint-backed machine settings" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    assert {:ok, updated_record} =
+             ChordMatrices.update_machine(
+               matrix_record.id,
+               "progression__steady_strum__strum1",
+               %{
+                 "velocity" => "90",
+                 "pressure_attack_mbeats" => "250.0",
+                 "pressure_curve" => "triangle"
+               }
+             )
+
+    assert updated_record.chord_matrix.machine.blueprint_id == "progression__steady_strum__strum1"
+    assert updated_record.chord_matrix.machine.additional_params["velocity"] == 90
+
+    assert updated_record.chord_matrix.machine.additional_params["pressure_attack_mbeats"] ==
+             250.0
+
+    assert updated_record.chord_matrix.machine.additional_params["pressure_curve"] == "triangle"
+
+    assert {:ok, reloaded_record} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+
+    assert reloaded_record.chord_matrix.machine.blueprint_id ==
+             "progression__steady_strum__strum1"
+
+    assert {:error, "invalid blueprint_id"} =
+             ChordMatrices.update_machine(matrix_record.id, "unknown", %{})
   end
 
   test "insert and remove row shifts assignments as expected" do

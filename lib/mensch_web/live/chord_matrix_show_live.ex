@@ -6,10 +6,13 @@ defmodule MenschWeb.ChordMatrixShowLive do
   alias Mensch.Harmony.ChordMatrix
   alias Mensch.Harmony.ChordSpec
   alias Mensch.Harmony.Resolver
+  alias Mensch.SampleBlueprint
   alias MenschWeb.FullPianoKeyboard
 
   @impl true
   def mount(_params, _session, socket) do
+    machine_settings = default_machine_settings()
+
     {:ok,
      socket
      |> assign(:midi_status, Mensch.Midi.Connection.status())
@@ -25,6 +28,8 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:progression_records, %{})
      |> assign(:bpm_form, to_form(%{"bpm" => "120"}, as: :chord_matrix))
      |> assign(:time_signature_form, time_signature_form({4, 4}))
+     |> assign(:machine_settings, machine_settings)
+     |> assign(:machine_schema, machine_settings_schema(machine_settings))
      |> assign(:bulk_assign_confirm, nil)
      |> assign(:preview_note_channels, [])
      |> assign(:preview_stop_ref, nil)}
@@ -39,6 +44,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
          |> assign(:record, record)
          |> assign(:bpm_form, bpm_form(record.chord_matrix.bpm))
          |> assign(:time_signature_form, time_signature_form(record.chord_matrix.time_signature))
+         |> assign_machine_settings(record.chord_matrix.machine)
          |> assign_keyboard_from_selected_pad()}
 
       {:error, :not_found} ->
@@ -163,6 +169,54 @@ defmodule MenschWeb.ChordMatrixShowLive do
       {:error, reason} ->
         {:noreply,
          put_flash(socket, :error, "Failed to update time signature: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("set_machine_settings", %{"machine" => machine_params}, socket) do
+    current_settings = socket.assigns.machine_settings
+
+    selected_blueprint_id =
+      Map.get(machine_params, "blueprint_id", Map.get(current_settings, "blueprint_id"))
+
+    incoming_additional = Map.get(machine_params, "additional", %{})
+
+    normalized_settings =
+      if selected_blueprint_id != Map.get(current_settings, "blueprint_id") do
+        normalize_machine_settings(selected_blueprint_id, %{})
+      else
+        normalize_machine_settings(selected_blueprint_id, incoming_additional)
+      end
+
+    {:noreply,
+     socket
+     |> assign(:machine_settings, normalized_settings)
+     |> assign(:machine_schema, machine_settings_schema(normalized_settings))}
+  end
+
+  @impl true
+  def handle_event("save_machine_settings", %{"machine" => machine_params}, socket) do
+    blueprint_id =
+      Map.get(machine_params, "blueprint_id", socket.assigns.machine_settings["blueprint_id"])
+
+    additional = Map.get(machine_params, "additional", %{})
+
+    case ChordMatrices.update_machine(socket.assigns.record.id, blueprint_id, additional) do
+      {:ok, record} ->
+        {:noreply,
+         socket
+         |> assign(:record, record)
+         |> assign_machine_settings(record.chord_matrix.machine)
+         |> put_flash(:info, "Machine settings updated")}
+
+      {:error, reason} ->
+        normalized_settings = normalize_machine_settings(blueprint_id, additional)
+
+        {:noreply,
+         socket
+         |> assign(:machine_settings, normalized_settings)
+         |> assign(:machine_schema, machine_settings_schema(normalized_settings))
+         |> put_flash(:error, "Failed to update machine settings: #{inspect(reason)}")}
     end
   end
 
@@ -630,6 +684,85 @@ defmodule MenschWeb.ChordMatrixShowLive do
                   </button>
                 </.form>
               </div>
+
+              <form
+                id="matrix-machine-form"
+                phx-change="set_machine_settings"
+                phx-submit="save_machine_settings"
+                class="mt-4 space-y-3 rounded-sm border border-zinc-700/70 bg-zinc-950/60 p-3"
+              >
+                <h4 class="font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                  Global Machine
+                </h4>
+
+                <label class="space-y-1">
+                  <span class="block font-mono text-[11px] uppercase tracking-wide text-zinc-400">
+                    Machine Type
+                  </span>
+                  <select
+                    name="machine[blueprint_id]"
+                    value={@machine_settings["blueprint_id"]}
+                    class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                  >
+                    <option
+                      :for={bp <- machine_blueprint_options()}
+                      value={bp.id}
+                      selected={@machine_settings["blueprint_id"] == bp.id}
+                    >
+                      {bp.label}
+                    </option>
+                  </select>
+                </label>
+
+                <div :if={@machine_schema == []} class="font-mono text-xs text-zinc-400">
+                  No parameters required for this machine.
+                </div>
+
+                <div :if={@machine_schema != []} class="grid gap-2 lg:grid-cols-3">
+                  <div :for={field <- @machine_schema} class="space-y-1">
+                    <label class="block font-mono text-[11px] uppercase tracking-wide text-zinc-300">
+                      {field.label}
+                    </label>
+
+                    <select
+                      :if={field.type == :enum}
+                      name={"machine[additional][#{field.name}]"}
+                      value={machine_additional_value(@machine_settings, field)}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    >
+                      <option
+                        :for={option <- Map.get(field, :options, [])}
+                        value={option.value}
+                        selected={
+                          machine_additional_value(@machine_settings, field) ==
+                            to_string(option.value)
+                        }
+                      >
+                        {option.label}
+                      </option>
+                    </select>
+
+                    <input
+                      :if={field.type in [:int, :float]}
+                      name={"machine[additional][#{field.name}]"}
+                      type="number"
+                      min={Map.get(field, :min)}
+                      max={Map.get(field, :max)}
+                      step={machine_field_input_step(field)}
+                      value={machine_additional_value(@machine_settings, field)}
+                      class="w-full rounded-sm border border-zinc-700 bg-zinc-900/80 px-2 py-1 font-mono text-xs text-zinc-100"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  id="matrix-machine-save"
+                  type="submit"
+                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                >
+                  Save Machine Settings
+                </button>
+              </form>
             </div>
 
             <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/50 p-3">
@@ -1231,6 +1364,95 @@ defmodule MenschWeb.ChordMatrixShowLive do
       },
       as: :chord_matrix
     )
+  end
+
+  defp machine_blueprint_options do
+    SampleBlueprint.available_blueprints()
+  end
+
+  defp machine_additional_value(settings, field) do
+    additional = Map.get(settings, "additional", %{})
+    value = Map.get(additional, field.name, field.default)
+    to_string(value)
+  end
+
+  defp machine_field_input_step(%{type: :int}), do: "1"
+
+  defp machine_field_input_step(%{type: :float} = field),
+    do: to_string(Map.get(field, :step, 0.1))
+
+  defp default_machine_settings do
+    blueprint_id = SampleBlueprint.default_blueprint_id()
+
+    additional =
+      case SampleBlueprint.default_additional_params(blueprint_id) do
+        {:ok, values} -> normalize_map_string_keys(values)
+        {:error, _reason} -> %{}
+      end
+
+    %{"blueprint_id" => blueprint_id, "additional" => additional}
+  end
+
+  defp normalize_machine_settings(blueprint_id, additional) when is_binary(blueprint_id) do
+    normalized_additional = normalize_map_string_keys(additional)
+
+    with {:ok, schema} <- SampleBlueprint.additional_param_schema(blueprint_id),
+         {:ok, defaults} <- SampleBlueprint.default_additional_params(blueprint_id) do
+      allowed_keys = Enum.map(schema, & &1.name)
+
+      merged_additional =
+        defaults
+        |> normalize_map_string_keys()
+        |> Map.merge(normalized_additional)
+        |> Map.take(allowed_keys)
+
+      %{"blueprint_id" => blueprint_id, "additional" => merged_additional}
+    else
+      _ ->
+        default_machine_settings()
+    end
+  end
+
+  defp normalize_machine_settings(_blueprint_id, _additional), do: default_machine_settings()
+
+  defp machine_settings_schema(settings) do
+    blueprint_id = Map.get(settings, "blueprint_id", SampleBlueprint.default_blueprint_id())
+
+    case SampleBlueprint.additional_param_schema(blueprint_id) do
+      {:ok, schema} -> schema
+      {:error, _reason} -> []
+    end
+  end
+
+  defp assign_machine_settings(socket, machine_config) when is_map(machine_config) do
+    blueprint_id =
+      Map.get(machine_config, :blueprint_id) || Map.get(machine_config, "blueprint_id") ||
+        SampleBlueprint.default_blueprint_id()
+
+    additional =
+      Map.get(machine_config, :additional_params) || Map.get(machine_config, "additional_params") ||
+        %{}
+
+    settings = normalize_machine_settings(blueprint_id, additional)
+
+    socket
+    |> assign(:machine_settings, settings)
+    |> assign(:machine_schema, machine_settings_schema(settings))
+  end
+
+  defp assign_machine_settings(socket, _machine_config) do
+    settings = default_machine_settings()
+
+    socket
+    |> assign(:machine_settings, settings)
+    |> assign(:machine_schema, machine_settings_schema(settings))
+  end
+
+  defp normalize_map_string_keys(map) when is_map(map) do
+    Enum.reduce(map, %{}, fn {key, value}, acc ->
+      normalized_key = if is_atom(key), do: Atom.to_string(key), else: to_string(key)
+      Map.put(acc, normalized_key, value)
+    end)
   end
 
   defp ensure_selected_pad_in_bounds(nil, _row, _column), do: {:error, :invalid_record}

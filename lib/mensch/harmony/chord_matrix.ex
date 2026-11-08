@@ -13,6 +13,7 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   @default_time_signature {4, 4}
+  @default_machine %{blueprint_id: "progression__alternating_wander__dv1", additional_params: %{}}
 
   @enforce_keys [:number_rows, :number_columns]
   defstruct [
@@ -20,6 +21,7 @@ defmodule Mensch.Harmony.ChordMatrix do
     :number_columns,
     bpm: 120,
     time_signature: @default_time_signature,
+    machine: @default_machine,
     assignments: %{}
   ]
 
@@ -32,6 +34,7 @@ defmodule Mensch.Harmony.ChordMatrix do
           number_columns: pos_integer(),
           bpm: pos_integer(),
           time_signature: {pos_integer(), pos_integer()},
+          machine: %{blueprint_id: String.t(), additional_params: map()},
           assignments: %{optional(pad_key()) => pad_assignment()}
         }
 
@@ -48,6 +51,7 @@ defmodule Mensch.Harmony.ChordMatrix do
          {:ok, bpm} <- parse_positive_integer(Map.get(attrs_map, :bpm, 120)),
          {:ok, time_signature} <-
            parse_time_signature(Map.get(attrs_map, :time_signature, @default_time_signature)),
+         {:ok, machine} <- parse_machine_config(Map.get(attrs_map, :machine, @default_machine)),
          {:ok, assignments} <-
            parse_assignments(
              Map.get(attrs_map, :assignments, %{}),
@@ -60,6 +64,7 @@ defmodule Mensch.Harmony.ChordMatrix do
          number_columns: number_columns,
          bpm: bpm,
          time_signature: time_signature,
+         machine: machine,
          assignments: assignments
        }}
     end
@@ -140,6 +145,17 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   def set_time_signature(_chord_matrix, _time_signature), do: {:error, :invalid_time_signature}
+
+  @spec set_machine(t(), map()) :: {:ok, t()} | {:error, term()}
+  def set_machine(%__MODULE__{} = chord_matrix, machine_config) do
+    with {:ok, normalized_machine} <- parse_machine_config(machine_config) do
+      {:ok, %__MODULE__{chord_matrix | machine: normalized_machine}}
+    else
+      {:error, :invalid_machine} -> {:error, :invalid_machine}
+    end
+  end
+
+  def set_machine(_chord_matrix, _machine_config), do: {:error, :invalid_machine}
 
   @spec insert_row_before(t(), integer()) :: {:ok, t()} | {:error, term()}
   def insert_row_before(%__MODULE__{} = chord_matrix, row_index) do
@@ -307,6 +323,48 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   defp parse_time_signature(_value), do: {:error, :invalid_time_signature}
+
+  defp parse_machine_config(%{} = machine_config) do
+    blueprint_id =
+      Map.get(machine_config, :blueprint_id) || Map.get(machine_config, "blueprint_id")
+
+    additional_params =
+      Map.get(machine_config, :additional_params) || Map.get(machine_config, "additional_params") ||
+        %{}
+
+    with {:ok, normalized_blueprint_id} <- parse_non_empty_string(blueprint_id),
+         true <- is_map(additional_params) do
+      {:ok,
+       %{
+         blueprint_id: normalized_blueprint_id,
+         additional_params: normalize_map_string_keys(additional_params)
+       }}
+    else
+      false -> {:error, :invalid_machine}
+      {:error, :invalid_string} -> {:error, :invalid_machine}
+    end
+  end
+
+  defp parse_machine_config(_value), do: {:error, :invalid_machine}
+
+  defp parse_non_empty_string(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if trimmed == "" do
+      {:error, :invalid_string}
+    else
+      {:ok, trimmed}
+    end
+  end
+
+  defp parse_non_empty_string(_value), do: {:error, :invalid_string}
+
+  defp normalize_map_string_keys(map) when is_map(map) do
+    Enum.reduce(map, %{}, fn {key, value}, acc ->
+      normalized_key = if is_atom(key), do: Atom.to_string(key), else: to_string(key)
+      Map.put(acc, normalized_key, value)
+    end)
+  end
 
   defp ensure_in_bounds(%__MODULE__{} = chord_matrix, row, column) do
     if row < chord_matrix.number_rows and column < chord_matrix.number_columns do

@@ -8,6 +8,7 @@ defmodule Mensch.ChordMatrices do
 
   alias Mensch.Harmony.ChordMatrix
   alias Mensch.Harmony.ChordSpec
+  alias Mensch.SampleBlueprint
 
   @type chord_matrix_record :: %{
           version: pos_integer(),
@@ -17,7 +18,7 @@ defmodule Mensch.ChordMatrices do
           chord_matrix: ChordMatrix.t()
         }
 
-  @current_version 4
+  @current_version 5
 
   @spec list_chord_matrices() :: [map()]
   def list_chord_matrices do
@@ -72,7 +73,11 @@ defmodule Mensch.ChordMatrices do
   def create_chord_matrix(number_rows, number_columns)
       when is_integer(number_rows) and is_integer(number_columns) do
     with {:ok, chord_matrix} <-
-           ChordMatrix.new(%{number_rows: number_rows, number_columns: number_columns}) do
+           ChordMatrix.new(%{
+             number_rows: number_rows,
+             number_columns: number_columns,
+             machine: default_machine_config()
+           }) do
       storage_dir()
       |> ensure_storage_dir!()
 
@@ -239,6 +244,19 @@ defmodule Mensch.ChordMatrices do
 
   def update_time_signature(_id, _time_signature), do: {:error, :invalid_params}
 
+  @spec update_machine(String.t(), String.t(), map()) ::
+          {:ok, chord_matrix_record()} | {:error, term()}
+  def update_machine(id, blueprint_id, additional_params)
+      when is_binary(id) and is_binary(blueprint_id) and is_map(additional_params) do
+    with {:ok, machine_config} <- normalize_machine_config(blueprint_id, additional_params) do
+      update_chord_matrix(id, fn chord_matrix ->
+        ChordMatrix.set_machine(chord_matrix, machine_config)
+      end)
+    end
+  end
+
+  def update_machine(_id, _blueprint_id, _additional_params), do: {:error, :invalid_params}
+
   @spec assign_progression_to_row(String.t(), integer(), String.t(), String.t(), [ChordSpec.t()]) ::
           {:ok, chord_matrix_record()} | {:error, term()}
   def assign_progression_to_row(id, row_index, progression_id, progression_name, chords)
@@ -383,6 +401,140 @@ defmodule Mensch.ChordMatrices do
     if axis_index >= 0 and axis_index < chord_matrix.number_columns,
       do: :ok,
       else: {:error, :out_of_bounds}
+  end
+
+  defp default_machine_config do
+    blueprint_id = SampleBlueprint.default_blueprint_id()
+
+    case SampleBlueprint.default_additional_params(blueprint_id) do
+      {:ok, additional_params} ->
+        %{
+          blueprint_id: blueprint_id,
+          additional_params: normalize_map_string_keys(additional_params)
+        }
+
+      {:error, _reason} ->
+        %{blueprint_id: blueprint_id, additional_params: %{}}
+    end
+  end
+
+  defp normalize_machine_config(blueprint_id, additional_params) do
+    with {:ok, schema} <- SampleBlueprint.additional_param_schema(blueprint_id),
+         {:ok, defaults} <- SampleBlueprint.default_additional_params(blueprint_id),
+         {:ok, normalized_additional} <-
+           normalize_machine_additional(additional_params, schema, defaults) do
+      {:ok, %{blueprint_id: blueprint_id, additional_params: normalized_additional}}
+    end
+  end
+
+  defp normalize_machine_additional(additional_params, schema, defaults)
+       when is_map(additional_params) and is_list(schema) and is_map(defaults) do
+    incoming = normalize_map_string_keys(additional_params)
+    normalized_defaults = normalize_map_string_keys(defaults)
+    allowed_keys = MapSet.new(Enum.map(schema, & &1.name))
+
+    unknown_keys =
+      incoming
+      |> Map.keys()
+      |> MapSet.new()
+      |> MapSet.difference(allowed_keys)
+      |> MapSet.to_list()
+
+    if unknown_keys != [] do
+      {:error, "unknown machine parameters: #{Enum.join(unknown_keys, ", ")}"}
+    else
+      schema
+      |> Enum.reduce_while({:ok, %{}}, fn field, {:ok, acc} ->
+        raw_value =
+          Map.get(incoming, field.name, Map.get(normalized_defaults, field.name, field.default))
+
+        case normalize_machine_field_value(field, raw_value) do
+          {:ok, value} -> {:cont, {:ok, Map.put(acc, field.name, value)}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+    end
+  end
+
+  defp normalize_machine_additional(_additional_params, _schema, _defaults),
+    do: {:error, "machine additional params must be a map"}
+
+  defp normalize_machine_field_value(%{type: :int, name: name} = field, raw_value) do
+    with {:ok, value} <- parse_int(raw_value, name),
+         :ok <- validate_min_max(value, field, name) do
+      {:ok, value}
+    end
+  end
+
+  defp normalize_machine_field_value(%{type: :float, name: name} = field, raw_value) do
+    with {:ok, value} <- parse_float(raw_value, name),
+         :ok <- validate_min_max(value, field, name) do
+      {:ok, value}
+    end
+  end
+
+  defp normalize_machine_field_value(%{type: :enum, name: name, options: options}, raw_value)
+       when is_list(options) do
+    allowed_values = Enum.map(options, & &1.value)
+    value = to_string(raw_value)
+
+    if value in allowed_values do
+      {:ok, value}
+    else
+      {:error, "#{name} must be one of: #{Enum.join(allowed_values, ", ")}"}
+    end
+  end
+
+  defp normalize_machine_field_value(%{type: :enum, name: name}, _raw_value),
+    do: {:error, "#{name} enum schema is invalid"}
+
+  defp normalize_machine_field_value(%{name: name}, _raw_value),
+    do: {:error, "unsupported machine field type for #{name}"}
+
+  defp validate_min_max(value, field, name) do
+    min = Map.get(field, :min)
+    max = Map.get(field, :max)
+
+    cond do
+      not is_nil(min) and value < min ->
+        {:error, "#{name} must be >= #{min}"}
+
+      not is_nil(max) and value > max ->
+        {:error, "#{name} must be <= #{max}"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp parse_int(value, _field) when is_integer(value), do: {:ok, value}
+
+  defp parse_int(value, field) when is_binary(value) do
+    case Integer.parse(value) do
+      {parsed, ""} -> {:ok, parsed}
+      _ -> {:error, "#{field} must be an integer"}
+    end
+  end
+
+  defp parse_int(_value, field), do: {:error, "#{field} must be an integer"}
+
+  defp parse_float(value, _field) when is_float(value), do: {:ok, value}
+  defp parse_float(value, _field) when is_integer(value), do: {:ok, value * 1.0}
+
+  defp parse_float(value, field) when is_binary(value) do
+    case Float.parse(value) do
+      {parsed, ""} -> {:ok, parsed}
+      _ -> {:error, "#{field} must be a float"}
+    end
+  end
+
+  defp parse_float(_value, field), do: {:error, "#{field} must be a float"}
+
+  defp normalize_map_string_keys(map) when is_map(map) do
+    Enum.reduce(map, %{}, fn {key, value}, acc ->
+      normalized_key = if is_atom(key), do: Atom.to_string(key), else: to_string(key)
+      Map.put(acc, normalized_key, value)
+    end)
   end
 
   defp unique_id do

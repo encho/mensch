@@ -165,6 +165,41 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert persisted.chord_matrix.time_signature == {4, 4}
   end
 
+  test "shows machine form and persists machine settings", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    assert has_element?(view, "#matrix-machine-form")
+
+    view
+    |> form("#matrix-machine-form", %{
+      "machine" => %{"blueprint_id" => "progression__steady_strum__strum1"}
+    })
+    |> render_change()
+
+    view
+    |> form("#matrix-machine-form", %{
+      "machine" => %{
+        "blueprint_id" => "progression__steady_strum__strum1",
+        "additional" => %{
+          "velocity" => "88",
+          "pressure_attack_mbeats" => "210.0",
+          "pressure_curve" => "square"
+        }
+      }
+    })
+    |> render_submit()
+
+    assert render(view) =~ "Machine settings updated"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.machine.blueprint_id == "progression__steady_strum__strum1"
+    assert persisted.chord_matrix.machine.additional_params["velocity"] == 88
+    assert persisted.chord_matrix.machine.additional_params["pressure_attack_mbeats"] == 210.0
+    assert persisted.chord_matrix.machine.additional_params["pressure_curve"] == "square"
+  end
+
   test "toggles global matrix play mode", %{conn: conn} do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(1, 1)
 
