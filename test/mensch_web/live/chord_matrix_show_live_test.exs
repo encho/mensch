@@ -97,6 +97,39 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert Map.get(persisted_after_clear.chord_matrix.assignments, {0, 0}) == nil
   end
 
+  test "shows default bpm and allows updating it", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    assert render(view) =~ "120 BPM"
+
+    view
+    |> form("#matrix-bpm-form", %{"chord_matrix" => %{"bpm" => "138"}})
+    |> render_submit()
+
+    assert render(view) =~ "BPM updated"
+    assert render(view) =~ "138 BPM"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.bpm == 138
+  end
+
+  test "rejects invalid bpm updates", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> form("#matrix-bpm-form", %{"chord_matrix" => %{"bpm" => "0"}})
+    |> render_submit()
+
+    assert render(view) =~ "BPM must be a positive integer"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.bpm == 120
+  end
+
   test "toggles global matrix play mode", %{conn: conn} do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(1, 1)
 

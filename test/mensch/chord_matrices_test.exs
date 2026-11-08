@@ -31,6 +31,7 @@ defmodule Mensch.ChordMatricesTest do
 
   test "assign_chord_to_pad persists assignment metadata and chord snapshot" do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+    assert matrix_record.chord_matrix.bpm == 120
 
     assert {:ok, updated_record} =
              ChordMatrices.assign_chord_to_pad(
@@ -101,7 +102,21 @@ defmodule Mensch.ChordMatricesTest do
     assert {:ok, loaded} = ChordMatrices.fetch_chord_matrix("legacy")
     assert loaded.chord_matrix.number_rows == 3
     assert loaded.chord_matrix.number_columns == 4
+    assert loaded.chord_matrix.bpm == 120
     assert loaded.chord_matrix.assignments == %{}
+  end
+
+  test "update_bpm persists valid bpm and rejects invalid values" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+    assert matrix_record.chord_matrix.bpm == 120
+
+    assert {:ok, updated_record} = ChordMatrices.update_bpm(matrix_record.id, 144)
+    assert updated_record.chord_matrix.bpm == 144
+
+    assert {:ok, reloaded_record} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert reloaded_record.chord_matrix.bpm == 144
+
+    assert {:error, :invalid_bpm} = ChordMatrices.update_bpm(matrix_record.id, 0)
   end
 
   test "insert and remove row shifts assignments as expected" do

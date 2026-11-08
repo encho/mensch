@@ -23,6 +23,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:progressions, ChordProgressions.list_progressions())
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
+     |> assign(:bpm_form, to_form(%{"bpm" => "120"}, as: :chord_matrix))
      |> assign(:bulk_assign_confirm, nil)
      |> assign(:preview_note_channels, [])
      |> assign(:preview_stop_ref, nil)}
@@ -35,6 +36,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
         {:noreply,
          socket
          |> assign(:record, record)
+         |> assign(:bpm_form, bpm_form(record.chord_matrix.bpm))
          |> assign_keyboard_from_selected_pad()}
 
       {:error, :not_found} ->
@@ -88,6 +90,33 @@ defmodule MenschWeb.ChordMatrixShowLive do
   @impl true
   def handle_event("toggle_matrix_play_mode", _params, socket) do
     {:noreply, assign(socket, :chord_matrix_play_mode, !socket.assigns.chord_matrix_play_mode)}
+  end
+
+  @impl true
+  def handle_event("update_bpm", %{"chord_matrix" => %{"bpm" => bpm_value}}, socket) do
+    with {:ok, parsed_bpm} <- parse_positive_integer(bpm_value),
+         {:ok, record} <- ChordMatrices.update_bpm(socket.assigns.record.id, parsed_bpm) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:bpm_form, bpm_form(record.chord_matrix.bpm))
+       |> put_flash(:info, "BPM updated")}
+    else
+      {:error, :invalid_integer} ->
+        {:noreply,
+         socket
+         |> assign(:bpm_form, bpm_form(bpm_value))
+         |> put_flash(:error, "BPM must be a positive integer")}
+
+      {:error, :invalid_bpm} ->
+        {:noreply,
+         socket
+         |> assign(:bpm_form, bpm_form(bpm_value))
+         |> put_flash(:error, "BPM must be a positive integer")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to update BPM: #{inspect(reason)}")}
+    end
   end
 
   @impl true
@@ -488,7 +517,33 @@ defmodule MenschWeb.ChordMatrixShowLive do
                 <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
                   {@record.chord_matrix.number_rows} rows x {@record.chord_matrix.number_columns} columns
                 </span>
+                <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
+                  {@record.chord_matrix.bpm} BPM
+                </span>
               </div>
+
+              <.form
+                for={@bpm_form}
+                id="matrix-bpm-form"
+                phx-submit="update_bpm"
+                class="mt-3 flex flex-wrap items-end gap-2"
+              >
+                <.input
+                  field={@bpm_form[:bpm]}
+                  type="number"
+                  min="1"
+                  label="BPM"
+                  required
+                />
+
+                <button
+                  id="matrix-bpm-save"
+                  type="submit"
+                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                >
+                  Save BPM
+                </button>
+              </.form>
             </div>
 
             <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/50 p-3">
@@ -1059,6 +1114,21 @@ defmodule MenschWeb.ChordMatrixShowLive do
   end
 
   defp parse_non_negative_integer(_value), do: {:error, :invalid_integer}
+
+  defp parse_positive_integer(value) when is_integer(value) and value > 0, do: {:ok, value}
+
+  defp parse_positive_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, ""} when number > 0 -> {:ok, number}
+      _ -> {:error, :invalid_integer}
+    end
+  end
+
+  defp parse_positive_integer(_value), do: {:error, :invalid_integer}
+
+  defp bpm_form(value) do
+    to_form(%{"bpm" => to_string(value)}, as: :chord_matrix)
+  end
 
   defp ensure_selected_pad_in_bounds(nil, _row, _column), do: {:error, :invalid_record}
 

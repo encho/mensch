@@ -6,7 +6,7 @@ defmodule Mensch.Harmony.ChordMatrix do
   alias Mensch.Harmony.ChordSpec
 
   @enforce_keys [:number_rows, :number_columns]
-  defstruct [:number_rows, :number_columns, assignments: %{}]
+  defstruct [:number_rows, :number_columns, bpm: 120, assignments: %{}]
 
   @type pad_key :: {non_neg_integer(), non_neg_integer()}
 
@@ -22,6 +22,7 @@ defmodule Mensch.Harmony.ChordMatrix do
   @type t :: %__MODULE__{
           number_rows: pos_integer(),
           number_columns: pos_integer(),
+          bpm: pos_integer(),
           assignments: %{optional(pad_key()) => pad_assignment()}
         }
 
@@ -35,6 +36,7 @@ defmodule Mensch.Harmony.ChordMatrix do
 
     with {:ok, number_rows} <- parse_positive_integer(Map.get(attrs_map, :number_rows)),
          {:ok, number_columns} <- parse_positive_integer(Map.get(attrs_map, :number_columns)),
+         {:ok, bpm} <- parse_positive_integer(Map.get(attrs_map, :bpm, 120)),
          {:ok, assignments} <-
            parse_assignments(
              Map.get(attrs_map, :assignments, %{}),
@@ -45,6 +47,7 @@ defmodule Mensch.Harmony.ChordMatrix do
        %__MODULE__{
          number_rows: number_rows,
          number_columns: number_columns,
+         bpm: bpm,
          assignments: assignments
        }}
     end
@@ -114,6 +117,17 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   def assignment_at(_chord_matrix, _row, _column), do: nil
+
+  @spec set_bpm(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def set_bpm(%__MODULE__{} = chord_matrix, bpm) do
+    with {:ok, normalized_bpm} <- parse_positive_integer(bpm) do
+      {:ok, %__MODULE__{chord_matrix | bpm: normalized_bpm}}
+    else
+      {:error, :invalid_dimension} -> {:error, :invalid_bpm}
+    end
+  end
+
+  def set_bpm(_chord_matrix, _bpm), do: {:error, :invalid_bpm}
 
   @spec insert_row_before(t(), integer()) :: {:ok, t()} | {:error, term()}
   def insert_row_before(%__MODULE__{} = chord_matrix, row_index) do
