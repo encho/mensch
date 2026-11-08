@@ -83,8 +83,6 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
 
     assignment = persisted_after_assign.chord_matrix.assignments[{0, 0}]
     assert assignment != nil
-    assert assignment.source_progression_id == progression_record.id
-    assert assignment.source_chord_index == 1
     assert ChordSpec.root(assignment.chord_spec) == :g
 
     view

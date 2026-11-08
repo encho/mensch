@@ -5,19 +5,19 @@ defmodule Mensch.Harmony.ChordMatrix do
 
   alias Mensch.Harmony.ChordSpec
 
+  defmodule Pad do
+    @enforce_keys [:chord_spec]
+    defstruct [:chord_spec]
+
+    @type t :: %__MODULE__{chord_spec: ChordSpec.t()}
+  end
+
   @enforce_keys [:number_rows, :number_columns]
   defstruct [:number_rows, :number_columns, bpm: 120, assignments: %{}]
 
   @type pad_key :: {non_neg_integer(), non_neg_integer()}
 
-  @type pad_assignment :: %{
-          row: non_neg_integer(),
-          column: non_neg_integer(),
-          chord_spec: ChordSpec.t(),
-          source_progression_id: String.t(),
-          source_progression_name: String.t(),
-          source_chord_index: non_neg_integer()
-        }
+  @type pad_assignment :: Pad.t()
 
   @type t :: %__MODULE__{
           number_rows: pos_integer(),
@@ -67,29 +67,18 @@ defmodule Mensch.Harmony.ChordMatrix do
         row,
         column,
         %ChordSpec{} = chord_spec,
-        %{} = source
+        %{} = _source
       ) do
     with {:ok, normalized_row} <- parse_non_negative_integer(row),
          {:ok, normalized_column} <- parse_non_negative_integer(column),
-         :ok <- ensure_in_bounds(chord_matrix, normalized_row, normalized_column),
-         {:ok, assignment} <-
-           parse_assignment(
-             %{
-               row: normalized_row,
-               column: normalized_column,
-               chord_spec: chord_spec,
-               source_progression_id: Map.get(source, :source_progression_id),
-               source_progression_name: Map.get(source, :source_progression_name),
-               source_chord_index: Map.get(source, :source_chord_index)
-             },
-             chord_matrix.number_rows,
-             chord_matrix.number_columns
-           ) do
+         :ok <- ensure_in_bounds(chord_matrix, normalized_row, normalized_column) do
       {:ok,
        %__MODULE__{
          chord_matrix
          | assignments:
-             Map.put(chord_matrix.assignments, {normalized_row, normalized_column}, assignment)
+             Map.put(chord_matrix.assignments, {normalized_row, normalized_column}, %Pad{
+               chord_spec: chord_spec
+             })
        }}
     end
   end
@@ -167,8 +156,7 @@ defmodule Mensch.Harmony.ChordMatrix do
                  acc
 
                {{row, column}, assignment}, acc when row > normalized_row_index ->
-                 updated_assignment = %{assignment | row: row - 1}
-                 Map.put(acc, {row - 1, column}, updated_assignment)
+                 Map.put(acc, {row - 1, column}, assignment)
 
                {{row, column}, assignment}, acc ->
                  Map.put(acc, {row, column}, assignment)
@@ -218,8 +206,7 @@ defmodule Mensch.Harmony.ChordMatrix do
                  acc
 
                {{row, column}, assignment}, acc when column > normalized_column_index ->
-                 updated_assignment = %{assignment | column: column - 1}
-                 Map.put(acc, {row, column - 1}, updated_assignment)
+                 Map.put(acc, {row, column - 1}, assignment)
 
                {{row, column}, assignment}, acc ->
                  Map.put(acc, {row, column}, assignment)
@@ -315,8 +302,7 @@ defmodule Mensch.Harmony.ChordMatrix do
     shifted_assignments =
       Enum.reduce(chord_matrix.assignments, %{}, fn
         {{row, column}, assignment}, acc when row >= start_index ->
-          updated_assignment = %{assignment | row: row + delta}
-          Map.put(acc, {row + delta, column}, updated_assignment)
+          Map.put(acc, {row + delta, column}, assignment)
 
         {{row, column}, assignment}, acc ->
           Map.put(acc, {row, column}, assignment)
@@ -329,8 +315,7 @@ defmodule Mensch.Harmony.ChordMatrix do
     shifted_assignments =
       Enum.reduce(chord_matrix.assignments, %{}, fn
         {{row, column}, assignment}, acc when column >= start_index ->
-          updated_assignment = %{assignment | column: column + delta}
-          Map.put(acc, {row, column + delta}, updated_assignment)
+          Map.put(acc, {row, column + delta}, assignment)
 
         {{row, column}, assignment}, acc ->
           Map.put(acc, {row, column}, assignment)
@@ -343,12 +328,10 @@ defmodule Mensch.Harmony.ChordMatrix do
     swapped_assignments =
       Enum.reduce(chord_matrix.assignments, %{}, fn
         {{row, column}, assignment}, acc when row == row_a ->
-          updated_assignment = %{assignment | row: row_b}
-          Map.put(acc, {row_b, column}, updated_assignment)
+          Map.put(acc, {row_b, column}, assignment)
 
         {{row, column}, assignment}, acc when row == row_b ->
-          updated_assignment = %{assignment | row: row_a}
-          Map.put(acc, {row_a, column}, updated_assignment)
+          Map.put(acc, {row_a, column}, assignment)
 
         {{row, column}, assignment}, acc ->
           Map.put(acc, {row, column}, assignment)
@@ -361,12 +344,10 @@ defmodule Mensch.Harmony.ChordMatrix do
     swapped_assignments =
       Enum.reduce(chord_matrix.assignments, %{}, fn
         {{row, column}, assignment}, acc when column == column_a ->
-          updated_assignment = %{assignment | column: column_b}
-          Map.put(acc, {row, column_b}, updated_assignment)
+          Map.put(acc, {row, column_b}, assignment)
 
         {{row, column}, assignment}, acc when column == column_b ->
-          updated_assignment = %{assignment | column: column_a}
-          Map.put(acc, {row, column_a}, updated_assignment)
+          Map.put(acc, {row, column_a}, assignment)
 
         {{row, column}, assignment}, acc ->
           Map.put(acc, {row, column}, assignment)
@@ -378,9 +359,11 @@ defmodule Mensch.Harmony.ChordMatrix do
   defp parse_assignments(assignments, number_rows, number_columns) when is_map(assignments) do
     Enum.reduce_while(assignments, {:ok, %{}}, fn {key, value}, {:ok, acc} ->
       with {:ok, {row, column}} <- parse_pad_key(key),
-           {:ok, assignment} <- parse_assignment(value, number_rows, number_columns) do
+           true <- row < number_rows and column < number_columns,
+           {:ok, assignment} <- parse_assignment(value) do
         {:cont, {:ok, Map.put(acc, {row, column}, assignment)}}
       else
+        false -> {:halt, {:error, :out_of_bounds}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
@@ -398,45 +381,16 @@ defmodule Mensch.Harmony.ChordMatrix do
 
   defp parse_pad_key(_key), do: {:error, :invalid_assignment_key}
 
-  defp parse_assignment(value, number_rows, number_columns) when is_map(value) do
-    with {:ok, row} <- parse_non_negative_integer(Map.get(value, :row)),
-         {:ok, column} <- parse_non_negative_integer(Map.get(value, :column)),
-         true <- row < number_rows and column < number_columns,
-         %ChordSpec{} = chord_spec <- Map.get(value, :chord_spec),
-         {:ok, source_progression_id} <-
-           parse_non_empty_string(Map.get(value, :source_progression_id)),
-         {:ok, source_progression_name} <-
-           parse_non_empty_string(Map.get(value, :source_progression_name)),
-         {:ok, source_chord_index} <-
-           parse_non_negative_integer(Map.get(value, :source_chord_index)) do
-      {:ok,
-       %{
-         row: row,
-         column: column,
-         chord_spec: chord_spec,
-         source_progression_id: source_progression_id,
-         source_progression_name: source_progression_name,
-         source_chord_index: source_chord_index
-       }}
-    else
-      false -> {:error, :out_of_bounds}
-      nil -> {:error, :invalid_assignment}
-      {:error, reason} -> {:error, reason}
-      _other -> {:error, :invalid_assignment}
+  defp parse_assignment(%Pad{chord_spec: %ChordSpec{} = chord_spec}) do
+    {:ok, %Pad{chord_spec: chord_spec}}
+  end
+
+  defp parse_assignment(%{} = value) do
+    case Map.get(value, :chord_spec) do
+      %ChordSpec{} = chord_spec -> {:ok, %Pad{chord_spec: chord_spec}}
+      _ -> {:error, :invalid_assignment}
     end
   end
 
-  defp parse_assignment(_value, _number_rows, _number_columns), do: {:error, :invalid_assignment}
-
-  defp parse_non_empty_string(value) when is_binary(value) do
-    trimmed = String.trim(value)
-
-    if trimmed == "" do
-      {:error, :invalid_assignment}
-    else
-      {:ok, trimmed}
-    end
-  end
-
-  defp parse_non_empty_string(_value), do: {:error, :invalid_assignment}
+  defp parse_assignment(_value), do: {:error, :invalid_assignment}
 end

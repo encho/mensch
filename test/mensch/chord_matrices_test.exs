@@ -29,7 +29,7 @@ defmodule Mensch.ChordMatricesTest do
     :ok
   end
 
-  test "assign_chord_to_pad persists assignment metadata and chord snapshot" do
+  test "assign_chord_to_pad persists pad chord snapshot" do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
     assert matrix_record.chord_matrix.bpm == 120
 
@@ -50,15 +50,11 @@ defmodule Mensch.ChordMatricesTest do
 
     assert %ChordSpec{} = assignment.chord_spec
     assert ChordSpec.root(assignment.chord_spec) == :c
-    assert assignment.source_progression_id == "ii_v_i"
-    assert assignment.source_progression_name == "II V I"
-    assert assignment.source_chord_index == 2
 
     assert {:ok, reloaded_record} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
     reloaded_assignment = reloaded_record.chord_matrix.assignments[{0, 1}]
 
     assert ChordSpec.root(reloaded_assignment.chord_spec) == :c
-    assert reloaded_assignment.source_progression_id == "ii_v_i"
   end
 
   test "clear_pad_assignment removes assignment from matrix" do

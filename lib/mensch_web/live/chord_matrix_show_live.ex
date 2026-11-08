@@ -824,12 +824,6 @@ defmodule MenschWeb.ChordMatrixShowLive do
                         <p class="font-mono text-xs text-zinc-200">
                           {ChordSpec.symbol_label(assignment.chord_spec)}
                         </p>
-                        <p class="font-mono text-[11px] text-zinc-400">
-                          from {assignment.source_progression_name}
-                        </p>
-                        <p class="font-mono text-[11px] text-zinc-500">
-                          chord #{assignment.source_chord_index + 1}
-                        </p>
                       </div>
 
                       <button
@@ -1365,14 +1359,14 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
   defp count_assignments_in_row(record, row_index) do
     record.chord_matrix.assignments
-    |> Map.values()
-    |> Enum.count(&(&1.row == row_index))
+    |> Map.keys()
+    |> Enum.count(fn {row, _column} -> row == row_index end)
   end
 
   defp count_assignments_in_column(record, column_index) do
     record.chord_matrix.assignments
-    |> Map.values()
-    |> Enum.count(&(&1.column == column_index))
+    |> Map.keys()
+    |> Enum.count(fn {_row, column} -> column == column_index end)
   end
 
   defp play_notes_for_3s(socket, notes, source_label \\ "Previewing chord") do

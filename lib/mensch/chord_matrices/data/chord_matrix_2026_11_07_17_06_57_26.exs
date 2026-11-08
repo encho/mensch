@@ -1,13 +1,12 @@
 %{
   id: "chord_matrix_2026_11_07_17_06_57_26",
-  version: 2,
+  version: 3,
   chord_matrix: %Mensch.Harmony.ChordMatrix{
     number_rows: 3,
     number_columns: 8,
+    bpm: 120,
     assignments: %{
-      {0, 0} => %{
-        column: 0,
-        row: 0,
+      {0, 0} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -27,14 +26,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "251",
-        source_progression_name: "251",
-        source_chord_index: 0
+        }
       },
-      {0, 1} => %{
-        column: 1,
-        row: 0,
+      {0, 1} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :g,
@@ -54,14 +48,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "251",
-        source_progression_name: "251",
-        source_chord_index: 1
+        }
       },
-      {0, 2} => %{
-        column: 2,
-        row: 0,
+      {0, 2} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :c,
@@ -81,14 +70,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "251",
-        source_progression_name: "251",
-        source_chord_index: 2
+        }
       },
-      {0, 7} => %{
-        column: 7,
-        row: 0,
+      {0, 7} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -108,14 +92,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "251",
-        source_progression_name: "251",
-        source_chord_index: 0
+        }
       },
-      {1, 0} => %{
-        column: 0,
-        row: 1,
+      {1, 0} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :c,
@@ -135,14 +114,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 0
+        }
       },
-      {1, 1} => %{
-        column: 1,
-        row: 1,
+      {1, 1} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -162,14 +136,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 1
+        }
       },
-      {1, 2} => %{
-        column: 2,
-        row: 1,
+      {1, 2} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :e,
@@ -189,14 +158,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 2
+        }
       },
-      {1, 3} => %{
-        column: 3,
-        row: 1,
+      {1, 3} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :f,
@@ -216,14 +180,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 3
+        }
       },
-      {1, 4} => %{
-        column: 4,
-        row: 1,
+      {1, 4} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :g,
@@ -243,14 +202,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 4
+        }
       },
-      {1, 5} => %{
-        column: 5,
-        row: 1,
+      {1, 5} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :a,
@@ -270,14 +224,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 5
+        }
       },
-      {1, 6} => %{
-        column: 6,
-        row: 1,
+      {1, 6} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :b,
@@ -297,14 +246,9 @@
           },
           min_voice_count: 5,
           foreign_bass: nil
-        },
-        source_progression_id: "hello_1",
-        source_progression_name: "hello 1",
-        source_chord_index: 6
+        }
       },
-      {1, 7} => %{
-        column: 7,
-        row: 1,
+      {1, 7} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :g,
@@ -324,14 +268,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "251",
-        source_progression_name: "251",
-        source_chord_index: 1
+        }
       },
-      {2, 0} => %{
-        column: 0,
-        row: 2,
+      {2, 0} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -351,14 +290,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "dddd",
-        source_progression_name: "dddd",
-        source_chord_index: 0
+        }
       },
-      {2, 1} => %{
-        column: 1,
-        row: 2,
+      {2, 1} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :d,
@@ -378,14 +312,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "adfs",
-        source_progression_name: "adfs",
-        source_chord_index: 1
+        }
       },
-      {2, 2} => %{
-        column: 2,
-        row: 2,
+      {2, 2} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :e,
@@ -405,14 +334,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "adfs",
-        source_progression_name: "adfs",
-        source_chord_index: 2
+        }
       },
-      {2, 3} => %{
-        column: 3,
-        row: 2,
+      {2, 3} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :f,
@@ -432,14 +356,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "adfs",
-        source_progression_name: "adfs",
-        source_chord_index: 3
+        }
       },
-      {2, 4} => %{
-        column: 4,
-        row: 2,
+      {2, 4} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :g,
@@ -459,14 +378,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "adfs",
-        source_progression_name: "adfs",
-        source_chord_index: 4
+        }
       },
-      {2, 5} => %{
-        column: 5,
-        row: 2,
+      {2, 5} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :a,
@@ -486,14 +400,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "adfs",
-        source_progression_name: "adfs",
-        source_chord_index: 5
+        }
       },
-      {2, 6} => %{
-        column: 6,
-        row: 2,
+      {2, 6} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :b,
@@ -513,14 +422,9 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "adfs",
-        source_progression_name: "adfs",
-        source_chord_index: 6
+        }
       },
-      {2, 7} => %{
-        column: 7,
-        row: 2,
+      {2, 7} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
             root: :c,
@@ -540,13 +444,10 @@
           },
           min_voice_count: 3,
           foreign_bass: nil
-        },
-        source_progression_id: "251",
-        source_progression_name: "251",
-        source_chord_index: 2
+        }
       }
     }
   },
-  updated_at: "2026-11-08T10:53:14Z",
+  updated_at: "2026-11-08T15:14:23Z",
   inserted_at: "2026-11-07T17:06:57Z"
 }
