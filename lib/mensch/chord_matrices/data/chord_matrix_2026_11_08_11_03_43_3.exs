@@ -1,23 +1,24 @@
 %{
   id: "chord_matrix_2026_11_08_11_03_43_3",
-  version: 3,
+  version: 4,
   chord_matrix: %Mensch.Harmony.ChordMatrix{
     number_rows: 8,
     number_columns: 8,
     bpm: 100,
+    time_signature: {4, 4},
     assignments: %{
       {0, 1} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
           harmonic_identity: %Mensch.Harmony.ChordSpec.HarmonicIdentity{
-            root: :d,
-            quality: :min,
+            root: :f_sharp,
+            quality: :maj,
             foreign_bass: nil
           },
-          octave: 2,
+          octave: 3,
           inversion: 0,
           voicing: %Mensch.Harmony.ChordSpec.Voicing{
             type: :close,
-            center_note: 48,
+            center_note: 66,
             range_min: nil,
             range_max: nil,
             voice_count: nil,
@@ -338,6 +339,6 @@
       }
     }
   },
-  updated_at: "2026-11-08T15:15:04Z",
+  updated_at: "2026-11-08T15:25:48Z",
   inserted_at: "2026-11-08T11:03:43Z"
 }

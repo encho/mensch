@@ -1,10 +1,11 @@
 %{
   id: "chord_matrix_2026_11_07_17_06_57_26",
-  version: 3,
+  version: 4,
   chord_matrix: %Mensch.Harmony.ChordMatrix{
     number_rows: 3,
     number_columns: 8,
     bpm: 120,
+    time_signature: {4, 4},
     assignments: %{
       {0, 0} => %Mensch.Harmony.ChordMatrix.Pad{
         chord_spec: %Mensch.Harmony.ChordSpec{
@@ -448,6 +449,6 @@
       }
     }
   },
-  updated_at: "2026-11-08T15:14:23Z",
-  inserted_at: "2026-11-07T17:06:57Z"
+  inserted_at: "2026-11-07T17:06:57Z",
+  updated_at: "2026-11-08T15:24:06Z"
 }

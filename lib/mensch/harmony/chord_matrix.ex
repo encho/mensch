@@ -12,8 +12,16 @@ defmodule Mensch.Harmony.ChordMatrix do
     @type t :: %__MODULE__{chord_spec: ChordSpec.t()}
   end
 
+  @default_time_signature {4, 4}
+
   @enforce_keys [:number_rows, :number_columns]
-  defstruct [:number_rows, :number_columns, bpm: 120, assignments: %{}]
+  defstruct [
+    :number_rows,
+    :number_columns,
+    bpm: 120,
+    time_signature: @default_time_signature,
+    assignments: %{}
+  ]
 
   @type pad_key :: {non_neg_integer(), non_neg_integer()}
 
@@ -23,6 +31,7 @@ defmodule Mensch.Harmony.ChordMatrix do
           number_rows: pos_integer(),
           number_columns: pos_integer(),
           bpm: pos_integer(),
+          time_signature: {pos_integer(), pos_integer()},
           assignments: %{optional(pad_key()) => pad_assignment()}
         }
 
@@ -37,6 +46,8 @@ defmodule Mensch.Harmony.ChordMatrix do
     with {:ok, number_rows} <- parse_positive_integer(Map.get(attrs_map, :number_rows)),
          {:ok, number_columns} <- parse_positive_integer(Map.get(attrs_map, :number_columns)),
          {:ok, bpm} <- parse_positive_integer(Map.get(attrs_map, :bpm, 120)),
+         {:ok, time_signature} <-
+           parse_time_signature(Map.get(attrs_map, :time_signature, @default_time_signature)),
          {:ok, assignments} <-
            parse_assignments(
              Map.get(attrs_map, :assignments, %{}),
@@ -48,6 +59,7 @@ defmodule Mensch.Harmony.ChordMatrix do
          number_rows: number_rows,
          number_columns: number_columns,
          bpm: bpm,
+         time_signature: time_signature,
          assignments: assignments
        }}
     end
@@ -117,6 +129,17 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   def set_bpm(_chord_matrix, _bpm), do: {:error, :invalid_bpm}
+
+  @spec set_time_signature(t(), {integer(), integer()}) :: {:ok, t()} | {:error, term()}
+  def set_time_signature(%__MODULE__{} = chord_matrix, time_signature) do
+    with {:ok, normalized_time_signature} <- parse_time_signature(time_signature) do
+      {:ok, %__MODULE__{chord_matrix | time_signature: normalized_time_signature}}
+    else
+      {:error, :invalid_time_signature} -> {:error, :invalid_time_signature}
+    end
+  end
+
+  def set_time_signature(_chord_matrix, _time_signature), do: {:error, :invalid_time_signature}
 
   @spec insert_row_before(t(), integer()) :: {:ok, t()} | {:error, term()}
   def insert_row_before(%__MODULE__{} = chord_matrix, row_index) do
@@ -273,6 +296,17 @@ defmodule Mensch.Harmony.ChordMatrix do
   defp parse_non_negative_integer(value) when is_integer(value) and value >= 0, do: {:ok, value}
 
   defp parse_non_negative_integer(_value), do: {:error, :invalid_coordinate}
+
+  defp parse_time_signature({num, den}) do
+    with {:ok, parsed_num} <- parse_positive_integer(num),
+         {:ok, parsed_den} <- parse_positive_integer(den) do
+      {:ok, {parsed_num, parsed_den}}
+    else
+      {:error, :invalid_dimension} -> {:error, :invalid_time_signature}
+    end
+  end
+
+  defp parse_time_signature(_value), do: {:error, :invalid_time_signature}
 
   defp ensure_in_bounds(%__MODULE__{} = chord_matrix, row, column) do
     if row < chord_matrix.number_rows and column < chord_matrix.number_columns do

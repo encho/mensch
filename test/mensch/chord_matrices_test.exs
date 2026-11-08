@@ -32,6 +32,7 @@ defmodule Mensch.ChordMatricesTest do
   test "assign_chord_to_pad persists pad chord snapshot" do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
     assert matrix_record.chord_matrix.bpm == 120
+    assert matrix_record.chord_matrix.time_signature == {4, 4}
 
     assert {:ok, updated_record} =
              ChordMatrices.assign_chord_to_pad(
@@ -99,6 +100,7 @@ defmodule Mensch.ChordMatricesTest do
     assert loaded.chord_matrix.number_rows == 3
     assert loaded.chord_matrix.number_columns == 4
     assert loaded.chord_matrix.bpm == 120
+    assert loaded.chord_matrix.time_signature == {4, 4}
     assert loaded.chord_matrix.assignments == %{}
   end
 
@@ -113,6 +115,20 @@ defmodule Mensch.ChordMatricesTest do
     assert reloaded_record.chord_matrix.bpm == 144
 
     assert {:error, :invalid_bpm} = ChordMatrices.update_bpm(matrix_record.id, 0)
+  end
+
+  test "update_time_signature persists valid values and rejects invalid values" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+    assert matrix_record.chord_matrix.time_signature == {4, 4}
+
+    assert {:ok, updated_record} = ChordMatrices.update_time_signature(matrix_record.id, {7, 8})
+    assert updated_record.chord_matrix.time_signature == {7, 8}
+
+    assert {:ok, reloaded_record} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert reloaded_record.chord_matrix.time_signature == {7, 8}
+
+    assert {:error, :invalid_time_signature} =
+             ChordMatrices.update_time_signature(matrix_record.id, {0, 4})
   end
 
   test "insert and remove row shifts assignments as expected" do

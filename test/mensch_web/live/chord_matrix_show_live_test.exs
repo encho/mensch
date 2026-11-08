@@ -128,6 +128,43 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert persisted.chord_matrix.bpm == 120
   end
 
+  test "shows default time signature and allows updating it", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    assert render(view) =~ "TS 4/4"
+
+    view
+    |> form("#matrix-time-signature-form", %{
+      "chord_matrix" => %{"time_signature_numerator" => "7", "time_signature_denominator" => "8"}
+    })
+    |> render_submit()
+
+    assert render(view) =~ "Time signature updated"
+    assert render(view) =~ "TS 7/8"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.time_signature == {7, 8}
+  end
+
+  test "rejects invalid time signature updates", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> form("#matrix-time-signature-form", %{
+      "chord_matrix" => %{"time_signature_numerator" => "0", "time_signature_denominator" => "4"}
+    })
+    |> render_submit()
+
+    assert render(view) =~ "Time signature must be positive integers"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.time_signature == {4, 4}
+  end
+
   test "toggles global matrix play mode", %{conn: conn} do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(1, 1)
 

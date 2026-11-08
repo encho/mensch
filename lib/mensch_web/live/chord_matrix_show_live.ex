@@ -24,6 +24,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
      |> assign(:bpm_form, to_form(%{"bpm" => "120"}, as: :chord_matrix))
+     |> assign(:time_signature_form, time_signature_form({4, 4}))
      |> assign(:bulk_assign_confirm, nil)
      |> assign(:preview_note_channels, [])
      |> assign(:preview_stop_ref, nil)}
@@ -37,6 +38,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
          socket
          |> assign(:record, record)
          |> assign(:bpm_form, bpm_form(record.chord_matrix.bpm))
+         |> assign(:time_signature_form, time_signature_form(record.chord_matrix.time_signature))
          |> assign_keyboard_from_selected_pad()}
 
       {:error, :not_found} ->
@@ -116,6 +118,51 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to update BPM: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event(
+        "update_time_signature",
+        %{
+          "chord_matrix" => %{
+            "time_signature_numerator" => num,
+            "time_signature_denominator" => den
+          }
+        },
+        socket
+      ) do
+    with {:ok, parsed_num} <- parse_positive_integer(num),
+         {:ok, parsed_den} <- parse_positive_integer(den),
+         {:ok, record} <-
+           ChordMatrices.update_time_signature(socket.assigns.record.id, {parsed_num, parsed_den}) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:time_signature_form, time_signature_form(record.chord_matrix.time_signature))
+       |> put_flash(:info, "Time signature updated")}
+    else
+      {:error, :invalid_integer} ->
+        {:noreply,
+         socket
+         |> assign(
+           :time_signature_form,
+           time_signature_form(%{"numerator" => num, "denominator" => den})
+         )
+         |> put_flash(:error, "Time signature must be positive integers")}
+
+      {:error, :invalid_time_signature} ->
+        {:noreply,
+         socket
+         |> assign(
+           :time_signature_form,
+           time_signature_form(%{"numerator" => num, "denominator" => den})
+         )
+         |> put_flash(:error, "Time signature must be positive integers")}
+
+      {:error, reason} ->
+        {:noreply,
+         put_flash(socket, :error, "Failed to update time signature: #{inspect(reason)}")}
     end
   end
 
@@ -520,30 +567,69 @@ defmodule MenschWeb.ChordMatrixShowLive do
                 <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
                   {@record.chord_matrix.bpm} BPM
                 </span>
+                <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
+                  TS {elem(@record.chord_matrix.time_signature, 0)}/{elem(
+                    @record.chord_matrix.time_signature,
+                    1
+                  )}
+                </span>
               </div>
 
-              <.form
-                for={@bpm_form}
-                id="matrix-bpm-form"
-                phx-submit="update_bpm"
-                class="mt-3 flex flex-wrap items-end gap-2"
-              >
-                <.input
-                  field={@bpm_form[:bpm]}
-                  type="number"
-                  min="1"
-                  label="BPM"
-                  required
-                />
-
-                <button
-                  id="matrix-bpm-save"
-                  type="submit"
-                  class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+              <div class="mt-3 flex flex-wrap items-end gap-4">
+                <.form
+                  for={@bpm_form}
+                  id="matrix-bpm-form"
+                  phx-submit="update_bpm"
+                  class="flex flex-wrap items-end gap-2"
                 >
-                  Save BPM
-                </button>
-              </.form>
+                  <.input
+                    field={@bpm_form[:bpm]}
+                    type="number"
+                    min="1"
+                    label="BPM"
+                    required
+                  />
+
+                  <button
+                    id="matrix-bpm-save"
+                    type="submit"
+                    class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                  >
+                    Save BPM
+                  </button>
+                </.form>
+
+                <.form
+                  for={@time_signature_form}
+                  id="matrix-time-signature-form"
+                  phx-submit="update_time_signature"
+                  class="flex flex-wrap items-end gap-2"
+                >
+                  <.input
+                    field={@time_signature_form[:time_signature_numerator]}
+                    type="number"
+                    min="1"
+                    label="Time Sig Numerator"
+                    required
+                  />
+
+                  <.input
+                    field={@time_signature_form[:time_signature_denominator]}
+                    type="number"
+                    min="1"
+                    label="Time Sig Denominator"
+                    required
+                  />
+
+                  <button
+                    id="matrix-time-signature-save"
+                    type="submit"
+                    class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                  >
+                    Save Time Signature
+                  </button>
+                </.form>
+              </div>
             </div>
 
             <div class="rounded-sm border border-zinc-700/70 bg-zinc-950/50 p-3">
@@ -1125,6 +1211,26 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
   defp bpm_form(value) do
     to_form(%{"bpm" => to_string(value)}, as: :chord_matrix)
+  end
+
+  defp time_signature_form({num, den}) do
+    to_form(
+      %{
+        "time_signature_numerator" => to_string(num),
+        "time_signature_denominator" => to_string(den)
+      },
+      as: :chord_matrix
+    )
+  end
+
+  defp time_signature_form(%{"numerator" => num, "denominator" => den}) do
+    to_form(
+      %{
+        "time_signature_numerator" => to_string(num),
+        "time_signature_denominator" => to_string(den)
+      },
+      as: :chord_matrix
+    )
   end
 
   defp ensure_selected_pad_in_bounds(nil, _row, _column), do: {:error, :invalid_record}
