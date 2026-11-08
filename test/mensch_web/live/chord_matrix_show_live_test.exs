@@ -128,6 +128,39 @@ defmodule MenschWeb.ChordMatrixShowLiveTest do
     assert persisted.chord_matrix.bpm == 120
   end
 
+  test "shows default duration and allows updating it", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    assert render(view) =~ "4000 mbeats"
+
+    view
+    |> form("#matrix-duration-form", %{"chord_matrix" => %{"duration_mbeats" => "6000"}})
+    |> render_submit()
+
+    assert render(view) =~ "Duration updated"
+    assert render(view) =~ "6000 mbeats"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.duration_mbeats == 6000
+  end
+
+  test "rejects invalid duration updates", %{conn: conn} do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/chord-matrix/#{matrix_record.id}")
+
+    view
+    |> form("#matrix-duration-form", %{"chord_matrix" => %{"duration_mbeats" => "0"}})
+    |> render_submit()
+
+    assert render(view) =~ "Duration must be a positive integer"
+
+    assert {:ok, persisted} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert persisted.chord_matrix.duration_mbeats == 4000
+  end
+
   test "shows default time signature and allows updating it", %{conn: conn} do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
 

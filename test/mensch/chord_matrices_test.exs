@@ -33,6 +33,7 @@ defmodule Mensch.ChordMatricesTest do
   test "assign_chord_to_pad persists pad chord snapshot" do
     assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
     assert matrix_record.chord_matrix.bpm == 120
+    assert matrix_record.chord_matrix.duration_mbeats == 4000
     assert matrix_record.chord_matrix.time_signature == {4, 4}
 
     assert matrix_record.chord_matrix.machine.blueprint_id ==
@@ -106,6 +107,7 @@ defmodule Mensch.ChordMatricesTest do
     assert loaded.chord_matrix.number_rows == 3
     assert loaded.chord_matrix.number_columns == 4
     assert loaded.chord_matrix.bpm == 120
+    assert loaded.chord_matrix.duration_mbeats == 4000
     assert loaded.chord_matrix.time_signature == {4, 4}
     assert loaded.chord_matrix.assignments == %{}
   end
@@ -135,6 +137,20 @@ defmodule Mensch.ChordMatricesTest do
 
     assert {:error, :invalid_time_signature} =
              ChordMatrices.update_time_signature(matrix_record.id, {0, 4})
+  end
+
+  test "update_duration_mbeats persists valid values and rejects invalid values" do
+    assert {:ok, matrix_record} = ChordMatrices.create_chord_matrix(2, 2)
+    assert matrix_record.chord_matrix.duration_mbeats == 4000
+
+    assert {:ok, updated_record} = ChordMatrices.update_duration_mbeats(matrix_record.id, 8000)
+    assert updated_record.chord_matrix.duration_mbeats == 8000
+
+    assert {:ok, reloaded_record} = ChordMatrices.fetch_chord_matrix(matrix_record.id)
+    assert reloaded_record.chord_matrix.duration_mbeats == 8000
+
+    assert {:error, :invalid_duration_mbeats} =
+             ChordMatrices.update_duration_mbeats(matrix_record.id, 0)
   end
 
   test "update_machine persists blueprint-backed machine settings" do

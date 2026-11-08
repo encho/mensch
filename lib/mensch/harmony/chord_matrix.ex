@@ -20,6 +20,7 @@ defmodule Mensch.Harmony.ChordMatrix do
     :number_rows,
     :number_columns,
     bpm: 120,
+    duration_mbeats: 4000,
     time_signature: @default_time_signature,
     machine: @default_machine,
     assignments: %{}
@@ -33,6 +34,7 @@ defmodule Mensch.Harmony.ChordMatrix do
           number_rows: pos_integer(),
           number_columns: pos_integer(),
           bpm: pos_integer(),
+          duration_mbeats: pos_integer(),
           time_signature: {pos_integer(), pos_integer()},
           machine: %{blueprint_id: String.t(), additional_params: map()},
           assignments: %{optional(pad_key()) => pad_assignment()}
@@ -49,6 +51,8 @@ defmodule Mensch.Harmony.ChordMatrix do
     with {:ok, number_rows} <- parse_positive_integer(Map.get(attrs_map, :number_rows)),
          {:ok, number_columns} <- parse_positive_integer(Map.get(attrs_map, :number_columns)),
          {:ok, bpm} <- parse_positive_integer(Map.get(attrs_map, :bpm, 120)),
+         {:ok, duration_mbeats} <-
+           parse_positive_integer(Map.get(attrs_map, :duration_mbeats, 4000)),
          {:ok, time_signature} <-
            parse_time_signature(Map.get(attrs_map, :time_signature, @default_time_signature)),
          {:ok, machine} <- parse_machine_config(Map.get(attrs_map, :machine, @default_machine)),
@@ -63,6 +67,7 @@ defmodule Mensch.Harmony.ChordMatrix do
          number_rows: number_rows,
          number_columns: number_columns,
          bpm: bpm,
+         duration_mbeats: duration_mbeats,
          time_signature: time_signature,
          machine: machine,
          assignments: assignments
@@ -134,6 +139,17 @@ defmodule Mensch.Harmony.ChordMatrix do
   end
 
   def set_bpm(_chord_matrix, _bpm), do: {:error, :invalid_bpm}
+
+  @spec set_duration_mbeats(t(), integer()) :: {:ok, t()} | {:error, term()}
+  def set_duration_mbeats(%__MODULE__{} = chord_matrix, duration_mbeats) do
+    with {:ok, normalized_duration_mbeats} <- parse_positive_integer(duration_mbeats) do
+      {:ok, %__MODULE__{chord_matrix | duration_mbeats: normalized_duration_mbeats}}
+    else
+      {:error, :invalid_dimension} -> {:error, :invalid_duration_mbeats}
+    end
+  end
+
+  def set_duration_mbeats(_chord_matrix, _duration_mbeats), do: {:error, :invalid_duration_mbeats}
 
   @spec set_time_signature(t(), {integer(), integer()}) :: {:ok, t()} | {:error, term()}
   def set_time_signature(%__MODULE__{} = chord_matrix, time_signature) do

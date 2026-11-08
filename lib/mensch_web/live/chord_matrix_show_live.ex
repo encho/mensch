@@ -27,6 +27,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
      |> assign(:expanded_progression_ids, MapSet.new())
      |> assign(:progression_records, %{})
      |> assign(:bpm_form, to_form(%{"bpm" => "120"}, as: :chord_matrix))
+     |> assign(:duration_form, duration_form(4000))
      |> assign(:time_signature_form, time_signature_form({4, 4}))
      |> assign(:machine_settings, machine_settings)
      |> assign(:machine_schema, machine_settings_schema(machine_settings))
@@ -43,6 +44,7 @@ defmodule MenschWeb.ChordMatrixShowLive do
          socket
          |> assign(:record, record)
          |> assign(:bpm_form, bpm_form(record.chord_matrix.bpm))
+         |> assign(:duration_form, duration_form(record.chord_matrix.duration_mbeats))
          |> assign(:time_signature_form, time_signature_form(record.chord_matrix.time_signature))
          |> assign_machine_settings(record.chord_matrix.machine)
          |> assign_keyboard_from_selected_pad()}
@@ -124,6 +126,38 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to update BPM: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event(
+        "update_duration_mbeats",
+        %{"chord_matrix" => %{"duration_mbeats" => value}},
+        socket
+      ) do
+    with {:ok, parsed_duration_mbeats} <- parse_positive_integer(value),
+         {:ok, record} <-
+           ChordMatrices.update_duration_mbeats(socket.assigns.record.id, parsed_duration_mbeats) do
+      {:noreply,
+       socket
+       |> assign(:record, record)
+       |> assign(:duration_form, duration_form(record.chord_matrix.duration_mbeats))
+       |> put_flash(:info, "Duration updated")}
+    else
+      {:error, :invalid_integer} ->
+        {:noreply,
+         socket
+         |> assign(:duration_form, duration_form(value))
+         |> put_flash(:error, "Duration must be a positive integer")}
+
+      {:error, :invalid_duration_mbeats} ->
+        {:noreply,
+         socket
+         |> assign(:duration_form, duration_form(value))
+         |> put_flash(:error, "Duration must be a positive integer")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to update duration: #{inspect(reason)}")}
     end
   end
 
@@ -622,6 +656,9 @@ defmodule MenschWeb.ChordMatrixShowLive do
                   {@record.chord_matrix.bpm} BPM
                 </span>
                 <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
+                  {@record.chord_matrix.duration_mbeats} mbeats
+                </span>
+                <span class="rounded-sm border border-zinc-700/70 bg-zinc-900/70 px-2 py-1 font-mono text-xs text-zinc-100">
                   TS {elem(@record.chord_matrix.time_signature, 0)}/{elem(
                     @record.chord_matrix.time_signature,
                     1
@@ -650,6 +687,29 @@ defmodule MenschWeb.ChordMatrixShowLive do
                     class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
                   >
                     Save BPM
+                  </button>
+                </.form>
+
+                <.form
+                  for={@duration_form}
+                  id="matrix-duration-form"
+                  phx-submit="update_duration_mbeats"
+                  class="flex flex-wrap items-end gap-2"
+                >
+                  <.input
+                    field={@duration_form[:duration_mbeats]}
+                    type="number"
+                    min="1"
+                    label="Duration (mbeats)"
+                    required
+                  />
+
+                  <button
+                    id="matrix-duration-save"
+                    type="submit"
+                    class="rounded-sm border border-zinc-600 bg-zinc-900/70 px-3 py-1.5 font-mono text-xs text-zinc-100 transition-colors duration-150 hover:border-zinc-400"
+                  >
+                    Save Duration
                   </button>
                 </.form>
 
@@ -1344,6 +1404,10 @@ defmodule MenschWeb.ChordMatrixShowLive do
 
   defp bpm_form(value) do
     to_form(%{"bpm" => to_string(value)}, as: :chord_matrix)
+  end
+
+  defp duration_form(value) do
+    to_form(%{"duration_mbeats" => to_string(value)}, as: :chord_matrix)
   end
 
   defp time_signature_form({num, den}) do
